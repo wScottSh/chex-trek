@@ -1,0 +1,1480 @@
+------------------------------------------------------------------------
+r44 | zl1corvette | 2006-08-23 21:05:31 -0400 (Wed, 23 Aug 2006) | 9 lines
+Changed paths:
+   M /maps/office.bak
+   M /maps/office.map
+   M /materials/chex_tex.mtr
+
+messed with the reception type area some.
+There's gonna be a level overlooking the lowest that's kinda just
+a place to hang out.  I'll probably try to fix a restroom
+and fastfood joint in.  There will be a desk in front of the fountain
+when you come up the main elevator.  The doors to the landing bays will be
+locked, when you come back from storagefacility you land on one of the pads
+to go to the big meeting.  Next to the main elevator will be two other
+elevators that actually service the building.  Thats the plan for now.
+
+------------------------------------------------------------------------
+r43 | stoney | 2006-08-22 16:35:23 -0400 (Tue, 22 Aug 2006) | 1 line
+Changed paths:
+   M /materials/chex_models.mtr
+   M /models/chex/chexguy/jumpsuit_h.tga
+   M /models/chex/chexian_armor_d.tga
+   A /models/chex/chexian_armor_h.tga
+
+
+------------------------------------------------------------------------
+r42 | zl1corvette | 2006-08-20 17:25:32 -0400 (Sun, 20 Aug 2006) | 4 lines
+Changed paths:
+   M /corvette_notes.txt
+   M /def/items.def
+   M /maps/testcam.map
+   M /materials/chex_models.mtr
+   D /models/chex/bootspoon.ase
+   D /models/chex/chexian_armor.ASE
+   A /models/chex/chexian_armor.ase
+
+Here be ur changes Stoney!
+
+materials for models!
+
+------------------------------------------------------------------------
+r41 | zl1corvette | 2006-08-19 19:26:27 -0400 (Sat, 19 Aug 2006) | 2 lines
+Changed paths:
+   M /gamex86.dll
+   M /guis/hud.gui
+   A /guis/pda_chex.gui
+   M /guis/temp.guied
+   M /materials/chex_gui.mtr
+   M /materials/chex_models.mtr
+   M /models/chex/fountain/water_local.tga
+   A /textures/chex/guis/card.tga
+   A /textures/chex/guis/dduser.tga
+
+Changes to the CDA & Hud Maps
+
+------------------------------------------------------------------------
+r40 | stoney | 2006-08-18 23:30:14 -0400 (Fri, 18 Aug 2006) | 2 lines
+Changed paths:
+   M /def/weapon_fists.def
+   M /sound/chex/cly_death1.wav
+   M /sound/chex/flemoid_death1.wav
+   M /sound/chex/flemoid_death2.wav
+   A /sound/chex/weapons/spoon/raise.wav
+   M /sound/chex_snd.sndshd
+   A /sound/chex_weapons.sndshd
+
+messed wit more sounds
+
+------------------------------------------------------------------------
+r39 | stoney | 2006-08-18 22:17:00 -0400 (Fri, 18 Aug 2006) | 5 lines
+Changed paths:
+   A /env/Blood Sport.txt
+   A /env/bazoik_surface_back.tga
+   A /env/bazoik_surface_down.tga
+   A /env/bazoik_surface_forward.tga
+   A /env/bazoik_surface_left.tga
+   A /env/bazoik_surface_right.tga
+   A /env/bazoik_surface_up.tga
+   A /env/space_flying_back.tga
+   A /env/space_flying_down.tga
+   A /env/space_flying_forward.tga
+   A /env/space_flying_left.tga
+   A /env/space_flying_right.tga
+   A /env/space_flying_up.tga
+   M /materials/chex_sky.mtr
+   A /models/chex/chexguy
+   A /models/chex/chexguy/jumpsuit_chex.tga
+   A /models/chex/chexguy/jumpsuit_h.tga
+   A /models/chex/chexguy/jumpsuit_local.tga
+   A /models/chex/chexguy/jumpsuit_s.tga
+   A /models/md5/chex/bootspoon
+   A /models/md5/chex/bootspoon/bootspoon_d.tga
+   A /models/md5/chex/bootspoon/bootspoon_h.tga
+   A /models/md5/chex/bootspoon/bootspoon_local.tga
+   M /skins/chex.skin
+
+Added two sky textures for "bazoik surface" and "flying in space".
+
+Skinned bootspoon. Can download the .max file off the site. 
+
+Made new skin for the jumpsuit. looks good. it's the chexguys uniform at the beginning of the game before he suits up.
+------------------------------------------------------------------------
+r38 | stoney | 2006-08-18 03:45:57 -0400 (Fri, 18 Aug 2006) | 2 lines
+Changed paths:
+   M /def/weapon_pistol.def
+   M /def/weapon_shotgun.def
+   M /maps/floor_1.map
+   A /sound/chex/weapons/large
+   A /sound/chex/weapons/large/fire.wav
+   A /sound/chex/weapons/large/raise.wav
+   M /sound/chex/weapons/mini/fire.wav
+   A /sound/chex/weapons/mini/raise.wav
+   M /sound/chex/weapons/nade/explode.wav
+   M /sound/chex_snd.sndshd
+   A /textures/example_map
+
+Messed with gun sounds
+
+------------------------------------------------------------------------
+r37 | zl1corvette | 2006-08-11 18:54:15 -0400 (Fri, 11 Aug 2006) | 2 lines
+Changed paths:
+   M /maps/office.map
+   M /materials/chex_models.mtr
+   M /materials/chex_tex.mtr
+   A /models/chex/fountain
+   A /models/chex/fountain/fount_d.tga
+   A /models/chex/fountain/fount_local.tga
+   A /models/chex/fountain/fount_s.tga
+   A /models/chex/fountain/fountain.ase
+   A /models/chex/fountain/sculp_d.tga
+   A /models/chex/fountain/sculp_local.tga
+   A /models/chex/fountain/sculp_s.tga
+   A /models/chex/fountain/water_a.tga
+   A /models/chex/fountain/water_local.tga
+
+I felt the urge to start mapping again
+
+------------------------------------------------------------------------
+r36 | zl1corvette | 2006-08-09 18:30:58 -0400 (Wed, 09 Aug 2006) | 4 lines
+Changed paths:
+   M /gamex86.dll
+   M /guis/pda.gui
+   A /script/weapon_pda.script
+
+pda raise issue is fixed
+I basically stripped down the pda gui too and implement each part chex style
+ie the guns stats and stuff
+
+------------------------------------------------------------------------
+r35 | zl1corvette | 2006-08-07 19:56:41 -0400 (Mon, 07 Aug 2006) | 2 lines
+Changed paths:
+   A /def/heads.def
+
+Forgot the head!!
+
+------------------------------------------------------------------------
+r34 | zl1corvette | 2006-08-07 19:00:58 -0400 (Mon, 07 Aug 2006) | 1 line
+Changed paths:
+   A /models/chex/sc_chexbfast/bf_juice_d.tga
+
+forgot the juice
+------------------------------------------------------------------------
+r33 | zl1corvette | 2006-08-07 18:58:58 -0400 (Mon, 07 Aug 2006) | 6 lines
+Changed paths:
+   M /def/chex.def
+   M /def/monster_default.def
+   M /def/player.def
+   M /def/weapon_pistol.def
+   M /gamex86.dll
+   M /materials/chex_decals.mtr
+   M /materials/chex_models.mtr
+   D /models/chex/sc_chexbfast/bf_bowl.ASE
+   M /models/chex/sc_chexbfast/bf_bowl_d.tga
+   M /models/chex/sc_chexbfast/bf_bowl_local.tga
+   D /models/chex/sc_chexbfast/bf_box.ASE
+   M /models/chex/sc_chexbfast/bf_box_d.tga
+   M /models/chex/sc_chexbfast/bf_box_s.tga
+   D /models/chex/sc_chexbfast/bf_glass.ASE
+   D /models/chex/sc_chexbfast/bf_orange.ASE
+   M /models/chex/sc_chexbfast/bf_orange_d.tga
+   M /models/chex/sc_chexbfast/bf_orange_local.tga
+   M /models/chex/sc_chexbfast/bf_orange_s.tga
+   D /models/chex/sc_chexbfast/bf_plate.ASE
+   M /models/chex/sc_chexbfast/bf_plate_d.tga
+   M /models/chex/sc_chexbfast/bf_plate_s.tga
+   D /models/chex/sc_chexbfast/bf_toast.ASE
+   M /models/chex/sc_chexbfast/bf_toast_d.tga
+   M /models/chex/sc_chexbfast/bf_toast_local.tga
+   M /models/chex/sc_chexbfast/bf_toast_s.tga
+   A /models/chex/sc_chexbfast/chex_breakfast.ase
+   M /script/doom_main.script
+   M /skins/chex.skin
+   A /textures/chex/decals/zorch_mark.tga
+
+-zsec head for player model
+-supercharged breakfast
+-zorch mark instead of bullet holes
+
+
+
+------------------------------------------------------------------------
+r32 | zl1corvette | 2006-08-04 20:28:13 -0400 (Fri, 04 Aug 2006) | 3 lines
+Changed paths:
+   M /def/chex_maps.def
+   D /makedds.bat
+   D /makeogg.bat
+   M /tools/atidds.awk
+   M /tools/chexdds.bat
+   M /tools/loadsize.bat
+   M /tools/make makedds.bat
+
+Wanted to make sure I could regenerate all the dds files
+
+
+------------------------------------------------------------------------
+r31 | zl1corvette | 2006-08-04 18:38:29 -0400 (Fri, 04 Aug 2006) | 7 lines
+Changed paths:
+   D /dds
+   M /gamex86.dll
+   M /guis/pda.gui
+   M /maps/e1m1.map
+   M /maps/sf_923.map
+   M /materials/chex_gui.mtr
+   D /textures/chex/maps/e1m1_c.tga
+   D /textures/chex/maps/e1m1_d.tga
+   D /textures/guis/hudmap_alpha.tga
+   A /textures/guis/hudmap_alpha0.tga
+   A /textures/guis/hudmap_alpha1.tga
+   A /textures/guis/hudmap_alpha2.tga
+   A /textures/guis/hudmap_alpha3.tga
+   A /textures/guis/hudmap_alpha4.tga
+
+Some changes to the hud-map stuff.
+
+Removed dds because its just a real pain, we'll build these before we release.
+Trying to keep the upto date is stupid.
+
+Right now tha map just shows the level below it faded.
+
+------------------------------------------------------------------------
+r30 | zl1corvette | 2006-08-02 21:28:56 -0400 (Wed, 02 Aug 2006) | 1 line
+Changed paths:
+   A /flem.ico
+
+oh yeah the maps pretty much broken in sf & e1m1
+------------------------------------------------------------------------
+r29 | zl1corvette | 2006-08-02 21:21:59 -0400 (Wed, 02 Aug 2006) | 1 line
+Changed paths:
+   M /def/slime_trail.def
+   M /def/weapon_pda.def
+   M /gamex86.dll
+   M /guis/pda.gui
+   D /matt.log
+
+HudMap stuff
+------------------------------------------------------------------------
+r28 | zl1corvette | 2006-07-26 21:40:04 -0400 (Wed, 26 Jul 2006) | 3 lines
+Changed paths:
+   D /dds/textures/chex/decals/slime_trail_a.dds
+   D /dds/textures/chex/decals/slime_trail_d.dds
+   M /def/slime_trail.def
+   M /matt.log
+   M /textures/chex/decals/slime_trail_a.tga
+   M /textures/chex/decals/slime_trail_d.tga
+
+The trail repeats now instead of being blah.  No windozes build yet cause Im still on linux.
+
+
+------------------------------------------------------------------------
+r27 | stoney | 2006-07-26 16:11:58 -0400 (Wed, 26 Jul 2006) | 1 line
+Changed paths:
+   M /guis/temp.guied
+   M /textures/chex/chex_man_1.tga
+   M /textures/chex/chex_man_2.tga
+   M /textures/chex/maps/e1m1.tga
+   A /textures/chex/maps/e1m1_d.tga
+
+Made new map for e1m1
+------------------------------------------------------------------------
+r26 | stoney | 2006-07-24 18:36:02 -0400 (Mon, 24 Jul 2006) | 1 line
+Changed paths:
+   A /def/weapon_rocketlauncher.def
+   M /def/weapon_zorchnade.def
+   A /maps/floor_1.map
+
+Changed weapon behavior in rocketlauncher.def as well as zorchnade. We need a zorch explosion for weapons.
+------------------------------------------------------------------------
+r25 | zl1corvette | 2006-07-22 18:38:34 -0400 (Sat, 22 Jul 2006) | 2 lines
+Changed paths:
+   A /models/chex/bowl.ase (from /models/chex/bowl.ase:1)
+
+Must have deleted the bowl model on accident
+
+------------------------------------------------------------------------
+r24 | zl1corvette | 2006-07-21 16:40:58 -0400 (Fri, 21 Jul 2006) | 1 line
+Changed paths:
+   M /def/func_envshot.def
+   M /gamex86.dll
+   M /maps/sf_923.map
+   M /materials/chex_gui.mtr
+   M /matt.log
+   M /textures/chex/guis/map_investigate.tga
+
+CDA Map stuff
+------------------------------------------------------------------------
+r23 | stoney | 2006-07-21 06:35:32 -0400 (Fri, 21 Jul 2006) | 1 line
+Changed paths:
+   A /sound/chex/weapons/nade
+   A /sound/chex/weapons/nade/explode.wav
+
+Added new wip zorchnade explode sound
+------------------------------------------------------------------------
+r22 | stoney | 2006-07-21 06:34:29 -0400 (Fri, 21 Jul 2006) | 1 line
+Changed paths:
+   M /def/weapon_zorchnade.def
+   M /sound/chex_snd.sndshd
+   M /sound/music/sf_923.ogg
+
+Just screwed around with more crap.
+------------------------------------------------------------------------
+r21 | stoney | 2006-07-21 04:01:24 -0400 (Fri, 21 Jul 2006) | 1 line
+Changed paths:
+   M /guis/sinewave.tga
+   M /textures/chex/decals/flemprint_l_glow.tga
+   M /textures/chex/decals/flemprint_r_glow.tga
+   M /textures/chex/decals/hurt_a2.tga
+   M /textures/chex/guis/map_arrow_up.tga
+   M /textures/chex/guis/map_center.tga
+   M /textures/chex/guis/map_investigate.tga
+   D /textures/guis/ship_hatch/Untitled-1.psd
+   D /textures/guis/ship_hatch/hud copy.jpg
+   D /textures/guis/ship_hatch/hud.psd
+
+changed some CDA gui pictures. Tweaked other stuff.
+------------------------------------------------------------------------
+r20 | zl1corvette | 2006-07-20 21:31:52 -0400 (Thu, 20 Jul 2006) | 1 line
+Changed paths:
+   A /textures/chex/guis/map_investigate.tga
+
+-Forgot image I added for map
+------------------------------------------------------------------------
+r19 | zl1corvette | 2006-07-20 21:24:29 -0400 (Thu, 20 Jul 2006) | 3 lines
+Changed paths:
+   D /copydll_debug.bat
+   D /copydll_release.bat
+   M /def/func_envshot.def
+   M /gamex86.dll
+   M /guis/pda.gui
+   M /maps/sf_923.map
+   M /materials/chex_gui.mtr
+   M /matt.log
+   M /models/chex/amap_add.tga
+   M /models/chex/amap_d.tga
+   M /models/chex/amap_local.tga
+   D /models/chex/armor_d.tga
+   D /models/chex/armor_locall.tga
+   D /models/chex/armor_s.tga
+   D /models/chex/bowl_d.tga
+   D /models/chex/bowl_local.tga
+   D /models/chex/chex_armor.ASE
+   D /models/chex/glass.ASE
+   D /models/chex/orange.ASE
+   D /models/chex/orange_d.tga
+   D /models/chex/orange_local.tga
+   D /models/chex/orange_s.tga
+   D /models/chex/plate.ASE
+   D /models/chex/plate_d.tga
+   D /models/chex/plate_s.tga
+   D /models/chex/toast.ASE
+   D /models/chex/toast_d.tga
+   D /models/chex/toast_local.tga
+   D /models/chex/toast_s.tga
+
+-Removed the duplicate breakfast models
+-Put the update gamex86 dll in
+-Resized the amap textures
+------------------------------------------------------------------------
+r18 | zl1corvette | 2006-07-20 21:23:36 -0400 (Thu, 20 Jul 2006) | 3 lines
+Changed paths:
+   D /models/chex/bowl.ase
+
+-Removed the duplicate breakfast models
+-Put the update gamex86 dll in
+-Resized the amap textures
+------------------------------------------------------------------------
+r17 | stoney | 2006-07-20 13:41:50 -0400 (Thu, 20 Jul 2006) | 1 line
+Changed paths:
+   A /models/chex/chexian_armor.ASE
+   A /models/chex/chexian_armor_d.tga
+   A /models/chex/chexian_armor_local.tga
+   A /models/chex/chexian_armor_s.tga
+   A /models/chex/sc_chexbfast
+   A /models/chex/sc_chexbfast/bf_bowl.ASE
+   A /models/chex/sc_chexbfast/bf_bowl_d.tga
+   A /models/chex/sc_chexbfast/bf_bowl_local.tga
+   A /models/chex/sc_chexbfast/bf_box.ASE
+   A /models/chex/sc_chexbfast/bf_box_d.tga
+   A /models/chex/sc_chexbfast/bf_box_s.tga
+   A /models/chex/sc_chexbfast/bf_glass.ASE
+   A /models/chex/sc_chexbfast/bf_orange.ASE
+   A /models/chex/sc_chexbfast/bf_orange_d.tga
+   A /models/chex/sc_chexbfast/bf_orange_local.tga
+   A /models/chex/sc_chexbfast/bf_orange_s.tga
+   A /models/chex/sc_chexbfast/bf_plate.ASE
+   A /models/chex/sc_chexbfast/bf_plate_d.tga
+   A /models/chex/sc_chexbfast/bf_plate_s.tga
+   A /models/chex/sc_chexbfast/bf_toast.ASE
+   A /models/chex/sc_chexbfast/bf_toast_d.tga
+   A /models/chex/sc_chexbfast/bf_toast_local.tga
+   A /models/chex/sc_chexbfast/bf_toast_s.tga
+
+fixed stuff I screwed up last night
+------------------------------------------------------------------------
+r16 | stoney | 2006-07-20 06:12:36 -0400 (Thu, 20 Jul 2006) | 1 line
+Changed paths:
+   M /gamex86.dll
+
+managed to screw over the dll, so if this ain't the current version, change it. I grabbed it from the beta release.
+------------------------------------------------------------------------
+r15 | stoney | 2006-07-20 05:52:54 -0400 (Thu, 20 Jul 2006) | 1 line
+Changed paths:
+   A /models/chex/armor_d.tga
+   A /models/chex/armor_locall.tga
+   A /models/chex/armor_s.tga
+   M /models/chex/bowl.ase
+   A /models/chex/bowl_d.tga
+   A /models/chex/bowl_local.tga
+   A /models/chex/chex_armor.ASE
+   M /models/chex/chex_box_d.tga
+   A /models/chex/chex_box_s.tga
+   A /models/chex/glass.ASE
+   A /models/chex/orange.ASE
+   A /models/chex/orange_d.tga
+   A /models/chex/orange_local.tga
+   A /models/chex/orange_s.tga
+   A /models/chex/plate.ASE
+   A /models/chex/plate_d.tga
+   A /models/chex/plate_s.tga
+   A /models/chex/toast.ASE
+   A /models/chex/toast_d.tga
+   A /models/chex/toast_local.tga
+   A /models/chex/toast_s.tga
+
+Yay, I'm back on the svn! I got XP running on my uber laptop now, so I can actully get things done. Added the armor and chex breakfast textures. they're not resized yet.
+------------------------------------------------------------------------
+r14 | sadistic | 2006-07-18 17:54:42 -0400 (Tue, 18 Jul 2006) | 1 line
+Changed paths:
+   A /Sadistic_Notes.txt
+
+Finally got around to starting to make notes. 
+------------------------------------------------------------------------
+r13 | zl1corvette | 2006-07-17 20:43:16 -0400 (Mon, 17 Jul 2006) | 1 line
+Changed paths:
+   M /def/chex.def
+   A /materials/amap.mtr
+   M /matt.log
+   A /models/chex/amap.ase
+   A /models/chex/amap_add.tga
+   A /models/chex/amap_d.tga
+   A /models/chex/amap_local.tga
+
+AMAP by sadistic
+------------------------------------------------------------------------
+r12 | zl1corvette | 2006-07-17 20:13:49 -0400 (Mon, 17 Jul 2006) | 1 line
+Changed paths:
+   D /DoomConfig.cfg
+   D /editor.cfg
+
+Deleted configs for real this time
+------------------------------------------------------------------------
+r11 | zl1corvette | 2006-07-17 20:12:03 -0400 (Mon, 17 Jul 2006) | 1 line
+Changed paths:
+   M /def/slime_trail.def
+   M /matt.log
+
+Deleted configs and fixed trail
+------------------------------------------------------------------------
+r10 | zl1corvette | 2006-07-17 19:55:12 -0400 (Mon, 17 Jul 2006) | 1 line
+Changed paths:
+   D /maps/testcam.cm
+   D /maps/testcam.proc
+
+need to the extra map files
+------------------------------------------------------------------------
+r9 | zl1corvette | 2006-07-17 19:54:06 -0400 (Mon, 17 Jul 2006) | 1 line
+Changed paths:
+   D /maps/office.cm
+
+need to the extra map files
+------------------------------------------------------------------------
+r8 | zl1corvette | 2006-07-17 19:54:00 -0400 (Mon, 17 Jul 2006) | 1 line
+Changed paths:
+   D /maps/office.proc
+
+need to the extra map files
+------------------------------------------------------------------------
+r7 | zl1corvette | 2006-07-17 19:53:31 -0400 (Mon, 17 Jul 2006) | 1 line
+Changed paths:
+   D /maps/sf_923.proc
+
+need to the extra map files
+------------------------------------------------------------------------
+r6 | zl1corvette | 2006-07-17 19:53:25 -0400 (Mon, 17 Jul 2006) | 1 line
+Changed paths:
+   D /maps/sf_923.cm
+
+need to the extra map files
+------------------------------------------------------------------------
+r5 | zl1corvette | 2006-07-17 19:53:19 -0400 (Mon, 17 Jul 2006) | 1 line
+Changed paths:
+   D /maps/sf_923.aas48
+
+need to the extra map files
+------------------------------------------------------------------------
+r4 | zl1corvette | 2006-07-17 19:53:13 -0400 (Mon, 17 Jul 2006) | 1 line
+Changed paths:
+   D /maps/e1m1.aas48
+
+need to the extra map files
+------------------------------------------------------------------------
+r3 | zl1corvette | 2006-07-17 19:53:03 -0400 (Mon, 17 Jul 2006) | 1 line
+Changed paths:
+   D /maps/e1m1.proc
+
+need to the extra map files
+------------------------------------------------------------------------
+r2 | zl1corvette | 2006-07-17 19:52:52 -0400 (Mon, 17 Jul 2006) | 1 line
+Changed paths:
+   D /maps/e1m1.cm
+
+need to the extra map files
+------------------------------------------------------------------------
+r1 | zl1corvette | 2006-07-17 19:48:08 -0400 (Mon, 17 Jul 2006) | 1 line
+Changed paths:
+   A /DoomConfig.cfg
+   A /Readme.txt
+   A /Stnynotes.txt
+   A /af
+   A /af/monster_chex_biped.af
+   A /af/monster_chex_cly.af
+   A /af/monster_chex_flemoid.af
+   A /autoexec.cfg
+   A /binary.conf
+   A /config.spec
+   A /copydll_debug.bat
+   A /copydll_release.bat
+   A /corvette_notes.txt
+   A /dds
+   A /dds/guis
+   A /dds/guis/armorbar.dds
+   A /dds/guis/assets
+   A /dds/guis/assets/mainmenu
+   A /dds/guis/assets/mainmenu/doom3.dds
+   A /dds/guis/assets/mainmenu/doom3_1.dds
+   A /dds/guis/assets/mainmenu/doom3_2.dds
+   A /dds/guis/assets/mainmenu/stars.dds
+   A /dds/guis/batt.dds
+   A /dds/guis/charge.dds
+   A /dds/guis/clip.dds
+   A /dds/guis/hparmbord.dds
+   A /dds/guis/inv.dds
+   A /dds/guis/sinewave.dds
+   A /dds/guis/update.dds
+   A /dds/lights
+   A /dds/lights/baronflash.dds
+   A /dds/lights/impflash.dds
+   A /dds/lights/roundfire.dds
+   A /dds/lights/squareblast.dds
+   A /dds/lights/squareishlight.dds
+   A /dds/lights/squarelight.dds
+   A /dds/lights/squarelight1.dds
+   A /dds/models
+   A /dds/models/chex
+   A /dds/models/chex/chex_box_d.dds
+   A /dds/models/chex/container_d.dds
+   A /dds/models/chex/container_local.dds
+   A /dds/models/chex/container_s.dds
+   A /dds/models/chex/flag_b_d.dds
+   A /dds/models/chex/flemship_d.dds
+   A /dds/models/chex/flemship_engineadd.dds
+   A /dds/models/chex/flemship_slimeadd.dds
+   A /dds/models/chex/fruit_bowl_d.dds
+   A /dds/models/chex/fruit_bowl_local.dds
+   A /dds/models/chex/health_pls_c.dds
+   A /dds/models/chex/health_pls_d.dds
+   A /dds/models/chex/keys
+   A /dds/models/chex/keys/key_add.dds
+   A /dds/models/chex/keys/key_local.dds
+   A /dds/models/chex/keys/keyb_d.dds
+   A /dds/models/chex/keys/keyr_d.dds
+   A /dds/models/chex/lamp_d.dds
+   A /dds/models/chex/lamp_local.dds
+   A /dds/models/chex/large_recharge_add.dds
+   A /dds/models/chex/large_recharge_d.dds
+   A /dds/models/chex/large_recharge_local.dds
+   A /dds/models/chex/large_recharge_s.dds
+   A /dds/models/chex/projectiles
+   A /dds/models/chex/projectiles/fball_d.dds
+   A /dds/models/chex/projectiles/fball_s.dds
+   A /dds/models/chex/projector_add.dds
+   A /dds/models/chex/projector_d.dds
+   A /dds/models/chex/projector_local.dds
+   A /dds/models/chex/ship_d.dds
+   A /dds/models/chex/ship_local.dds
+   A /dds/models/chex/slimeoff_d.dds
+   A /dds/models/chex/slimeoff_local.dds
+   A /dds/models/chex/slimeoff_s.dds
+   A /dds/models/chex/tesla_a.dds
+   A /dds/models/chex/tesla_d.dds
+   A /dds/models/chex/tesla_g.dds
+   A /dds/models/chex/tesla_local.dds
+   A /dds/models/chex/tesla_sweep.dds
+   A /dds/models/chex/water_bottle_d.dds
+   A /dds/models/chex/water_bottle_local.dds
+   A /dds/models/mapobjects
+   A /dds/models/mapobjects/monitors
+   A /dds/models/mapobjects/monitors/controlmonitor.dds
+   A /dds/models/mapobjects/washroom
+   A /dds/models/mapobjects/washroom/airtank_grn.dds
+   A /dds/models/md5
+   A /dds/models/md5/chex
+   A /dds/models/md5/chex/cly_base.dds
+   A /dds/models/md5/chex/cly_base_add.dds
+   A /dds/models/md5/chex/cly_base_jetadd.dds
+   A /dds/models/md5/chex/cly_base_s.dds
+   A /dds/models/md5/chex/cly_body.dds
+   A /dds/models/md5/chex/cly_body_add.dds
+   A /dds/models/md5/chex/cly_body_s.dds
+   A /dds/models/md5/chex/cly_tubes_add.dds
+   A /dds/models/md5/chex/cly_tubes_d.dds
+   A /dds/models/md5/chex/nade
+   A /dds/models/md5/chex/nade/charge_add.dds
+   A /dds/models/md5/chex/nade/charge_button_d.dds
+   A /dds/models/md5/chex/nade/charge_button_local.dds
+   A /dds/models/md5/chex/nade/charge_button_s.dds
+   A /dds/models/md5/chex/nade/charge_d.dds
+   A /dds/models/md5/chex/nade/charge_s.dds
+   A /dds/models/monsters
+   A /dds/models/monsters/pinky
+   A /dds/models/monsters/pinky/pinky_d.dds
+   A /dds/models/monsters/pinky/pinky_dis.dds
+   A /dds/models/monsters/pinky/pinky_local.dds
+   A /dds/models/monsters/pinky/pinky_s.dds
+   A /dds/textures
+   A /dds/textures/chex
+   A /dds/textures/chex/decals
+   A /dds/textures/chex/decals/bigslime_d.dds
+   A /dds/textures/chex/decals/bigslime_s.dds
+   A /dds/textures/chex/decals/chex_newspaper.dds
+   A /dds/textures/chex/decals/chexchieve_d.dds
+   A /dds/textures/chex/decals/chexchieve_s.dds
+   A /dds/textures/chex/decals/flemprint_l.dds
+   A /dds/textures/chex/decals/flemprint_l_glow.dds
+   A /dds/textures/chex/decals/flemprint_r.dds
+   A /dds/textures/chex/decals/flemprint_r_glow.dds
+   A /dds/textures/chex/decals/footprint_l.dds
+   A /dds/textures/chex/decals/footprint_l_glow.dds
+   A /dds/textures/chex/decals/footprint_r.dds
+   A /dds/textures/chex/decals/footprint_r_glow.dds
+   A /dds/textures/chex/decals/fsplat.dds
+   A /dds/textures/chex/decals/hangar_left.dds
+   A /dds/textures/chex/decals/hangar_right.dds
+   A /dds/textures/chex/decals/hurt.dds
+   A /dds/textures/chex/decals/ladypaint_d.dds
+   A /dds/textures/chex/decals/ladypaint_s.dds
+   A /dds/textures/chex/decals/maxcap_d.dds
+   A /dds/textures/chex/decals/maxcap_s.dds
+   A /dds/textures/chex/decals/no_milk_d.dds
+   A /dds/textures/chex/decals/no_milk_s.dds
+   A /dds/textures/chex/decals/observdeck_d.dds
+   A /dds/textures/chex/decals/observdeck_s.dds
+   A /dds/textures/chex/decals/office_left.dds
+   A /dds/textures/chex/decals/office_right.dds
+   A /dds/textures/chex/decals/restroom_left.dds
+   A /dds/textures/chex/decals/restroom_right.dds
+   A /dds/textures/chex/decals/slime1_d.dds
+   A /dds/textures/chex/decals/slime1_s.dds
+   A /dds/textures/chex/decals/slime2_d.dds
+   A /dds/textures/chex/decals/slime2_s.dds
+   A /dds/textures/chex/decals/slime3_d.dds
+   A /dds/textures/chex/decals/slime3_s.dds
+   A /dds/textures/chex/decals/slime4_d.dds
+   A /dds/textures/chex/decals/slime4_s.dds
+   A /dds/textures/chex/decals/slime5_d.dds
+   A /dds/textures/chex/decals/slime5_s.dds
+   A /dds/textures/chex/decals/slime_trail_a.dds
+   A /dds/textures/chex/decals/slime_trail_d.dds
+   A /dds/textures/chex/decals/squad_left.dds
+   A /dds/textures/chex/decals/squad_right.dds
+   A /dds/textures/chex/decals/storage_right.dds
+   A /dds/textures/chex/doors
+   A /dds/textures/chex/doors/black_d.dds
+   A /dds/textures/chex/doors/black_local.dds
+   A /dds/textures/chex/doors/black_s.dds
+   A /dds/textures/chex/doors/door1_d.dds
+   A /dds/textures/chex/doors/door1_local.dds
+   A /dds/textures/chex/doors/door1_s.dds
+   A /dds/textures/chex/doors/redhangardoor_d.dds
+   A /dds/textures/chex/doors/redhangardoor_local.dds
+   A /dds/textures/chex/doors/redhangardoor_s.dds
+   A /dds/textures/chex/e1m1
+   A /dds/textures/chex/e1m1/splash.dds
+   A /dds/textures/chex/floors
+   A /dds/textures/chex/floors/bluetile_d.dds
+   A /dds/textures/chex/floors/bluetile_local.dds
+   A /dds/textures/chex/floors/bluetile_s.dds
+   A /dds/textures/chex/floors/cementblack_d.dds
+   A /dds/textures/chex/floors/cementgrey_d.dds
+   A /dds/textures/chex/floors/cementgrey_local.dds
+   A /dds/textures/chex/floors/cementred_d.dds
+   A /dds/textures/chex/floors/federlogo_d.dds
+   A /dds/textures/chex/floors/federlogo_local.dds
+   A /dds/textures/chex/floors/federlogo_s.dds
+   A /dds/textures/chex/floors/white_lines_d.dds
+   A /dds/textures/chex/floors/white_lines_local.dds
+   A /dds/textures/chex/floors/whitetile_d.dds
+   A /dds/textures/chex/floors/whitetile_local.dds
+   A /dds/textures/chex/floors/whitetile_s.dds
+   A /dds/textures/chex/guis
+   A /dds/textures/chex/guis/blueborder_a.dds
+   A /dds/textures/chex/guis/bottombar.dds
+   A /dds/textures/chex/guis/button_g.dds
+   A /dds/textures/chex/guis/chex_man_1.dds
+   A /dds/textures/chex/guis/chex_man_2.dds
+   A /dds/textures/chex/guis/comm_down_a.dds
+   A /dds/textures/chex/guis/fedlogo_alpha.dds
+   A /dds/textures/chex/guis/hangartop_a.dds
+   A /dds/textures/chex/guis/map_scope.dds
+   A /dds/textures/chex/guis/red_back.dds
+   A /dds/textures/chex/guis/security_down_a.dds
+   A /dds/textures/chex/lights
+   A /dds/textures/chex/lights/squarelight_add.dds
+   A /dds/textures/chex/lights/squarelight_d.dds
+   A /dds/textures/chex/lights/squarelight_local.dds
+   A /dds/textures/chex/maps
+   A /dds/textures/chex/maps/e1m1.dds
+   A /dds/textures/chex/metals
+   A /dds/textures/chex/metals/borderedwall_d.dds
+   A /dds/textures/chex/metals/borderedwall_local.dds
+   A /dds/textures/chex/metals/borderedwall_s.dds
+   A /dds/textures/chex/metals/brushedmetal_d.dds
+   A /dds/textures/chex/metals/brushedmetal_local.dds
+   A /dds/textures/chex/metals/brushedmetal_s.dds
+   A /dds/textures/chex/metals/hinge_d.dds
+   A /dds/textures/chex/metals/hinge_local.dds
+   A /dds/textures/chex/metals/hinge_s.dds
+   A /dds/textures/chex/metals/ventinside_d.dds
+   A /dds/textures/chex/metals/ventinside_local.dds
+   A /dds/textures/chex/metals/ventinside_s.dds
+   A /dds/textures/chex/particles
+   A /dds/textures/chex/particles/zorch.dds
+   A /dds/textures/chex/sf
+   A /dds/textures/chex/sf/field.dds
+   A /dds/textures/chex/sf/landing_zone.dds
+   A /dds/textures/chex/sf/splash.dds
+   A /dds/textures/chex/slug
+   A /dds/textures/chex/slug/slug_d.dds
+   A /dds/textures/chex/slug/slug_local.dds
+   A /dds/textures/chex/slug/slug_s.dds
+   A /dds/textures/chex/trim
+   A /dds/textures/chex/trim/blue_key_add.dds
+   A /dds/textures/chex/trim/blue_key_d.dds
+   A /dds/textures/chex/trim/blue_key_local.dds
+   A /dds/textures/chex/trim/proj_screen_d.dds
+   A /dds/textures/chex/trim/proj_screen_local.dds
+   A /dds/textures/chex/trim/red_key_add.dds
+   A /dds/textures/chex/walls
+   A /dds/textures/chex/walls/bigchexposter_d.dds
+   A /dds/textures/chex/walls/bigchexposter_s.dds
+   A /dds/textures/chex/walls/bluemarble_d.dds
+   A /dds/textures/chex/walls/bluemarble_local.dds
+   A /dds/textures/chex/walls/bluemarble_s.dds
+   A /dds/textures/chex/walls/brownboxy_d.dds
+   A /dds/textures/chex/walls/brownboxy_local.dds
+   A /dds/textures/chex/walls/brownboxy_s.dds
+   A /dds/textures/chex/walls/greysquare_d.dds
+   A /dds/textures/chex/walls/greysquare_local.dds
+   A /dds/textures/chex/walls/greysquare_s.dds
+   A /dds/textures/chex/walls/hangwalltop_d.dds
+   A /dds/textures/chex/walls/hangwalltop_local.dds
+   A /dds/textures/chex/walls/hangwalltop_s.dds
+   A /dds/textures/chex/walls/redcabinet_d.dds
+   A /dds/textures/chex/walls/redcabinet_local.dds
+   A /dds/textures/chex/walls/redcabinet_s.dds
+   A /dds/textures/decals
+   A /dds/textures/decals/fsplat11.dds
+   A /dds/textures/decals/fsplat2.dds
+   A /dds/textures/decals/fsplat5.dds
+   A /dds/textures/decals/fsplat7.dds
+   A /dds/textures/flem
+   A /dds/textures/flem/biped_add.dds
+   A /dds/textures/flem/biped_d.dds
+   A /dds/textures/flem/flem_add.dds
+   A /dds/textures/flem/flem_d.dds
+   A /dds/textures/flem/flem_s.dds
+   A /dds/textures/guis
+   A /dds/textures/guis/hudmap_alpha.dds
+   A /dds/textures/particles
+   A /dds/textures/particles/plasma.dds
+   A /dds/textures/particles/plasma2.dds
+   A /dds/textures/particles/plasma_mflash_strip.dds
+   A /dds/textures/particles/plasmablast.dds
+   A /dds/textures/particles/plasmaflame_strip.dds
+   A /dds/textures/particles/plasmalight.dds
+   A /def
+   A /def/ammo.def
+   A /def/beam.def
+   A /def/chex.def
+   A /def/chex_maps.def
+   A /def/chex_monster_flemoid.def
+   A /def/endlevelgui.def
+   A /def/func.def
+   A /def/func_envshot.def
+   A /def/items.def
+   A /def/misc.def
+   A /def/monster_chex_biped.def
+   A /def/monster_chex_cly.def
+   A /def/monster_default.def
+   A /def/monster_demon_pinky.def
+   A /def/monster_zombie_fat.def
+   A /def/player.def
+   A /def/slime_trail.def
+   A /def/weapon_chaingun.def
+   A /def/weapon_fists.def
+   A /def/weapon_flashlight.def
+   A /def/weapon_pda.def
+   A /def/weapon_pistol.def
+   A /def/weapon_plasmagun.def
+   A /def/weapon_shotgun.def
+   A /def/weapon_zorchnade.def
+   A /default.cfg
+   A /description.txt
+   A /editor.cfg
+   A /env
+   A /env/Orbital Element.txt
+   A /env/chexsky_back.tga
+   A /env/chexsky_down.tga
+   A /env/chexsky_forward.tga
+   A /env/chexsky_left.tga
+   A /env/chexsky_right.tga
+   A /env/chexsky_up.tga
+   A /env/chexspace_back.tga
+   A /env/chexspace_down.tga
+   A /env/chexspace_forward.tga
+   A /env/chexspace_left.tga
+   A /env/chexspace_right.tga
+   A /env/chexspace_up.tga
+   A /env/darkhollow.txt
+   A /env/darkhollow_back.tga
+   A /env/darkhollow_down.tga
+   A /env/darkhollow_forward.tga
+   A /env/darkhollow_left.tga
+   A /env/darkhollow_right.tga
+   A /env/darkhollow_up.tga
+   A /env/q3tod3.bat
+   A /gamex86.dll
+   A /guis
+   A /guis/armorbar.tga
+   A /guis/assets
+   A /guis/assets/mainmenu
+   A /guis/assets/mainmenu/doom3.tga
+   A /guis/assets/mainmenu/doom3_1.tga
+   A /guis/assets/mainmenu/doom3_2.tga
+   A /guis/assets/mainmenu/stars.tga
+   A /guis/bat_mask.tga
+   A /guis/batt.tga
+   A /guis/charge.tga
+   A /guis/chex
+   A /guis/chex/chex_hangar.gui
+   A /guis/chex/chex_intro.gui
+   A /guis/chex/chex_intro_loop.gui
+   A /guis/chex/chex_proj.gui
+   A /guis/chex/chex_sign.gui
+   A /guis/chex/chex_ss.gui
+   A /guis/chex/chex_ss2.gui
+   A /guis/chex/comm_down.gui
+   A /guis/chex/elevator2floor.gui
+   A /guis/chex/elevatorcall.gui
+   A /guis/chex/hud
+   A /guis/chex/hud/images
+   A /guis/chex/security_down.gui
+   A /guis/chex/stats.gui
+   A /guis/chex_credits.gui
+   A /guis/clip.tga
+   A /guis/clipback.tga
+   A /guis/end_trek.gui
+   A /guis/healthbar.tga
+   A /guis/hparmbord.tga
+   A /guis/hud.gui
+   A /guis/hud2.gui
+   A /guis/hud_old.gui
+   A /guis/hud_stoney.gui
+   A /guis/intro.gui
+   A /guis/inv.tga
+   A /guis/mainmenu.gui
+   A /guis/map
+   A /guis/map/e1m1.gui
+   A /guis/map/sf_923.gui
+   A /guis/pda.gui
+   A /guis/sinewave.tga
+   A /guis/sound.tga
+   A /guis/storage_facility
+   A /guis/storage_facility/crane.gui
+   A /guis/temp.guied
+   A /guis/update.tga
+   A /images.txt
+   A /log.txt
+   A /makedds.bat
+   A /makeogg.bat
+   A /maps
+   A /maps/autosave.map
+   A /maps/crane.map
+   A /maps/credits.map
+   A /maps/e1m1.aas48
+   A /maps/e1m1.cm
+   A /maps/e1m1.map
+   A /maps/e1m1.proc
+   A /maps/e1m1.script
+   A /maps/e1m1_2.map
+   A /maps/influence.map
+   A /maps/office.autosave.map
+   A /maps/office.bak
+   A /maps/office.cm
+   A /maps/office.map
+   A /maps/office.proc
+   A /maps/office.script
+   A /maps/rail_1.map
+   A /maps/sf_923.aas48
+   A /maps/sf_923.cm
+   A /maps/sf_923.map
+   A /maps/sf_923.proc
+   A /maps/sf_floor.map
+   A /maps/storage_facility.map
+   A /maps/testSlime.map
+   A /maps/test_credits.map
+   A /maps/test_end.map
+   A /maps/testcam.cm
+   A /maps/testcam.map
+   A /maps/testcam.proc
+   A /materials
+   A /materials/chex_atest.mtr
+   A /materials/chex_bootspoon.mtr
+   A /materials/chex_decals.mtr
+   A /materials/chex_gui.mtr
+   A /materials/chex_hangar_gui.mtr
+   A /materials/chex_intro.mtr
+   A /materials/chex_items.mtr
+   A /materials/chex_light.mtr
+   A /materials/chex_menu.mtr
+   A /materials/chex_models.mtr
+   A /materials/chex_nade.mtr
+   A /materials/chex_sf.mtr
+   A /materials/chex_sky.mtr
+   A /materials/chex_splash.mtr
+   A /materials/chex_tex.mtr
+   A /materials/chex_trim.mtr
+   A /materials/chex_zorch_particle.mtr
+   A /materials/cly.mtr
+   A /materials/emptyname.mtr
+   A /materials/flem.mtr
+   A /materials/gfx.mtr
+   A /matt.cfg
+   A /matt.log
+   A /models
+   A /models/chex
+   A /models/chex/bootspoon.ase
+   A /models/chex/bowl.ase
+   A /models/chex/chair
+   A /models/chex/chair/chair.ase
+   A /models/chex/chair/chair_d.tga
+   A /models/chex/chair/chair_hi.ase
+   A /models/chex/chair/chair_l.ase
+   A /models/chex/chair/chair_local.tga
+   A /models/chex/chair/chair_r.ase
+   A /models/chex/chair/orb__chair_local.tga
+   A /models/chex/chex_box.ase
+   A /models/chex/chex_box_d.tga
+   A /models/chex/chex_can.ase
+   A /models/chex/chex_can_d.tga
+   A /models/chex/container.ase
+   A /models/chex/container_big.lwo
+   A /models/chex/container_chex.lwo
+   A /models/chex/container_d.tga
+   A /models/chex/container_local.tga
+   A /models/chex/container_s.lwo
+   A /models/chex/container_s.tga
+   A /models/chex/flag2_b.ase
+   A /models/chex/flag2_b.cm
+   A /models/chex/flag_b.ase
+   A /models/chex/flag_b.cm
+   A /models/chex/flag_b_d.tga
+   A /models/chex/flag_hm.tga
+   A /models/chex/flag_local.tga
+   A /models/chex/flemship_d.tga
+   A /models/chex/flemship_engineadd.tga
+   A /models/chex/flemship_slimeadd.tga
+   A /models/chex/fruit_bowl_d.tga
+   A /models/chex/fruit_bowl_local.tga
+   A /models/chex/health_pls_c.tga
+   A /models/chex/health_pls_d.tga
+   A /models/chex/health_plus.ase
+   A /models/chex/keys
+   A /models/chex/keys/key_add.tga
+   A /models/chex/keys/key_b.ase
+   A /models/chex/keys/key_local.tga
+   A /models/chex/keys/keyb_d.tga
+   A /models/chex/keys/keyr_d.tga
+   A /models/chex/lamp.ase
+   A /models/chex/lamp_d.tga
+   A /models/chex/lamp_hm.tga
+   A /models/chex/lamp_local.tga
+   A /models/chex/large_recharge.ase
+   A /models/chex/large_recharge_add.tga
+   A /models/chex/large_recharge_d.tga
+   A /models/chex/large_recharge_ed.tga
+   A /models/chex/large_recharge_local.tga
+   A /models/chex/large_recharge_s.tga
+   A /models/chex/largebox.ase
+   A /models/chex/largebox_aligned.ase
+   A /models/chex/lwo.exe
+   A /models/chex/nadebox.ase
+   A /models/chex/nadebox_add.tga
+   A /models/chex/nadebox_d.tga
+   A /models/chex/nadebox_local.tga
+   A /models/chex/nadebox_s.tga
+   A /models/chex/pole_nx.tga
+   A /models/chex/pole_ny.tga
+   A /models/chex/pole_nz.tga
+   A /models/chex/pole_px.tga
+   A /models/chex/pole_py.tga
+   A /models/chex/pole_pz.tga
+   A /models/chex/proj.ase
+   A /models/chex/proj.cm
+   A /models/chex/proj_high.ase
+   A /models/chex/projectiles
+   A /models/chex/projectiles/fball_d.tga
+   A /models/chex/projectiles/fball_s.tga
+   A /models/chex/projectiles/flemball.ase
+   A /models/chex/projector_add.tga
+   A /models/chex/projector_d.tga
+   A /models/chex/projector_local.tga
+   A /models/chex/sf_floor.ase
+   A /models/chex/ship.ase
+   A /models/chex/ship_d.tga
+   A /models/chex/ship_local.tga
+   A /models/chex/shipflem.ase
+   A /models/chex/shipflem_door.ase
+   A /models/chex/shipflem_glass.ase
+   A /models/chex/slimeoff.ase
+   A /models/chex/slimeoff_d.tga
+   A /models/chex/slimeoff_local.tga
+   A /models/chex/slimeoff_opt.ase
+   A /models/chex/slimeoff_s.tga
+   A /models/chex/smallbox.ase
+   A /models/chex/smallbox_aligned.ase
+   A /models/chex/tesla.ase
+   A /models/chex/tesla_a.tga
+   A /models/chex/tesla_d.tga
+   A /models/chex/tesla_d.xcf
+   A /models/chex/tesla_g.tga
+   A /models/chex/tesla_hi.lwo
+   A /models/chex/tesla_local.tga
+   A /models/chex/tesla_sweep.tga
+   A /models/chex/usb.ase
+   A /models/chex/usb_add.tga
+   A /models/chex/usb_d.tga
+   A /models/chex/usb_ed.tga
+   A /models/chex/usb_local.tga
+   A /models/chex/usb_s.tga
+   A /models/chex/water_bottle.ase
+   A /models/chex/water_bottle_d.tga
+   A /models/chex/water_bottle_hi.lwo
+   A /models/chex/water_bottle_local.tga
+   A /models/chex/zorchnade_world.ase
+   A /models/chex/zorchnade_world.cm
+   A /models/mapobjects
+   A /models/mapobjects/monitors
+   A /models/mapobjects/monitors/controlmonitor.tga
+   A /models/mapobjects/washroom
+   A /models/mapobjects/washroom/airtank_grn.tga
+   A /models/md5
+   A /models/md5/chex
+   A /models/md5/chex/MFC39.tmp
+   A /models/md5/chex/MFC3B.tmp
+   A /models/md5/chex/MFC3F.tmp
+   A /models/md5/chex/biped.md5anim
+   A /models/md5/chex/biped.md5mesh
+   A /models/md5/chex/biped_idle.md5anim
+   A /models/md5/chex/biped_melee1.md5anim
+   A /models/md5/chex/biped_melee2.md5anim
+   A /models/md5/chex/biped_pain1.md5anim
+   A /models/md5/chex/biped_pain2.md5anim
+   A /models/md5/chex/biped_range1.md5anim
+   A /models/md5/chex/biped_range2.md5anim
+   A /models/md5/chex/biped_walk.md5anim
+   A /models/md5/chex/cly.md5mesh
+   A /models/md5/chex/cly_base.tga
+   A /models/md5/chex/cly_base_add.tga
+   A /models/md5/chex/cly_base_h.tga
+   A /models/md5/chex/cly_base_jetadd.tga
+   A /models/md5/chex/cly_base_local.tga
+   A /models/md5/chex/cly_base_s.tga
+   A /models/md5/chex/cly_body.tga
+   A /models/md5/chex/cly_body_add.tga
+   A /models/md5/chex/cly_body_s.tga
+   A /models/md5/chex/cly_dodge_l.md5anim
+   A /models/md5/chex/cly_dodge_r.md5anim
+   A /models/md5/chex/cly_tubes_add.tga
+   A /models/md5/chex/cly_tubes_d.tga
+   A /models/md5/chex/clyfire1.md5anim
+   A /models/md5/chex/clyfire2.md5anim
+   A /models/md5/chex/clyidle.md5anim
+   A /models/md5/chex/clyinitial.md5anim
+   A /models/md5/chex/clymelee1.md5anim
+   A /models/md5/chex/clywalk.md5anim
+   A /models/md5/chex/md5scale.exe
+   A /models/md5/chex/nade
+   A /models/md5/chex/nade/charge_add.tga
+   A /models/md5/chex/nade/charge_button_d.tga
+   A /models/md5/chex/nade/charge_button_local.tga
+   A /models/md5/chex/nade/charge_button_s.tga
+   A /models/md5/chex/nade/charge_d.tga
+   A /models/md5/chex/nade/charge_s.tga
+   A /models/md5/chex/nade/zorchnade.md5mesh
+   A /models/md5/chex/nade/zorchnadearm.md5anim
+   A /models/md5/chex/nade/zorchnadeidle.md5anim
+   A /models/md5/chex/nade/zorchnadelower.md5anim
+   A /models/md5/chex/nade/zorchnaderaise.md5anim
+   A /models/md5/chex/nade/zorchnadethrow.md5anim
+   A /models/md5/chex/scale_biped.bat
+   A /models/md5/items
+   A /models/md5/items/pda_view
+   A /models/md5/items/pda_view/idle.md5mesh
+   A /models/md5/monsters
+   A /models/md5/monsters/flem
+   A /models/md5/monsters/flem/flem.md5anim
+   A /models/md5/monsters/flem/flem.md5mesh
+   A /models/md5/monsters/flem/flemAttack.md5anim
+   A /models/md5/monsters/flem/flemAttackClose.md5anim
+   A /models/md5/monsters/flem/flemDie.md5anim
+   A /models/md5/monsters/flem/flemDodgeL.md5anim
+   A /models/md5/monsters/flem/flemDodgeR.md5anim
+   A /models/md5/monsters/flem/flemIdle.md5anim
+   A /models/md5/monsters/flem/flemShot1.md5anim
+   A /models/md5/monsters/flem/flemShot2.md5anim
+   A /models/md5/monsters/flem/flemWalk.md5anim
+   A /models/md5/monsters/flem/flem_af_pose.md5anim
+   A /newpdas
+   A /newpdas/chex.pda
+   A /particles
+   A /particles/chex_beam.prt
+   A /particles/chex_steamblast_clr.prt
+   A /particles/cly_flame.prt
+   A /particles/slime.prt
+   A /particles/zorch.prt
+   A /scott.cfg
+   A /script
+   A /script/ai_base.script
+   A /script/ai_monster_base.script
+   A /script/ai_monster_chex_cly.script
+   A /script/ai_monster_chex_flemoid.script
+   A /script/ai_monster_flying_cacodemon.script
+   A /script/chex_events.script
+   A /script/chex_main.script
+   A /script/doom_events.script
+   A /script/doom_main.script
+   A /script/map_storage_facility.script
+   A /script/weapon_pistol.script
+   A /script/weapon_zorchnade.script
+   A /skins
+   A /skins/chex.skin
+   A /sound
+   A /sound/chex
+   A /sound/chex/acting
+   A /sound/chex/acting/storagefacility
+   A /sound/chex/acting/storagefacility/CDcomehome.ogg
+   A /sound/chex/acting/storagefacility/CDhicktopatrol.ogg
+   A /sound/chex/acting/storagefacility/CDlocked.ogg
+   A /sound/chex/acting/storagefacility/CDoffice.ogg
+   A /sound/chex/acting/storagefacility/CDslimemonsters.ogg
+   A /sound/chex/acting/storagefacility/CDtopatrol.ogg
+   A /sound/chex/acting/storagefacility/CDtopatrol_radio.wav
+   A /sound/chex/acting/storagefacility/SCitseems.ogg
+   A /sound/chex/acting/storagefacility/SCuploading.ogg
+   A /sound/chex/cly_death1.wav
+   A /sound/chex/cly_idle.wav
+   A /sound/chex/cly_melee.wav
+   A /sound/chex/cly_pain1.wav
+   A /sound/chex/cly_pain2.wav
+   A /sound/chex/cly_range.wav
+   A /sound/chex/dsbdcls.wav
+   A /sound/chex/dsbdopn.wav
+   A /sound/chex/dsdorcls.wav
+   A /sound/chex/dsdoropn.wav
+   A /sound/chex/dsnoway.wav
+   A /sound/chex/flemoid_bugee.wav
+   A /sound/chex/flemoid_death1.wav
+   A /sound/chex/flemoid_death2.wav
+   A /sound/chex/flemoid_idle.wav
+   A /sound/chex/flemoid_melee.wav
+   A /sound/chex/flemoid_pain.wav
+   A /sound/chex/flemoid_walk.wav
+   A /sound/chex/intro.ogg
+   A /sound/chex/items
+   A /sound/chex/items/fruitbowl.wav
+   A /sound/chex/items/h2o.wav
+   A /sound/chex/items/slimeoff2.wav
+   A /sound/chex/items/zorchpickup.wav
+   A /sound/chex/ship_eng.wav
+   A /sound/chex/ship_ignite.wav
+   A /sound/chex/weapons
+   A /sound/chex/weapons/mini
+   A /sound/chex/weapons/mini/fire.wav
+   A /sound/chex/weapons/spoon
+   A /sound/chex/weapons/spoon/hitslime.wav
+   A /sound/chex/weapons/spoon/hitsolid.wav
+   A /sound/chex_menu.sndshd
+   A /sound/chex_snd.sndshd
+   A /sound/chex_stat.sndshd
+   A /sound/chex_voice.sndshd
+   A /sound/music
+   A /sound/music/chexintro.ogg
+   A /sound/music/chexpause.ogg
+   A /sound/music/chextheme.ogg
+   A /sound/music/e1m1.ogg
+   A /sound/music/sf_923.ogg
+   A /strings
+   A /strings/english.lang
+   A /temp.pk4
+   A /textures
+   A /textures/chex
+   A /textures/chex/chex_man_1.tga
+   A /textures/chex/chex_man_2.tga
+   A /textures/chex/decals
+   A /textures/chex/decals/bigslime_b.tga
+   A /textures/chex/decals/bigslime_d.tga
+   A /textures/chex/decals/bigslime_s.tga
+   A /textures/chex/decals/chex_newspaper.tga
+   A /textures/chex/decals/chexchieve_b.tga
+   A /textures/chex/decals/chexchieve_d.tga
+   A /textures/chex/decals/chexchieve_s.tga
+   A /textures/chex/decals/flemprint_l.tga
+   A /textures/chex/decals/flemprint_l_glow.tga
+   A /textures/chex/decals/flemprint_r.tga
+   A /textures/chex/decals/flemprint_r_glow.tga
+   A /textures/chex/decals/footprint_l.tga
+   A /textures/chex/decals/footprint_l_glow.tga
+   A /textures/chex/decals/footprint_r.tga
+   A /textures/chex/decals/footprint_r_glow.tga
+   A /textures/chex/decals/fsplat.tga
+   A /textures/chex/decals/hangar_left.tga
+   A /textures/chex/decals/hangar_right.tga
+   A /textures/chex/decals/hurt.tga
+   A /textures/chex/decals/hurt_a1.tga
+   A /textures/chex/decals/hurt_a2.tga
+   A /textures/chex/decals/ladypaint_b.tga
+   A /textures/chex/decals/ladypaint_d.tga
+   A /textures/chex/decals/ladypaint_s.tga
+   A /textures/chex/decals/maxcap_d.tga
+   A /textures/chex/decals/maxcap_s.tga
+   A /textures/chex/decals/no_milk_d.tga
+   A /textures/chex/decals/no_milk_s.tga
+   A /textures/chex/decals/observdeck_b.tga
+   A /textures/chex/decals/observdeck_d.tga
+   A /textures/chex/decals/observdeck_s.tga
+   A /textures/chex/decals/office_left.tga
+   A /textures/chex/decals/office_right.tga
+   A /textures/chex/decals/plugsocket_b.tga
+   A /textures/chex/decals/plugsocket_d.tga
+   A /textures/chex/decals/restroom_left.tga
+   A /textures/chex/decals/restroom_right.tga
+   A /textures/chex/decals/slime1_b.tga
+   A /textures/chex/decals/slime1_d.tga
+   A /textures/chex/decals/slime1_s.tga
+   A /textures/chex/decals/slime2_b.tga
+   A /textures/chex/decals/slime2_d.tga
+   A /textures/chex/decals/slime2_s.tga
+   A /textures/chex/decals/slime3_b.tga
+   A /textures/chex/decals/slime3_d.tga
+   A /textures/chex/decals/slime3_s.tga
+   A /textures/chex/decals/slime4_b.tga
+   A /textures/chex/decals/slime4_d.tga
+   A /textures/chex/decals/slime4_s.tga
+   A /textures/chex/decals/slime5_b.tga
+   A /textures/chex/decals/slime5_d.tga
+   A /textures/chex/decals/slime5_s.tga
+   A /textures/chex/decals/slime_trail_a.tga
+   A /textures/chex/decals/slime_trail_d.tga
+   A /textures/chex/decals/squad_left.tga
+   A /textures/chex/decals/squad_right.tga
+   A /textures/chex/decals/storage_left.tga
+   A /textures/chex/decals/storage_right.tga
+   A /textures/chex/doors
+   A /textures/chex/doors/black_d.tga
+   A /textures/chex/doors/black_ed.tga
+   A /textures/chex/doors/black_local.tga
+   A /textures/chex/doors/black_s.tga
+   A /textures/chex/doors/door1_d.tga
+   A /textures/chex/doors/door1_ed.tga
+   A /textures/chex/doors/door1_local.tga
+   A /textures/chex/doors/door1_s.tga
+   A /textures/chex/doors/redhangardoor_d.tga
+   A /textures/chex/doors/redhangardoor_ed.tga
+   A /textures/chex/doors/redhangardoor_local.tga
+   A /textures/chex/doors/redhangardoor_s.tga
+   A /textures/chex/e1m1
+   A /textures/chex/e1m1/splash.tga
+   A /textures/chex/floors
+   A /textures/chex/floors/bluetile_d.tga
+   A /textures/chex/floors/bluetile_ed.tga
+   A /textures/chex/floors/bluetile_local.tga
+   A /textures/chex/floors/bluetile_s.tga
+   A /textures/chex/floors/cementblack_d.tga
+   A /textures/chex/floors/cementblack_ed.tga
+   A /textures/chex/floors/cementgrey_d.tga
+   A /textures/chex/floors/cementgrey_ed.tga
+   A /textures/chex/floors/cementgrey_local.tga
+   A /textures/chex/floors/cementred_d.tga
+   A /textures/chex/floors/cementred_ed.tga
+   A /textures/chex/floors/federlogo_d.tga
+   A /textures/chex/floors/federlogo_ed.tga
+   A /textures/chex/floors/federlogo_local.tga
+   A /textures/chex/floors/federlogo_s.tga
+   A /textures/chex/floors/white_lines_d.tga
+   A /textures/chex/floors/white_lines_local.tga
+   A /textures/chex/floors/whitetile_d.tga
+   A /textures/chex/floors/whitetile_local.tga
+   A /textures/chex/floors/whitetile_s.tga
+   A /textures/chex/guis
+   A /textures/chex/guis/blue_background.tga
+   A /textures/chex/guis/blueborder_a.tga
+   A /textures/chex/guis/bottombar.tga
+   A /textures/chex/guis/button_g.tga
+   A /textures/chex/guis/chex_man_1.tga
+   A /textures/chex/guis/chex_man_2.tga
+   A /textures/chex/guis/comm_down_a.tga
+   A /textures/chex/guis/console.tga
+   A /textures/chex/guis/fedlogo_alpha.tga
+   A /textures/chex/guis/hangartop_a.tga
+   A /textures/chex/guis/map_arrow_up.tga
+   A /textures/chex/guis/map_center.tga
+   A /textures/chex/guis/map_scope.tga
+   A /textures/chex/guis/red_back.tga
+   A /textures/chex/guis/security_down_a.tga
+   A /textures/chex/guis/winned.tga
+   A /textures/chex/lights
+   A /textures/chex/lights/hittheroad10.gif
+   A /textures/chex/lights/squarelight_add.tga
+   A /textures/chex/lights/squarelight_d.tga
+   A /textures/chex/lights/squarelight_local.tga
+   A /textures/chex/map_scope.tga
+   A /textures/chex/maps
+   A /textures/chex/maps/e1m1.tga
+   A /textures/chex/maps/e1m1_c.tga
+   A /textures/chex/maps/sf.tga
+   A /textures/chex/metals
+   A /textures/chex/metals/borderedwall_d.tga
+   A /textures/chex/metals/borderedwall_ed.tga
+   A /textures/chex/metals/borderedwall_local.tga
+   A /textures/chex/metals/borderedwall_s.tga
+   A /textures/chex/metals/brushedmetal_d.tga
+   A /textures/chex/metals/brushedmetal_ed.tga
+   A /textures/chex/metals/brushedmetal_local.tga
+   A /textures/chex/metals/brushedmetal_s.tga
+   A /textures/chex/metals/diamond_local.tga
+   A /textures/chex/metals/hinge_d.tga
+   A /textures/chex/metals/hinge_local.tga
+   A /textures/chex/metals/hinge_s.tga
+   A /textures/chex/metals/ventinside_d.tga
+   A /textures/chex/metals/ventinside_ed.tga
+   A /textures/chex/metals/ventinside_local.tga
+   A /textures/chex/metals/ventinside_s.tga
+   A /textures/chex/particles
+   A /textures/chex/particles/slime.tga
+   A /textures/chex/particles/zorch.tga
+   A /textures/chex/particles/zorch1.tga
+   A /textures/chex/particles/zorch2.tga
+   A /textures/chex/particles/zorch_beam.tga
+   A /textures/chex/particles/zorchgun
+   A /textures/chex/particles/zorchgun/back.tga
+   A /textures/chex/particles/zorchgun/center.tga
+   A /textures/chex/particles/zorchgun/shock1.tga
+   A /textures/chex/particles/zorchgun/shock2.tga
+   A /textures/chex/sf
+   A /textures/chex/sf/field.tga
+   A /textures/chex/sf/landing_zone.tga
+   A /textures/chex/sf/splash.tga
+   A /textures/chex/slug
+   A /textures/chex/slug/slug_d.tga
+   A /textures/chex/slug/slug_h.tga
+   A /textures/chex/slug/slug_local.tga
+   A /textures/chex/slug/slug_s.tga
+   A /textures/chex/trim
+   A /textures/chex/trim/blue_key_add.tga
+   A /textures/chex/trim/blue_key_d.tga
+   A /textures/chex/trim/blue_key_local.tga
+   A /textures/chex/trim/hazard_stipes_d.tga
+   A /textures/chex/trim/hazard_stipes_local.tga
+   A /textures/chex/trim/hazard_stipes_s.tga
+   A /textures/chex/trim/pipe_blue_d.tga
+   A /textures/chex/trim/pipe_blue_local.tga
+   A /textures/chex/trim/pipe_blue_s.tga
+   A /textures/chex/trim/proj_screen_d.tga
+   A /textures/chex/trim/proj_screen_local.tga
+   A /textures/chex/trim/red_key_add.tga
+   A /textures/chex/trim/white_floor_d.tga
+   A /textures/chex/trim/white_floor_local.tga
+   A /textures/chex/trim/white_floor_s.tga
+   A /textures/chex/walls
+   A /textures/chex/walls/bigchexposter_d.tga
+   A /textures/chex/walls/bigchexposter_ed.tga
+   A /textures/chex/walls/bigchexposter_s.tga
+   A /textures/chex/walls/bluemarble_d.tga
+   A /textures/chex/walls/bluemarble_ed.tga
+   A /textures/chex/walls/bluemarble_local.tga
+   A /textures/chex/walls/bluemarble_s.tga
+   A /textures/chex/walls/brownboxy_d.tga
+   A /textures/chex/walls/brownboxy_ed.tga
+   A /textures/chex/walls/brownboxy_local.tga
+   A /textures/chex/walls/brownboxy_s.tga
+   A /textures/chex/walls/greysquare_d.tga
+   A /textures/chex/walls/greysquare_ed.tga
+   A /textures/chex/walls/greysquare_local.tga
+   A /textures/chex/walls/greysquare_s.tga
+   A /textures/chex/walls/hangwalltop_d.tga
+   A /textures/chex/walls/hangwalltop_ed.tga
+   A /textures/chex/walls/hangwalltop_local.tga
+   A /textures/chex/walls/hangwalltop_s.tga
+   A /textures/chex/walls/redcabinet_d.tga
+   A /textures/chex/walls/redcabinet_ed.tga
+   A /textures/chex/walls/redcabinet_local.tga
+   A /textures/chex/walls/redcabinet_s.tga
+   A /textures/chex/zorch.tga
+   A /textures/common
+   A /textures/common/speaker.tga
+   A /textures/common/trigrelay.tga
+   A /textures/decals
+   A /textures/decals/fsplat11.tga
+   A /textures/decals/fsplat2.tga
+   A /textures/decals/fsplat5.tga
+   A /textures/decals/fsplat7.tga
+   A /textures/editor
+   A /textures/editor/default.tga
+   A /textures/editor/visportal.tga
+   A /textures/flem
+   A /textures/flem/biped_add.tga
+   A /textures/flem/biped_d.tga
+   A /textures/flem/flem_add.tga
+   A /textures/flem/flem_d.tga
+   A /textures/flem/flem_ed.tga
+   A /textures/flem/flem_s.tga
+   A /textures/guis
+   A /textures/guis/hudmap_alpha.tga
+   A /textures/guis/ship_hatch
+   A /textures/guis/ship_hatch/Untitled-1.psd
+   A /textures/guis/ship_hatch/bigbutton.tga
+   A /textures/guis/ship_hatch/hatchback.tga
+   A /textures/guis/ship_hatch/hud copy.jpg
+   A /textures/guis/ship_hatch/hud.psd
+   A /textures/menu
+   A /textures/menu/hst_mars.tga
+   A /textures/menu/hst_mars_h.tga
+   A /tools
+   A /tools/atidds.awk
+   A /tools/chexdds.bat
+   A /tools/loadsize.bat
+   A /tools/lwo.c
+   A /tools/make makedds.bat
+   A /tools/md5export-readme.txt
+   A /tools/md5export.ms
+   A /tools/md5import-readme.txt
+   A /tools/md5importer.ms
+   A /tools/md5scale.c
+   A /tools/md5scale.h
+   A /tools/nvdds.awk
+   A /video
+   A /video/chex_intro.RoQ
+
+Initial import of ChexTrek zl1
+------------------------------------------------------------------------
