@@ -1,0 +1,282 @@
+namespace map_storage_facility {
+
+// 	#define SF_CRANE_L 2
+// 	#define SF_CRANE_R 1
+	boolean	door_broken;
+// 	boolean crane_move;
+// 	boolean crane_speak;
+// 	float crane_status;
+	boolean weapDamage;
+	
+// 	float crane_getStatus() {
+// 		if ( $crane_base.distanceTo( $crane_path_right ) >= 99 && $crane_base.distanceTo( $crane_path_left ) >= 99 )
+// 			return 0;
+// 		if ( $crane_base.distanceTo( $crane_path_right ) < 99 )
+// 			return 2;
+// 		else 
+// 			return 1;
+// 	}
+// 	
+// 	void crane_toggle_sound() {
+// 		if( crane_move && !crane_speak ) {
+// 			$crane_speaker.startSoundShader( "al4_plat_start", SND_CHANNEL_BODY2 );
+// 			$crane_speaker.startSoundShader( "loop_hum_04", SND_CHANNEL_BODY );
+// 			crane_speak = true;
+// 		}
+// 		if( !crane_move && crane_speak ) {
+// 			$crane_speaker.stopSound( SND_CHANNEL_BODY, 0 );
+// 			$crane_speaker.startSoundShader( "al4_plat_stop", SND_CHANNEL_BODY2 );
+// 			crane_speak=false;
+// 		}		
+// 	}
+// 			
+// 	void crane_mover( float type ) {
+// 		$crane_base.accelTime( 2 );
+// 		$crane_base.decelTime( 0 );
+// 		crane_toggle_sound();
+// 		while ( 1 ) {
+// 		    if( !crane_move ) {
+// 			    $crane_base.decelTime( 2 );
+// 		    }
+// 		    vector origin;
+// 			origin = $crane_base.getOrigin();
+// 		    if( type==SF_CRANE_R ) {
+// 			    origin_x -= 50;
+// 		    }
+// 		    if( type==SF_CRANE_L ) {
+// 			    origin_x += 50;
+// 		    }
+// 		    $crane_base.moveToPos( origin );
+// 		    $crane_base.accelTime( 0 );		    
+// 		    sys.waitFor( $crane_base );
+// 		    $crane_panel.setGuiParm ( "gui_parm2" , crane_getStatus() );
+// 		    if( !crane_move ) {
+// 			    crane_toggle_sound();
+// 			    return;
+// 		    }
+// 		    if( ( type==SF_CRANE_R && $crane_base.distanceTo( $crane_path_right ) < 99 ) ||
+// 			    ( type==SF_CRANE_L && $crane_base.distanceTo( $crane_path_left ) < 99 ) ) {
+// 			    crane_move = false;
+// 		    }
+// 	    }		    
+// 	}
+// 	
+// 	void crane_stop() {
+// 		crane_move = false;
+// 	}
+// 	
+// 	void crane_right() {
+// 		if ( !crane_move && crane_getStatus() != 2  ) {
+// 			crane_move = true;
+// 			thread crane_mover( SF_CRANE_R );
+// 		}
+// 	}
+// 	
+// 	void crane_left() {
+// 		if( !crane_move && crane_getStatus() != 1 ) {
+// 			crane_move = true;
+// 			thread crane_mover( SF_CRANE_L );
+// 		}
+// 	}
+	
+	void chex_gui() {
+		sys.wait( 5 ); //let things settle
+		while( 1 ) {
+			sys.trigger( $intro_tv );
+			float i = $intro_tv.startSoundShader( "chex_intro", SND_CHANNEL_ANY );
+			sys.wait( i + .5 );
+		}
+	}
+	
+	void end_trek_e1m1() {
+		sys.wait( 1 );
+		//sys.println( "e1m1" );
+		sys.trigger( $target_endlevel_3 );
+	}
+	
+	void end_trek_credits() {
+		sys.wait( 1 );
+		//sys.println( "credits" );
+		sys.trigger( $trigger_credits );
+		$target_endlevelgui_2.hide(); //CustomUI does UnregisterGUI() on hide
+	}
+	
+	void open_hangar() {
+		sys.trigger( $hbdoor1 );
+		sys.trigger( $hbdoor2 );
+		if( !door_broken ) {
+			$brokendoor.show();
+			$unbrokendoor.hide();
+			sys.trigger( $dooroids );
+			door_broken = true;
+		}
+		//disable GUI entirely
+		$hbcontrol.setGuiParm( "gui_parm3", "2" );
+	}
+	
+	void close_hangar() {
+		$hbdoor1.setKey( "locked", "1" );
+		$hbdoor2.setKey( "locked", "1" );
+		$hbcontrol.setGuiParm( "gui_parm3", "0" );
+	}	
+	
+	void weap_disable() {
+		while( 1 ) {
+			entity weap;
+			weap = $player1.getWeaponEntity();
+			if( weapDamage ) {
+				weap.setProj( weap.getKey( "def_projectile" ) );
+			} else {
+				weap.setProj( weap.getKey( "def_projectile" ) + "_nodamage" );
+			}
+			sys.wait( 1 ); //1 sec res is pretty good	
+		}
+	}
+	
+	void weap_enable() {
+		weapDamage = true;
+	}
+	
+	void riseflem() {
+		//SHOW FLEMOID//
+		float flem;
+		float risetime = 7;
+		flem = $flemriser.getJointHandle( "origin" );
+		vector flempostemp;
+		flempostemp_x = 0;
+		flempostemp_y = 0;
+		boolean cameraended = false;
+		float starttime = sys.getTime();
+		while( 1 ) {
+			flempostemp_z = 80*(((sys.getTime() - starttime)/risetime)-1);
+		//	sys.println( flempostemp );
+			$flemriser.setJointPos( flem, JOINTMOD_WORLD_OVERRIDE, flempostemp );
+			if( sys.getTime()-starttime>=risetime/2 && !cameraended ) {
+				sys.trigger( $func_cameraview_2 );
+				cameraended = true;
+			}
+				
+			if( flempostemp_z >= 0 ) {
+				break;
+			}
+			sys.waitFrame();
+		}
+		$flemriser.clearAllJoints();
+	}
+	
+	void shipTakeOff() {
+		$sf.startSoundShader( "sound/chex/ship_ignite", SND_CHANNEL_BODY );
+		sys.wait( .3 );
+		sys.trigger( $sf_fire_l );
+		sys.trigger( $sf_fire_r );
+		sys.wait( .5 );
+		sys.trigger( $sf_fire_l );
+		sys.trigger( $sf_fire_r );
+		sys.wait( .5 );
+		sys.trigger( $sf_fire_l );
+		sys.trigger( $sf_fire_r );
+		$sf.startSoundShader( "sound/chex/ship_eng", SND_CHANNEL_BODY2 );
+		$sf_door.accelTime( 2 );
+		$sf_door.decelTime( 2 );
+		$sf_door.time( 6 );
+		$sf_door.rotateTo( '0 0 0' );
+		$sf.accelTime( 4 );
+		$sf.decelTime( 1 );
+		$sf.time( 16 );
+		$sf.rotateTo( '0 45 0' );
+		$sf.accelTime( 8 );
+		$sf.time( 16 );
+		$sf.disableSplineAngles();
+		$sf.startSpline( $sf_1 );
+		sys.waitFor( $sf );
+		$sf.accelTime( 1 );
+		$sf.decelTime( 1 );
+		$sf.time( 3 );
+		$sf.rotateTo( '3 50 2' );
+		sys.waitFor( $sf );
+		$sf.rotateTo( '-5 20 -10' );
+		sys.waitFor( $sf );
+		$sf.accelTime( 2 );
+		$sf.time( 4 );
+		$sf.startSpline( $sf_2 );
+		sys.waitFor( $sf );
+		$sf.fadeSound( SND_CHANNEL_BODY2, -100, 7 );
+		$sf.wait( 7 );
+		$sf.stopSound( SND_CHANNEL_ANY, 0 );
+	}
+		
+	void main() {
+		//Flem Ship
+		$sf_door.bind( $sf );
+		$sf_glass.bind( $sf );
+		$sf_light.bind( $sf );
+		sys.trigger( $sf_fire_l );
+		sys.trigger( $sf_fire_r );
+		$sf_fire_l.bind( $sf );
+		$sf_fire_r.bind( $sf );
+		$sf_clip.bind( $sf );
+		$zorch_boxes_1.bind( $sf );
+		$zorch_boxes_2.bind( $sf );
+		$zorch_boxes_3.bind( $sf );
+		$zorch_boxes_4.bind( $sf );
+		$zorch_boxes_5.bind( $sf );
+		$zorch_boxes_6.bind( $sf );
+		$sf_mon.setAngles( '0 -90 0' );
+		$sf_mon.bind( $sf );
+		$sf_door.accelTime( 0 );
+		$sf_door.decelTime( 0 );
+		$sf_door.time( 1 );
+		$sf_door.rotateTo( '0 0 58' );
+		$sf.accelTime( 0 );
+		$sf.decelTime( 0 );
+		$sf.time( 1 );
+		$sf.rotateTo( '0 225 0' );
+		
+		//unused?
+		sys.setPersistantArg( "shotsfired", 0 ); 
+		
+		//Flem entry cs
+		door_broken = false;
+		
+		//disable weap
+		weapDamage = false;
+		
+		//Crane
+		sys.cacheSoundShader( "loop_hum_04" );
+		sys.cacheSoundShader( "al4_plat_start" );
+		sys.cacheSoundShader( "al4_plat_stop" );
+		
+		//Intro tv
+		sys.cacheSoundShader( "chex_intro" );
+		
+		sys.cacheSoundShader( "sound/chex/ship_ignite" );
+		sys.cacheSoundShader( "sound/chex/ship_eng" );
+		
+		//r_speeds get pretty harry w/ the mirror, perm disabled for now
+		//if( !((sys.getcvar( "com_machineSpec" ) == "3") || (sys.getcvar( "com_machineSpec" ) == "4")) )
+			$bay_floor.setSkin( "skins/chex/bay_floor_low" );
+			
+// 		//Crane
+//		crane_move=false;
+//		crane_speak=false;
+// 		$crane_light.bind( $crane_base );
+// 		$crane_lift.bind( $crane_base );
+// 		$crane_light_model.bind( $crane_base );
+// 		$crane_crate.bind( $crane_base );
+// 		$crane_base.accelTime( 2 );
+// 		$crane_base.decelTime( 2 );
+// 		//$crane_base.speed( 10 );
+// 		$crane_base.time( 3 );
+		
+		//Intro tv
+		thread chex_gui();
+		
+		//flem entry cs
+		$brokendoor.hide();
+		//DISABLE WEAPONS//
+		thread weap_disable();
+		
+	//	thread marker_lights();
+	//	thread test_angles();
+	}
+}

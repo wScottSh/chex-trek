@@ -1,0 +1,8 @@
+video/chex_intro
+{
+	translucent
+	{
+		videomap video/chex_intro.RoQ
+		linear
+	}
+}

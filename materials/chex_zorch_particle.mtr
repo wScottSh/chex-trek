@@ -1,0 +1,70 @@
+textures/chex/particles/zorch
+{
+
+	noselfShadow
+    noshadows	
+	translucent
+	discrete
+	nonsolid
+	noimpact
+	{
+		map textures/chex/particles/zorch.tga
+		blend add
+		zeroClamp
+		rgb		.2*sinTable [ time ] + .8
+		//vertexcolor
+	}
+}
+
+textures/chex/particles/zorch1
+{
+
+	noselfShadow
+    noshadows	
+	translucent
+	discrete
+	nonsolid
+	noimpact
+	{
+		map textures/chex/particles/zorch1.tga
+		blend add
+		zeroClamp
+		rgb		.2*sinTable [ time ] + .8
+		//vertexcolor
+	}
+}
+
+textures/chex/particles/zorch2
+{
+
+	noselfShadow
+    noshadows	
+	translucent
+	discrete
+	nonsolid
+	noimpact
+	{
+		map textures/chex/particles/zorch2.tga
+		blend add
+		zeroClamp
+		rgb		.2*sinTable [ time ] + .8
+		//vertexcolor
+	}
+}
+
+textures/chex/zorch_beam {
+	noSelfShadow
+	translucent
+	noShadows
+	twosided
+	//{
+	//	maskcolor
+		//map makealpha(textures/chex/ramp)
+	//}
+	{
+		blend add // gl_dst_alpha, gl_one
+		//maskalpha
+		map textures/chex/particles/zorch_beam //particles/zorch.tga
+		colored
+	}
+}

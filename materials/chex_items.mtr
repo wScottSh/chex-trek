@@ -1,0 +1,110 @@
+models/chex/keys/key_blue
+{
+	diffusemap models/chex/keys/keyb_d
+	bumpmap models/chex/keys/key_local
+	{
+		map models/chex/keys/key_add
+		rgb  sinTable [ time ]
+		blend add
+	}
+//AMBIENT LIGHTING
+   {
+             blend   add //gl_one, gl_dst_alpha
+      map   models/chex/keys/keyb_d
+      rgb 0.1
+   } 
+}
+models/chex/keys/key_red
+{
+	diffusemap models/chex/keys/keyr_d
+	bumpmap models/chex/keys/key_local
+	{
+		map models/chex/keys/key_add
+		rgb  sinTable [ time ]
+		blend add
+	}
+//AMBIENT LIGHTING
+   {
+             blend   add //gl_one, gl_dst_alpha
+      map   models/chex/keys/keyr_d
+      rgb 0.1
+   } 
+}
+models/chex/health_plus
+{
+	{
+		map models/chex/health_pls_c
+		blend add
+		rgb .6 + .3 * sinTable [ .5 * time ]
+		translate .2 * time, .3 * time
+	}
+	{	
+		map models/chex/health_pls_d
+		blend gl_src_alpha, gl_one_minus_src_alpha
+	}
+//AMBIENT LIGHTING
+   {
+             blend   add //gl_one, gl_dst_alpha
+      map   models/chex/health_pls_c
+      rgb 0.1
+   } 
+}
+models/chex/slimeoff
+{
+	diffusemap 	models/chex/slimeoff_d
+	bumpmap		models/chex/slimeoff_local
+	specularmap	models/chex/slimeoff_s
+//AMBIENT LIGHTING
+   {
+             blend   add //gl_one, gl_dst_alpha
+      map   models/chex/slimeoff_d
+      rgb 0.1
+   } 
+}
+models/chex/large_recharge
+{
+noselfshadow
+   diffusemap models/chex/large_recharge_d
+   bumpmap models/chex/large_recharge_local
+   specularmap models/chex/large_recharge_s
+	{
+		map models/chex/large_recharge_add.tga
+		blend add
+		rgb flickerblink[  .5 * time ]
+	}
+//AMBIENT LIGHTING
+   {
+             blend   add //gl_one, gl_dst_alpha
+      map   models/chex/large_recharge_d
+      rgb 0.1
+   } 
+}
+models/chex/usb
+
+{
+   diffusemap 	models/chex/usb_d
+   bumpmap 	models/chex/usb_local
+   specularmap 	models/chex/usb_s
+   {
+   		map models/chex/usb_add
+            	blend add
+	}
+//AMBIENT LIGHTING
+   {
+             blend   add //gl_one, gl_dst_alpha
+      map   models/chex/usb_d
+      rgb 0.1
+   } 
+}
+//bowl o fruit
+models/chex/fruit_bowl
+{
+	diffusemap models/chex/fruit_bowl_d
+	bumpmap models/chex/fruit_bowl_local
+//AMBIENT LIGHTING
+   {
+             blend   add //gl_one, gl_dst_alpha
+      map   models/chex/fruit_bowl_d
+      rgb 0.1
+   } 
+}

@@ -1,0 +1,17 @@
+windowDef Desktop
+{
+	rect	0 ,0 ,640 ,480
+	nocursor	1
+	windowDef Movie
+	{
+		rect	31, 24, 577, 428
+		background	"video/chex_intro"
+		matcolor	1, 1, 1, 1
+		visible	1
+
+		onTrigger {
+			resetCinematics ;
+		}
+
+	}
+}

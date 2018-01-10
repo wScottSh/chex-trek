@@ -1,0 +1,779 @@
+//BIG SLIME ON A FLAT WALL
+textures/chex/decals/bigslime
+{
+ 	qer_editorimage textures/chex/decals/bigslime_d.tga
+	noShadows
+	//polygonOffset
+	nonsolid
+	noimpact
+	surftype15
+	{       
+      blend	diffusemap
+	 map	textures/chex/decals/bigslime_d.tga
+	 alphaTest 0.5
+	}
+	specularmap	textures/chex/decals/bigslime_s.tga
+	bumpmap 	heightmap (textures/chex/decals/bigslime_b.tga, 1)
+//AMBIENT LIGHTING
+   {
+             blend   add //gl_one, gl_dst_alpha
+      map   textures/chex/decals/bigslime_d.tga
+      rgb 0.3
+   } 
+}
+
+//SLIME 1
+textures/chex/decals/slime1
+
+{
+ 	qer_editorimage textures/chex/decals/slime1_d.tga
+	noShadows
+	//polygonOffset
+	nonsolid
+	noimpact
+	surftype15
+	{       
+      blend	diffusemap
+	 map	textures/chex/decals/slime1_d.tga
+	 alphaTest 0.5
+	}
+	specularmap	textures/chex/decals/slime1_s.tga
+	bumpmap 	heightmap (textures/chex/decals/slime1_b.tga, 1)
+//AMBIENT LIGHTING
+   {
+             blend   add //gl_one, gl_dst_alpha
+      map   textures/chex/decals/slime1_d.tga
+      rgb 0.3
+   } 
+}
+
+//SLIME 1 OVER LIGHT
+textures/chex/decals/slime1_light
+
+{
+ 	qer_editorimage textures/chex/decals/slime1_d.tga
+	noShadows
+	//polygonOffset
+	nonsolid
+	noimpact
+	surftype15
+	{       
+      blend	diffusemap
+	 map	textures/chex/decals/slime1_d.tga
+	 alphaTest 0.5
+	}
+	specularmap	textures/chex/decals/slime1_s.tga
+	bumpmap 	heightmap (textures/chex/decals/slime1_b.tga, 1)
+//AMBIENT LIGHTING
+   {
+             blend   add //gl_one, gl_dst_alpha
+      map   textures/chex/decals/slime1_d.tga
+      rgb 0.3
+   }
+	{
+		map textures/base_light/bluetex4aadd
+		blend add
+		rgb .5
+		clamp
+		scale 2, 2
+		translate -.25, -.25
+	}
+}
+
+//SLIME 2
+textures/chex/decals/slime2
+{
+ 	qer_editorimage textures/chex/decals/slime2_d.tga
+	noShadows
+	//polygonOffset
+	nonsolid
+	noimpact
+	surftype15
+	{       
+      blend	diffusemap
+	 map	textures/chex/decals/slime2_d.tga
+	 alphaTest 0.5
+	}
+	specularmap	textures/chex/decals/slime2_s.tga
+	bumpmap 	heightmap (textures/chex/decals/slime2_b.tga, 1)
+//AMBIENT LIGHTING
+   {
+             blend   add //gl_one, gl_dst_alpha
+      map   textures/chex/decals/slime2_d.tga
+      rgb 0.3
+   } 
+}
+
+//SLIME 3
+textures/chex/decals/slime3
+{
+ 	qer_editorimage textures/chex/decals/slime3_d.tga
+	noShadows
+	//polygonOffset
+	nonsolid
+	noimpact
+	surftype15
+	{       
+      blend	diffusemap
+	 map	textures/chex/decals/slime3_d.tga
+	 alphaTest 0.5
+	}
+	specularmap	textures/chex/decals/slime3_s.tga
+	bumpmap 	heightmap (textures/chex/decals/slime3_b.tga, 1)
+//AMBIENT LIGHTING
+   {
+             blend   add //gl_one, gl_dst_alpha
+      map   textures/chex/decals/slime3_d.tga
+      rgb 0.3
+   } 
+}
+
+//SLIME 4
+textures/chex/decals/slime4
+{
+ 	qer_editorimage textures/chex/decals/slime4_d.tga
+	noShadows
+	//polygonOffset
+	nonsolid
+	noimpact
+	surftype15
+	{       
+      blend	diffusemap
+	 map	textures/chex/decals/slime4_d.tga
+	 alphaTest 0.5
+	}
+	specularmap	textures/chex/decals/slime4_s.tga
+	bumpmap 	heightmap (textures/chex/decals/slime4_b.tga, 1)
+//AMBIENT LIGHTING
+   {
+             blend   add //gl_one, gl_dst_alpha
+      map   textures/chex/decals/slime4_d.tga
+      rgb 0.3
+   } 
+}
+
+//SLIME 5
+textures/chex/decals/slime5
+{
+ 	qer_editorimage textures/chex/decals/slime5_d.tga
+	noShadows
+	//polygonOffset
+	nonsolid
+	noimpact
+	surftype15
+	{       
+      blend	diffusemap
+	 map	textures/chex/decals/slime5_d.tga
+	 alphaTest 0.5
+	}
+	specularmap	textures/chex/decals/slime5_s.tga
+	bumpmap 	heightmap (textures/chex/decals/slime5_b.tga, 1)
+//AMBIENT LIGHTING
+   {
+             blend   add //gl_one, gl_dst_alpha
+      map   textures/chex/decals/slime5_d.tga
+      rgb 0.3
+   } 
+}
+
+//NO MILK FACILITY
+textures/chex/decals/no_milk
+
+{
+ 	qer_editorimage textures/chex/decals/no_milk_d.tga
+	noShadows
+	//polygonOffset
+	nonsolid
+	noimpact
+	{       
+      blend	diffusemap
+	 map	textures/chex/decals/no_milk_d.tga
+	 alphaTest 0.5
+	}
+	specularmap	textures/chex/decals/no_milk_s.tga
+	//bumpmap 	heightmap (textures/chex/decals/bigslime_b.tga, 1)
+//AMBIENT LIGHTING
+   {
+             blend   add //gl_one, gl_dst_alpha
+      map   textures/chex/decals/no_milk_d.tga
+      rgb 0.1
+   } 
+}
+
+//OBSERVATION DECK
+textures/chex/decals/observdeck
+
+{
+ 	qer_editorimage textures/chex/decals/observdeck_d.tga
+	noShadows
+	//polygonOffset
+	nonsolid
+	noimpact
+	{       
+      blend	diffusemap
+	 map	textures/chex/decals/observdeck_d.tga
+	 alphaTest 0.5
+	}
+	specularmap	textures/chex/decals/observdeck_s.tga
+	bumpmap 	heightmap (textures/chex/decals/observdeck_b.tga, 1)
+//AMBIENT LIGHTING
+   {
+             blend   add //gl_one, gl_dst_alpha
+      map   textures/chex/decals/observdeck_d.tga
+      rgb 0.1
+   } 
+}
+
+//MAX CAPACITY
+textures/chex/decals/maxcap
+
+{
+ 	qer_editorimage textures/chex/decals/maxcap_d.tga
+	noShadows
+	//polygonOffset
+	nonsolid
+	noimpact
+	{       
+      blend	diffusemap
+	 map	textures/chex/decals/maxcap_d.tga
+	 alphaTest 0.5
+	}
+	specularmap	textures/chex/decals/maxcap_s.tga
+	//bumpmap 	heightmap (textures/chex/decals/bigslime_b.tga, 1)
+//AMBIENT LIGHTING
+   {
+             blend   add //gl_one, gl_dst_alpha
+      map   textures/chex/decals/maxcap_d.tga
+      rgb 0.1
+   } 
+}
+
+//CERTIFICATE OF CHEXCHIEVEMENT
+textures/chex/decals/chexchieve
+
+{
+ 	qer_editorimage textures/chex/decals/chexchieve_d.tga
+	noShadows
+	//polygonOffset
+	nonsolid
+	noimpact
+	{       
+      blend	diffusemap
+	 map	textures/chex/decals/chexchieve_d.tga
+	 alphaTest 0.5
+	}
+	specularmap	textures/chex/decals/chexchieve_s.tga
+	bumpmap 	heightmap (textures/chex/decals/chexchieve_b.tga, 1)
+//AMBIENT LIGHTING
+   {
+             blend   add //gl_one, gl_dst_alpha
+      map   textures/chex/decals/chexchieve_d.tga
+      rgb 0.1
+   } 
+}
+
+//BOSS LADY CHICK PERSON
+textures/chex/decals/ladypaint
+
+{
+ 	qer_editorimage textures/chex/decals/ladypaint_d.tga
+	noShadows
+	//polygonOffset
+	nonsolid
+	noimpact
+	{       
+      blend	diffusemap
+	 map	textures/chex/decals/ladypaint_d.tga
+	 alphaTest 0.5
+	}
+	specularmap	textures/chex/decals/ladypaint_s.tga
+	//bumpmap 	heightmap (textures/chex/decals/ladypaint_b.tga, 1)
+//AMBIENT LIGHTING
+   {
+             blend   add //gl_one, gl_dst_alpha
+      map   textures/chex/decals/ladypaint_d.tga
+      rgb 0.1
+   } 
+}
+
+//SLIME WALL BURN???
+textures/chex/decals/slime_wall_burn
+{
+	qer_editorimage textures/decals/plasma_burn.tga
+
+	DECAL_MACRO
+	surftype15
+	decalInfo 9999 10 ( 10 10 10 10 ) ( 0 0 0 0 )
+	{
+		blend	gl_one, gl_one
+		clamp
+		rgb .5
+		map textures/chex/decals/slime5_d
+		vertexColor
+	}
+}
+
+//NEWSPAPER
+textures/chex/decals/newspaper
+{
+	nonsolid
+	noimpact
+	noShadows
+	diffusemap textures/chex/decals/chex_newspaper
+   {
+             blend   add //gl_one, gl_dst_alpha
+      map   textures/chex/decals/chex_newspaper
+      rgb 0.1
+   } 
+}
+
+//OFFICE ARROW RIGHT
+textures/chex/decals/office_right
+{
+	nonsolid
+	noimpact
+	noShadows
+	{
+		map textures/chex/decals/office_right
+		blend diffusemap
+		alphatest .5
+	}
+   {
+             blend   add //gl_one, gl_dst_alpha
+      map   textures/chex/decals/office_right
+      rgb 0.1
+   } 
+}
+
+//OFFICE ARROW LEFT
+textures/chex/decals/office_left
+{
+	nonsolid
+	noimpact
+	noShadows
+	{
+		map textures/chex/decals/office_left
+		blend diffusemap
+		alphatest .5
+	}
+   {
+             blend   add //gl_one, gl_dst_alpha
+      map   textures/chex/decals/office_left
+      rgb 0.1
+   } 
+}
+
+//SQUADRON ARROW RIGHT
+textures/chex/decals/squad_right
+{
+	nonsolid
+	noimpact
+	noShadows
+	{
+		map textures/chex/decals/squad_right
+		blend diffusemap
+		alphatest .5
+	}
+   {
+             blend   add //gl_one, gl_dst_alpha
+      map   textures/chex/decals/squad_right
+      rgb 0.1
+   } 
+}
+
+//SQUADRON ARROW LEFT
+textures/chex/decals/squad_left
+{
+	nonsolid
+	noimpact
+	noShadows
+	{
+		map textures/chex/decals/squad_left
+		blend diffusemap
+		alphatest .5
+	}
+   {
+             blend   add //gl_one, gl_dst_alpha
+      map   textures/chex/decals/squad_left
+      rgb 0.1
+   } 
+}
+
+//STORAGE ARROW RIGHT
+textures/chex/decals/storage_right
+{
+	nonsolid
+	noimpact
+	noShadows
+	{
+		map textures/chex/decals/storage_right
+		blend diffusemap
+		alphatest .5
+	}
+   {
+             blend   add //gl_one, gl_dst_alpha
+      map   textures/chex/decals/storage_right
+      rgb 0.1
+   } 
+}
+
+//STORAGE ARROW LEFT
+textures/chex/decals/storage_left
+{
+	nonsolid
+	noimpact
+	noShadows
+	{
+		map textures/chex/decals/storage_left
+		blend diffusemap
+		alphatest .5
+	}
+   {
+             blend   add //gl_one, gl_dst_alpha
+      map   textures/chex/decals/storage_left
+      rgb 0.1
+   } 
+}
+
+//RESTROOM ARROW RIGHT
+textures/chex/decals/restroom_right
+{
+	nonsolid
+	noimpact
+	noShadows
+	{
+		map textures/chex/decals/restroom_right
+		blend diffusemap
+		alphatest .5
+	}
+   {
+             blend   add //gl_one, gl_dst_alpha
+      map   textures/chex/decals/restroom_right
+      rgb 0.1
+   } 
+}
+
+//RESTROOM ARROW LEFT
+textures/chex/decals/restroom_left
+{
+	nonsolid
+	noimpact
+	noShadows
+	{
+		map textures/chex/decals/restroom_left
+		blend diffusemap
+		alphatest .5
+	}
+   {
+             blend   add //gl_one, gl_dst_alpha
+      map   textures/chex/decals/restroom_left
+      rgb 0.1
+   } 
+}
+
+//HANGAR ARROW RIGHT
+textures/chex/decals/hangar_right
+{
+	nonsolid
+	noimpact
+	noShadows
+	{
+		map textures/chex/decals/hangar_right
+		blend diffusemap
+		alphatest .5
+	}
+   {
+             blend   add //gl_one, gl_dst_alpha
+      map   textures/chex/decals/hangar_right
+      rgb 0.1
+   } 
+}
+
+//HANGAR ARROW LEFT
+textures/chex/decals/hangar_left
+{
+	nonsolid
+	noimpact
+	noShadows
+	{
+		map textures/chex/decals/hangar_left
+		blend diffusemap
+		alphatest .5
+	}
+   {
+             blend   add //gl_one, gl_dst_alpha
+      map   textures/chex/decals/hangar_left
+      rgb 0.1
+   } 
+}
+
+//FLEM SPLATS
+//WORLDSPLAT
+textures/chex/decals/fsplat
+{
+	qer_editorimage	textures/chex/decals/fsplat
+
+	nonsolid
+	noimpact
+	blood
+	polygonoffset
+	DECAL_MACRO
+	surftype15
+	decalInfo 9999 5 ( 1 1 1 1 ) ( 0 0 0 0 )
+	{       
+      	blend		gl_zero, gl_one_minus_src_color
+		map			textures/chex/decals/fsplat
+		clamp		// we don't want it to tile if the projection extends past the bounds
+		vertexColor	// oblique projections will be slightly faded down
+	}	
+}
+textures/chex/decals/fsplat2
+{
+	qer_editorimage	textures/decals/fsplat2
+
+	nonsolid
+	noimpact
+	blood
+	polygonoffset
+	DECAL_MACRO
+	surftype15
+	decalInfo 9999 5 ( 1 1 1 1 ) ( 0 0 0 0 )
+	{       
+      	blend		gl_zero, gl_one_minus_src_color
+		map			textures/decals/fsplat2
+		clamp		// we don't want it to tile if the projection extends past the bounds
+		vertexColor	// oblique projections will be slightly faded down
+	}	
+}
+textures/chex/decals/fsplat3
+{
+	qer_editorimage	textures/decals/fsplat5
+
+	nonsolid
+	noimpact
+	blood
+	polygonoffset
+	DECAL_MACRO
+	surftype15
+	decalInfo 9999 5 ( 1 1 1 1 ) ( 0 0 0 0 )
+	{       
+      	blend		gl_zero, gl_one_minus_src_color
+		map			textures/decals/fsplat5
+		clamp		// we don't want it to tile if the projection extends past the bounds
+		vertexColor	// oblique projections will be slightly faded down
+	}	
+}
+textures/chex/decals/fsplat4
+{
+	qer_editorimage	textures/decals/fsplat7
+
+	nonsolid
+	noimpact
+	blood
+	polygonoffset
+	DECAL_MACRO
+	surftype15
+	decalInfo 9999 5 ( 1 1 1 1 ) ( 0 0 0 0 )
+	{       
+      	blend		gl_zero, gl_one_minus_src_color
+		map			textures/decals/fsplat7
+		clamp		// we don't want it to tile if the projection extends past the bounds
+		vertexColor	// oblique projections will be slightly faded down
+	}	
+}
+textures/chex/decals/fsplat5
+{
+	qer_editorimage	textures/decals/fsplat11
+
+	nonsolid
+	noimpact
+	blood
+	polygonoffset
+	DECAL_MACRO
+	surftype15
+	decalInfo 9999 5 ( 1 1 1 1 ) ( 0 0 0 0 )
+	{       
+      	blend		gl_zero, gl_one_minus_src_color
+		map			textures/decals/fsplat11
+		clamp		// we don't want it to tile if the projection extends past the bounds
+		vertexColor	// oblique projections will be slightly faded down
+	}	
+}
+//AISPLAT
+textures/chex/decals/hurt
+{
+	qer_editorimage textures/chex/decals/hurt
+	DECAL_MACRO
+	translucent
+	{
+		map makealpha( textures/chex/decals/hurt_a2.tga )
+		rotate .2 * time
+		clamp
+		maskcolor
+	}
+	{
+		if ( parm7 == 0 )
+		maskalpha
+		blend gl_dst_alpha, gl_one
+		rotate time
+		map	textures/chex/decals/hurt
+		clamp
+	}
+}
+textures/chex/decals/hurt2
+{
+	qer_editorimage textures/chex/decals/hurt
+	DECAL_MACRO
+	{
+		if ( parm7 == 0 )
+		blend gl_src_alpha, gl_one
+		rotate time
+		map	textures/chex/decals/hurt
+		clamp
+	}
+}
+
+textures/chex/decals/chex_footprint_r {
+	qer_editorimage	textures/chex/decals/footprint_r
+
+	nonsolid
+	noimpact
+	blood
+	polygonoffset
+	DECAL_MACRO
+	decalInfo 9999 5 ( 1 1 1 1 ) ( 0 0 0 0 )
+	{       
+      	blend		gl_zero, gl_one_minus_src_color
+		map			textures/chex/decals/footprint_r
+		clamp		// we don't want it to tile if the projection extends past the bounds
+		vertexColor	// oblique projections will be slightly faded down
+	}
+//AMBIENT LIGHTING
+   {
+   	//matt: added fade
+    clamp  
+   	vertexColor
+             blend   add
+      map   textures/chex/decals/footprint_r_glow
+      rgb 0.3
+   } 
+}
+
+textures/chex/decals/chex_footprint_l {
+	qer_editorimage	textures/chex/decals/footprint_l
+
+	nonsolid
+	noimpact
+	blood
+	polygonoffset
+	DECAL_MACRO
+	decalInfo 9999 5 ( 1 1 1 1 ) ( 0 0 0 0 )
+	{       
+      	blend		gl_zero, gl_one_minus_src_color
+		map			textures/chex/decals/footprint_l
+		clamp		// we don't want it to tile if the projection extends past the bounds
+		vertexColor	// oblique projections will be slightly faded down
+	}
+//AMBIENT LIGHTING
+   {
+   //matt: added fade
+   	clamp  
+   	vertexColor
+             blend   add
+      map   textures/chex/decals/footprint_l_glow
+      rgb 0.3
+   } 
+}
+
+textures/chex/decals/flemprint_l {
+	qer_editorimage	textures/chex/decals/flemprint_l
+	nonsolid
+	noimpact
+	blood
+	polygonoffset
+	DECAL_MACRO
+	decalInfo 9999 5 ( 1 1 1 1 ) ( 0 0 0 0 )
+	{       
+      	blend		gl_zero, gl_one_minus_src_color
+		map			textures/chex/decals/flemprint_l
+		clamp		// we don't want it to tile if the projection extends past the bounds
+		vertexColor	// oblique projections will be slightly faded down
+	}
+	{
+		vertexcolor
+		clamp
+		blend add
+		map textures/chex/decals/flemprint_l_glow
+		rgb 0.3
+	}
+}
+
+textures/chex/decals/flemprint_r {
+	qer_editorimage	textures/chex/decals/flemprint_r
+	nonsolid
+	noimpact
+	blood
+	polygonoffset
+	DECAL_MACRO
+	decalInfo 9999 5 ( 1 1 1 1 ) ( 0 0 0 0 )
+	{       
+      	blend		gl_zero, gl_one_minus_src_color
+		map			textures/chex/decals/flemprint_r
+		clamp		// we don't want it to tile if the projection extends past the bounds
+		vertexColor	// oblique projections will be slightly faded down
+	}
+	{
+		rgb 0.3
+		vertexcolor
+		clamp
+		blend add
+		map textures/chex/decals/flemprint_r_glow
+	}
+}
+
+textures/chex/decals/slime_trail {
+	nonsolid
+	noimpact
+	blood
+	surftype15
+	//specularmap	textures/flem/flem_s.tga
+	//{
+	//	blend bumpmap
+	//	map addnormals( textures/chex/slug/slug_local.tga , heightmap(textures/chex/slug/slug_h.tga,50))
+	//	scroll	time * .009 , time * -0.1
+	//}
+	polygonoffset
+	{
+		colored
+		blend GL_ZERO, GL_ONE_MINUS_SRC_COLOR
+		map textures/chex/decals/slime_trail_d
+		//rgb .5
+		clamp
+	}
+	{
+		rgb .4
+		alpha parm3
+		blend GL_SRC_ALPHA, GL_ONE
+		map textures/chex/decals/slime_trail_a
+		clamp
+	}
+}
+
+textures/decals/zorch_burn
+{
+	qer_editorimage textures/decals/plasma_burn.tga
+
+	DECAL_MACRO
+	decalInfo 0.5 10 ( 1 1 1 6 ) ( -5 -5 -5 0 )		// fade rgb down fast (clamps to 0), but leave alpha clamped at 1 for the first nine seconds
+	{       
+      	blend		gl_zero, gl_one_minus_src_alpha
+		map			makealpha(textures/decals/plasma_burn.tga)
+		clamp		// we don't want it to tile if the projection extends past the bounds
+		vertexColor
+	}
+	{
+      	blend	add  
+		map		textures/chex/decals/zorch_mark
+		vertexColor
+	}
+}

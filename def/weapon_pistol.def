@@ -1,0 +1,260 @@
+/***********************************************************************
+
+	weapon_pistol.def
+
+	anim fire2					models/md5/weapons/pistol_view/fire2.md5anim {
+		frame 1					sound_weapon player_pistol_fire
+	}
+	
+	anim fire3 					models/md5/weapons/pistol_view/fire3.md5anim {
+		frame 1					sound_weapon player_pistol_fire
+	}
+	
+	anim fire4 					models/md5/weapons/pistol_view/fire4.md5anim {
+		frame 1					sound_weapon player_pistol_fire
+	}
+
+
+***********************************************************************/
+
+export fred {
+	// view model pistol
+	options -prefix PISTOL_ -keep barrel eject flash -parent flash Bod -parent barrel Bar -parent Ext eject -parent Bar Bod -parent eject Bod -parent Bod Rhand1 -parent Luparm1 Rloarm1 -parent Cli Bod -parent Trig Bod -rename origin blah -sourcedir models/weapons/pistol/fred/cycles -destdir models/md5/weapons/pistol_view
+
+	mesh	idle.ma -dest viewpistol
+	anim	idle.ma
+	anim	idle_empty.ma
+	anim	fire1.ma
+	anim	fire2.ma
+	anim	fire3.ma
+	anim	fire4.ma
+	anim	put_away.ma
+	//anim	models/weapons/pistol/fred/cycles/raise3.ma -dest models/md5/weapons/pistol_view/raise3
+	anim	raise.ma
+	anim	reload_empty.ma
+	anim	reload_empty.ma -range 1 14 -dest empty_reload_start
+
+	// world model pistol
+	options -ignorescale -prefix PLAYER_PISTOL_ -keep pistolclip ATTACHER barrel flash eject -parent eject pbody -parent flash pbody -parent pistolclip pbody -rename pbarrel barrel -rename ATTACHER origin -clearorigin
+
+	addoptions -skipmesh PLAYER_pistolBarrel
+	addoptions -skipmesh PLAYER_pistolExtender
+	addoptions -skipmesh PLAYER_pistolTrigger
+	addoptions -skipmesh PLAYER_pistolBody
+	addoptions -skipmesh PLAYER_pistolClip1
+
+	mesh	models/characters/player/mocap/pistol_idle.mb -dest models/md5/weapons/pistol_world/worldpistol
+	anim	models/characters/player/mocap/pistol_idle.mb -dest models/md5/weapons/pistol_world/pistol_idle
+}
+
+entityDef weapon_pistol {
+	"editor_color"				".3 .3 1"
+	"editor_mins"				"-16 -16 0"
+	"editor_maxs"				"16 16 32"
+	"editor_usage"				"Pistol"
+	"editor_rotatable"		"1"
+
+	"spawnclass"				"idItem"
+	"size"						"32 32 32"
+	"model"						"models/weapons/pistol/w_pistol.lwo"
+	"model_view" 				"viewmodel_pistol"
+	"model_world" 				"worldmodel_pistol"
+	"joint_attach"				"PISTOL_ATTACHER"
+	"def_dropItem"				"moveable_item_pistol"
+
+	"inv_name"					"Pistol"
+	"inv_weapon"				"weapon_pistol"
+	"inv_item"					"5"
+	"inv_ammo_bullets"			"12"
+	"icon"						"guis/assets/hud/wpn_1"
+
+	"weapon_scriptobject"		"weapon_pistol"
+	"def_projectile"			"projectile_minizorchblast"
+	"ammoType"					"ammo_bullets"
+	"ammoRequired"				"1"
+	"clipSize"					"12"
+	"lowAmmo"					"4"
+	"mtr_flashShader"			"muzzleflash"
+	"flashColor"				"1 0.8 0.4"
+	"flashRadius"				"120"
+	"silent_fire"				"0"
+	"recoilTime"				"125"
+	"recoilAngles"				"-1 0 0"
+
+	"weaponAngleOffsetAverages" "10"
+	"weaponAngleOffsetScale" 	".25"
+	"weaponAngleOffsetMax"		"10"
+	"weaponOffsetTime"			"400"
+	"weaponOffsetScale"			"0.005"
+
+	"hide_time"					"0.3"								// time to hide weapon when talking to npcs or looking at guis
+	"hide_distance"				"-15"								// distance to offset weapon when talking to npcs or looking at guis
+
+	"smoke_muzzle"				"muzzlesmoke.prt"
+//	"def_ejectBrass"			"debris_brass"
+	"ejectBrassDelay"			"10"
+	
+	"snd_acquire"				"sound_weapon_acquire"
+	"snd_respawn"				"sound_weapon_respawn"
+	
+	"skin_invisible"			"skins/pistol_invis"
+	
+	"spread"					"0"
+}
+
+entityDef moveable_item_pistol {
+	"inherit"					"weapon_pistol"
+	"spawnclass"				"idMoveableItem"
+	"density"					"0.05"
+	"friction"					"0.2"
+	"bouncyness"				"0"
+}
+
+model worldmodel_pistol {
+	mesh 						models/md5/weapons/pistol_world/worldpistol.md5mesh
+
+	anim idle 					models/md5/weapons/pistol_world/pistol_idle.md5anim
+	anim idle_empty				models/md5/weapons/pistol_world/pistol_idle.md5anim
+	anim aim					models/md5/weapons/pistol_world/pistol_idle.md5anim
+	anim fire1 					models/md5/weapons/pistol_world/pistol_idle.md5anim
+	anim putaway				models/md5/weapons/pistol_world/pistol_idle.md5anim
+	anim raise					models/md5/weapons/pistol_world/pistol_idle.md5anim
+	anim reload					models/md5/weapons/pistol_world/pistol_idle.md5anim
+	anim noammo					models/md5/weapons/pistol_world/pistol_idle.md5anim
+}
+
+model viewmodel_pistol {
+	mesh						models/md5/weapons/pistol_view/viewpistol.md5mesh
+	
+	anim raise 					models/md5/weapons/pistol_view/raise.md5anim {
+		frame 7					sound_body sound/chex/weapons/mini/raise
+	}
+	anim idle					models/md5/weapons/pistol_view/idle.md5anim
+	anim idle_empty				models/md5/weapons/pistol_view/idle_empty.md5anim
+	
+	anim fire1					models/md5/weapons/pistol_view/fire1.md5anim {
+		frame 1					sound_weapon sound/chex/weapons/mini/fire
+	}
+	
+	
+		
+	anim reload 				models/md5/weapons/pistol_view/reload_empty.md5anim {
+		frame 1					sound_weapon player_pistol_reload
+	}
+	
+	anim noammo 				models/md5/weapons/pistol_view/empty_reload_start.md5anim {
+		frame 1					sound_body player_pistol_empty
+	}
+
+	anim putaway 				models/md5/weapons/pistol_view/put_away.md5anim
+}
+
+entityDef	damage_bullet_pistol {
+	"damage"			"14"
+	"kickDir"			"1 0 0"
+
+	"mtr_blob"			"genericDamage"
+	"blob_time"			"300"
+	"blob_size"			"400"
+	"blob_offset_x"		"400"
+
+	"knockback"			"1"
+	
+	"gib"				"1"
+	
+	
+	"smoke_wound_flesh"	    "chex_beam" //"burstysquirt.prt"
+	
+	"mtr_wound_flesh"	    "textures/chex/decals/hurt"
+	
+	"mtr_wound_metal"	    "textures/decals/hurtmetal"
+	"mtr_wound_ricochet"	"textures/decals/hurtmetal"
+	
+	"mtr_splat_flesh"	"textures/chex/decals/fsplat"
+	"mtr_splat_flesh2"	"textures/chex/decals/fsplat2"
+	"mtr_splat_flesh3"	"textures/chex/decals/fsplat3"
+	"mtr_splat_flesh4"	"textures/chex/decals/fsplat4"
+	"mtr_splat_flesh5"	"textures/chex/decals/fsplat5"
+	
+	// the flesh impact is used in the damage so players hear it on their body
+	// the other impacts are played on detonation
+//	"snd_flesh"			"bullet_impact_flesh"
+
+	"kick_time"			"400"
+	"kick_amplitude"	"1"
+
+	"dv_time"			"100"
+}
+
+entityDef projectile_minizorchblast {
+	"spawnclass"				"idProjectile"
+	"mins"						"-6 -6 -4"
+	"maxs"						"6 6 4"
+	"cone"						"3"
+//	"model" 					"models/particles/plasma_bolt/plasma_bolt.lwo"
+
+	"def_damage"				"damage_bullet_pistol"
+
+	"launchFromBarrel"			"1"
+	"health"					"0"					// amount of damage projectile can take if damaged (0 means it can't be destroyed)
+	"velocity"					"6000 0 0"			// how fast the projectile leaves the gun (or distance if fuse is 0)
+	"random_shader_spin"		"1"					// sets shader parm 5 which if appropriate the projectile shader will use this as an alternating spin
+	"angular_velocity"			"0 0 0"				// how the projectile is rotating when it leaves the gun
+	"thrust"					"0"					// the rate of acceleration (always in the direction of the projectiles model)
+	"thrust_start"				"0"					// when to start accelerating
+	"thrust_end"				"0"					// when to stop accelerating
+	"linear_friction"			"0"					// "air" friction
+	"angular_friction"			"0"
+	"contact_friction"			"0"
+	"bounce"					"0.6"				// how much speed a projectile retains when it bounces off of objects (coefficient of restitution).  0 means no bounce.
+	"mass"						"8"
+	"push"						"4000"				// additional impulse when projectile collides
+	"gravity"					"0"					// how much gravity affects the trajectory.  gravity direction is same as the entity that fired it.
+	"fuse"						"10"				// how long before the projectile is removed or self-detonates.  Use 0 for beam weapons (velocity == distance).
+
+	"detonate_on_fuse"			"0"					// whether projectile should detonate when it's fuse runs out
+	"detonate_on_death"			"1"					// whether projectile should detonate when it's "killed" (health runs out)
+	"detonate_on_world"			"1"					// whether projectile should detonate when it hits an obstacle
+	"detonate_on_actor"			"1"					// whether projectile should detonate when it hits a character in the game
+
+	"impact_damage_effect"		"1"					// whether projectile causes blood splats from characters that bleed
+	"impact_gib"				"1"					// whether projectile can gib a character or not (for example: bullets don't gib, but rockets do)
+
+    
+	"mtr_detonate"				"textures/decals/zorch_burn"
+	"mtr_detonate_glass"		"textures/decals/zorch_burn"
+	"decal_size"				"20"
+
+	"smoke_fly"					"chex_beam" //plasmatrail.prt"	// particle effect while in the air
+	"smoke_detonate"			""					// particle effect when detonates
+	"smoke_residue"				""					// particle effect while in the air
+	"smoke_bounce"				""					// particle effect when bounces
+	"smoke_fuse"				""					// particle effect when removed from fuse expiring
+
+	"model_detonate"			"plasmaimpact.prt"
+
+//	"mtr_light_shader"			""
+	"light_color"				"0.8 0 0"
+	"light_radius"				"160"
+	"light_offset"				"-8 0 0"
+
+//	"mtr_explode_light_shader"	"muzzleflash"
+//	"explode_light_color"		"1 0 0"
+//	"explode_light_radius"		"160"
+//	"explode_light_fadetime"	"0.25"
+
+	"snd_fly"					"plasma_flight"					// sound effect while in the air
+	"snd_explode"				"plasma_impact"
+
+	"beamDef"					"zorch_beam"
+	"beammaxlength"				"600"
+}
+
+entityDef projectile_minizorchblast_nodamage {
+	"inherit" 			"projectile_minizorchblast"
+	"def_damage"		"damage_bullet_pistol_nodamage"
+} 
+entityDef	damage_bullet_pistol_nodamage {
+	"inherit"			"damage_bullet_pistol"
+	"damage"			"0"
+}

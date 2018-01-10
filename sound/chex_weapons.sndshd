@@ -1,0 +1,56 @@
+sound/chex/weapons/mini/raise
+{
+	minDistance	10
+	maxDistance	35
+	volume		10
+	sound/chex/weapons/mini/raise.wav
+}
+sound/chex/weapons/mini/fire
+{
+	minDistance	10
+	maxDistance	35
+	volume		10
+	sound/chex/weapons/mini/fire.wav
+}
+sound/chex/weapons/spoon/hitsolid
+{
+	minDistance	10
+	maxDistance	35
+	volume		4
+	sound/chex/weapons/spoon/hitsolid.wav
+}
+sound/chex/weapons/spoon/hitslime
+{
+	minDistance	10
+	maxDistance	35
+	volume		6
+	sound/chex/weapons/spoon/hitslime.wav
+}
+sound/chex/weapons/spoon/raise
+{
+	minDistance	10
+	maxDistance	35
+	volume		6
+	sound/chex/weapons/spoon/raise.wav
+}
+sound/chex/weapons/nade/explode
+{
+	minDistance	10
+	maxDistance	35
+	volume		30
+	sound/chex/weapons/nade/explode.wav
+}
+sound/chex/weapons/large/raise
+{
+	minDistance	10
+	maxDistance	35
+	volume		10
+	sound/chex/weapons/large/raise.wav
+}
+sound/chex/weapons/large/fire
+{
+	minDistance	10
+	maxDistance	35
+	volume		10
+	sound/chex/weapons/large/fire.wav
+}

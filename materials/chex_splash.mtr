@@ -1,0 +1,19 @@
+gui/loading/storage_facility
+{
+	{
+		forceHighQuality
+		blend blend
+		map textures/chex/sf/splash.tga
+		colored
+	}
+}
+
+gui/loading/landing_zone
+{
+	{
+		forceHighQuality
+		blend blend
+		map textures/chex/sf/landing_zone.tga
+		colored
+	}
+}

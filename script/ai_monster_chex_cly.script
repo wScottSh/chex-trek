@@ -1,0 +1,129 @@
+#define CLY_DODGE_RATE		5
+#define CLY_DODGE_SPEED		256
+#define CLY_NORMAL_SPEED	125
+
+object monster_chex_cly : monster_flying_cacodemon {
+	float		nextDodge;
+	void		combat_dodge_right();
+	void		combat_dodge_left();
+	void		Torso_DodgeLeft();
+	void		Torso_DodgeRight();
+	void		do_attack( float attack_flags );
+	float		check_attacks();
+};
+
+void monster_chex_cly::Torso_DodgeLeft() {
+	playAnim( ANIMCHANNEL_TORSO, "evade_left" );
+
+	while( !animDone( ANIMCHANNEL_TORSO, 2 ) ) {
+		waitFrame();
+	}
+	
+	finishAction( "strafe" );
+	animState( ANIMCHANNEL_TORSO, "Torso_Idle", 2 );
+}
+
+void monster_chex_cly::Torso_DodgeRight() {
+	playAnim( ANIMCHANNEL_TORSO, "evade_right" );
+
+	while( !animDone( ANIMCHANNEL_TORSO, 2 ) ) {
+		waitFrame();
+	}
+
+	finishAction( "strafe" );
+	animState( ANIMCHANNEL_TORSO, "Torso_Idle", 2 );
+}
+
+void monster_chex_cly::do_attack( float attack_flags ) {
+	nextNoFOVAttack = sys.getTime() + CACO_NOFOVTIME;
+	if ( attack_flags & ATTACK_DODGE_LEFT ) {
+		combat_dodge_left();
+	} else if ( attack_flags & ATTACK_DODGE_RIGHT ) {
+		combat_dodge_right();
+	} else if ( attack_flags & ATTACK_COMBAT_NODE ) {
+		combat_ainode( combat_node );
+	} else if ( attack_flags & ATTACK_MELEE ) {
+		combat_melee();
+	} else if ( attack_flags & ATTACK_MISSILE ) {
+		combat_range();
+	}
+}
+	
+void monster_chex_cly::combat_dodge_left() {
+	stopMove();
+	faceEnemy();
+	vector left = -sys.angToRight( getAngles() );
+	left = left * CLY_DODGE_SPEED;
+	setFlySpeed( CLY_DODGE_SPEED );
+	setLinearVelocity( left );
+	animState( ANIMCHANNEL_TORSO, "Torso_DodgeLeft", 2 );
+	while( inAnimState( ANIMCHANNEL_TORSO, "strafe" ) ) {
+		waitFrame();
+	}
+	setFlySpeed( CLY_NORMAL_SPEED );
+	nextDodge = DelayTime( CLY_DODGE_RATE );
+	moveToEnemy();
+}
+
+void monster_chex_cly::combat_dodge_right() {
+	stopMove();
+	faceEnemy();
+	vector right = sys.angToRight( getAngles() );
+	right = right * CLY_DODGE_SPEED;
+	setFlySpeed( CLY_DODGE_SPEED );
+	setLinearVelocity( right );
+	animState( ANIMCHANNEL_TORSO, "Torso_DodgeRight", 2 );	
+	while( inAnimState( ANIMCHANNEL_TORSO, "strafe" ) ) {
+		waitFrame();
+	}
+	setFlySpeed( CLY_NORMAL_SPEED );
+	nextDodge = DelayTime( CLY_DODGE_RATE );
+	moveToEnemy();
+}
+
+float monster_chex_cly::check_attacks() {
+	float currentTime;
+	float canMelee;
+	float attack_flags;
+	
+	attack_flags = 0;
+	
+	canMelee = testMeleeAttack();
+	currentTime = sys.getTime();
+	if ( !canMelee ) {
+		combat_node = getCombatNode();
+		if ( combat_node ) {
+			attack_flags |= ATTACK_COMBAT_NODE;
+		}
+		if ( AI_PAIN && ( currentTime >= nextDodge ) ) {
+			if ( testAnimMove( "evade_left" ) ) {
+				attack_flags |= ATTACK_DODGE_LEFT;
+			}
+			if ( testAnimMove( "evade_right" ) ) {
+				attack_flags |= ATTACK_DODGE_RIGHT;
+				// if we can dodge either direction, pick one
+				if ( attack_flags & ATTACK_DODGE_LEFT ) {
+					if ( sys.random( 100 ) < 50 ) {
+						attack_flags &= ~ATTACK_DODGE_RIGHT;
+					} else {
+						attack_flags &= ~ATTACK_DODGE_LEFT;
+					}
+				}
+			}
+		}
+	}
+	
+	if ( canMelee ) {
+		attack_flags |= ATTACK_MELEE;
+	}
+
+	if ( ( ( sys.getTime() > nextNoFOVAttack ) && AI_ENEMY_VISIBLE ) || AI_ENEMY_IN_FOV ) {
+		if ( !canReachEnemy() || ( currentTime >= nextAttack ) ) {
+			if ( canHitEnemyFromAnim( "range_attack" ) ) {
+				attack_flags |= ATTACK_MISSILE;
+			}
+		}
+	}
+	
+	return attack_flags;
+}

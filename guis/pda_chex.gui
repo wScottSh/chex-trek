@@ -1,0 +1,937 @@
+windowDef Desktop
+{
+	rect	0,0,640,480
+	menugui 1
+    float ddset 0
+    float map_button_alpha 0
+	
+    /*
+    set "cmd" "StopPDAVideo" ;
+    set	"cmd"	"stopPDAAudio ; StopPDAVideo" ;
+    set	"cmd"	"updatePDA2 ; playpdavideo" ;
+    set	"cmd"	"playPDAAudio" ;
+    set "cmd" "updatepda" ;	
+    "gui::pda_personal" == 1
+    text	"gui::pda_name"
+    text	"gui::pda_id"
+    text	"gui::pda_location"
+    text	"gui::pda_title"
+    text	"gui::PDASecurityClearance"
+    text    	"gui::PDAVideoTitle"
+    background	"gui::PDAVideoIcon"
+    background	"gui::PDAVideoVid"
+    text    	"gui::PDAVideoInfo"
+    "gui::audioLogCount" == 0
+    text		"gui::missionobjective"
+    text	"gui::PDAEmailTitle"
+    text    "gui::PDAEmailText"
+    gui::weapon0-11
+    "gui::inv_count" == 0)
+    ackground	"gui::inv_icon_0"
+    text	"gui::inv_name_0"
+    */
+    
+	onActivate {
+        //when map is toggled
+	}
+
+	onNamedEvent showPDATip {
+		resetTime "TutorialAnim1" "0" ;
+	}
+		
+	onNamedEvent playerPDANotActive {
+		
+	}
+	onNamedEvent playerPDAActive {
+		
+	}
+    
+    windowDef INIT
+    {
+        rect 0,0,0,0
+        onTime 0 {
+            set "desktop::ddset" "1";
+            set notime 1 ;
+        }
+    }
+    //
+    //STATS
+    //
+        windowDef DDUserID
+		{
+			rect    180,57,353,132
+			visible	1
+            windowDef bg
+            {
+                rect -5,-5,363,142
+                background	"textures/chex/guis/card"
+                matcolor 1,1,1,1
+            }
+            windowDef DDUIDPrint
+			{
+				rect	0, 10, 100, 100
+				background	"textures/chex/guis/fed_logo_alpha"
+				matcolor	1, 1, 1, 1
+				visible	1
+			}
+			windowDef DDUIDTextName
+			{
+				rect	104, -4, 150, 20
+				text	"NAME"
+				font	"fonts/bank"
+				textscale	0.25
+				foreColor	0, 0, 0, 1
+				visible	1
+			}
+			windowDef DDUIDTextIdnum
+			{
+				rect	115, 22, 150, 20
+				text	"SERIAL NUMBER"
+				font	"fonts/bank"
+				textscale	0.25
+				foreColor	0, 0, 0, 1
+				visible	1
+			}			
+			windowDef DDUIDTextPost2
+			{
+				rect	126, 48, 150, 20
+				text	"CURRENT LOCATION"
+				font	"fonts/bank"
+				textscale	0.25
+				foreColor	0, 0, 0, 1
+				visible	1
+			}
+			windowDef DDUIDTextTitle2
+			{
+				rect	134, 74, 150, 20
+				text	"RANK"
+				font	"fonts/bank"
+				textscale	0.25
+				foreColor	0, 0, 0, 1
+				visible	1
+			}
+			windowDef DDUIDTextSecurity
+			{
+				rect	144, 100, 150, 20
+				text	"SECURITY CLEARANCE"
+				font	"fonts/bank"
+				textscale	0.25
+				foreColor	0, 0, 0, 1
+				visible	1
+			}
+			windowDef DDUIDBG
+			{
+				rect	94, 2, 256, 128
+				background	"textures/chex/guis/userid2"
+				matcolor	1, 1, 1, 1
+				visible	1
+			}
+			windowDef DDUIDText1
+			{
+				rect	110, 8, 190, 20
+				text	"gui::pda_name"
+				font	"fonts/bank"
+				textscale	0.25
+				foreColor	0, 0, 0, 1
+				visible	1
+			}
+			windowDef DDUIDText2
+			{
+				rect	120, 34, 190, 20
+				text	"gui::pda_id"
+				font	"fonts/bank"
+				textscale	0.25
+				foreColor	0, 0, 0, 1
+				visible	1
+			}
+			windowDef DDUIDText3
+			{
+				rect	130, 60, 190, 20
+				text	"gui::pda_location"
+				font	"fonts/bank"
+				textscale	0.25
+				foreColor	0, 0, 0, 1
+				visible	1
+			}
+			windowDef DDUIDText4
+			{
+				rect	140, 86, 190, 20
+				text	"gui::pda_title"
+				font	"fonts/bank"
+				textscale	0.25
+				foreColor	0, 0, 0, 1
+				visible	1
+			}
+			windowDef DDUIDText5
+			{
+				rect	150, 112, 190, 17
+				text	"gui::PDASecurityClearance"
+				font	"fonts/bank"
+				textscale	0.25
+				foreColor	0, 0, 0, 1
+				visible	1
+			}
+			windowDef DDUIDBox1
+			{
+				rect	100, 2, 0, 24
+				backcolor	1, 1, 1, 0.5
+				notime	1
+				visible	1
+
+				onTime 0 {
+					set "DDUserID::rect" "145 57 0 0" ;
+					set "DDUIDText1::visible" "0" ;
+					set "DDUIDText2::visible" "0" ;
+					set "DDUIDText3::visible" "0" ;
+					set "DDUIDText4::visible" "0" ;
+					set "DDUIDText5::visible" "0" ;
+					set "DDUIDBG::visible" "0" ;
+					set "DDUIDPrint::visible" "0" ;
+				}
+
+				onTime 300 {
+					transition "DDUserID::rect" "180 57 125 0" "180 57 353 132" "350" "0" "0.4" ;
+					transition "DDUIDBox1::rect" "105 3 0 22" "105 3 202 22" "200" "0.2" "0.8" ;
+					transition "DDUIDBox1::backcolor" "1 1 1 0.5" "1 1 1 0" "250" ;
+				}
+
+				onTime 310 {
+					set "DDUIDBG::visible" "1" ;
+					set "DDUIDPrint::visible" "1" ;
+				}
+
+				onTime 350 {
+					transition "DDUIDText1::forecolor" "0 0 0 0" "0 0 0 1" "200" ;
+					set "DDUIDText1::visible" "1" ;
+					
+				}
+
+				onTime 380 {
+					transition "DDUIDBox2::rect" "115 29 0 22" "115 29 202 22" "200" "0.2" "0.8" ;
+					transition "DDUIDBox2::backcolor" "1 1 1 0.5" "1 1 1 0" "250" ;
+					
+				}
+
+				onTime 410 {
+					transition "DDUIDText2::forecolor" "0 0 0 0" "0 0 0 1" "200" ;
+					set "DDUIDText2::visible" "1" ;
+					
+				}
+
+				onTime 440 {
+					transition "DDUIDBox3::rect" "125 55 0 22" "125 55 202 22" "200" "0.2" "0.8" ;
+					transition "DDUIDBox3::backcolor" "1 1 1 0.5" "1 1 1 0" "250" ;
+				}
+
+				onTime 470 {
+					transition "DDUIDText3::forecolor" "0 0 0 0" "0 0 0 1" "200" ;
+					set "DDUIDText3::visible" "1" ;
+				}
+
+				onTime 500 {
+					transition "DDUIDBox4::rect" "135 81 0 22" "135 81 202 22" "200" "0.2" "0.8" ;
+					transition "DDUIDBox4::backcolor" "1 1 1 0.5" "1 1 1 0" "250" ;
+					
+				}
+
+				onTime 530 {
+					transition "DDUIDText4::forecolor" "0 0 0 0" "0 0 0 1" "200" ;
+					set "DDUIDText4::visible" "1" ;
+				}
+
+				onTime 560 {
+					transition "DDUIDBox5::rect" "145 107 0 22" "145 107 200 22" "200" "0.2" "0.8" ;
+					transition "DDUIDBox5::backcolor" "1 1 1 0.5" "1 1 1 0" "250" ;
+				}
+
+				onTime 600 {
+					transition "DDUIDText5::forecolor" "0 0 0 0" "0 0 0 1" "200" ;
+					set "DDUIDText5::visible" "1" ;
+				}
+
+			}
+			windowDef DDUIDBox2
+			{
+				rect	115, 28, 0, 24
+				backcolor	1, 1, 1, 0.5
+			}
+			windowDef DDUIDBox3
+			{
+				rect	125, 54, 0, 24
+				backcolor	1, 1, 1, 0.5
+			}
+			windowDef DDUIDBox4
+			{
+				rect	135, 80, 0, 24
+				backcolor	1, 1, 1, 0.5
+			}
+			windowDef DDUIDBox5
+			{
+				rect	145, 106, 0, 24
+				backcolor	1, 1, 1, 0.5
+			}
+            windowDef stats_close
+            {
+                rect 0,0,0,0
+                notime 1
+                onTime 0 {
+                    set "DDUserID::rect" "145 57 0 0" ;
+					set "DDUIDText1::visible" "0" ;
+					set "DDUIDText2::visible" "0" ;
+					set "DDUIDText3::visible" "0" ;
+					set "DDUIDText4::visible" "0" ;
+					set "DDUIDText5::visible" "0" ;
+					set "DDUIDBG::visible" "0" ;
+					set "DDUIDPrint::visible" "0" ;
+                }
+            }
+        }
+        
+    //
+    //HUDMAP
+    //
+	windowDef hudmap
+	{
+		rect	0, 0, 640, 480
+		matcolor	1, 1, 1, 1
+		backcolor   0, 0, 0, 0
+		visible	"gui::HudMap"
+		windowDef scroll_up
+		{
+			rect		28, 210, 20, 20
+			background	"textures/chex/guis/map_arrow_up"
+			matcolor	0.5, 0.6, 0.6, "desktop::map_button_alpha"
+			onAction {
+				set "cmd" "map_scroll_up";
+			}
+			onActionRelease {
+				set "cmd" "map_stop";
+			}
+		}
+		windowDef scroll_down
+		{
+			background	"textures/chex/guis/map_arrow_up"
+			rotate 180
+			matcolor	0.5, 0.6, 0.6, "desktop::map_button_alpha"
+			rect		28, 260, 20, 20
+			onAction {
+				set "cmd" "map_scroll_down";
+			}
+			onActionRelease {
+				set "cmd" "map_stop";
+			}
+		}
+		windowDef scroll_left
+		{
+			background	"textures/chex/guis/map_arrow_up"
+			rotate 90
+			matcolor	0.5, 0.6, 0.6, "desktop::map_button_alpha"
+			rect		5, 235, 20, 20
+			onAction {
+				set "cmd" "map_scroll_left";
+			}
+			onActionRelease {
+				set "cmd" "map_stop";
+			}
+		}
+		windowDef scroll_right
+		{
+			background	"textures/chex/guis/map_arrow_up"
+			rotate -90
+			matcolor	0.5, 0.6, 0.6, "desktop::map_button_alpha"
+			rect		51, 235, 20, 20
+			onAction {
+				set "cmd" "map_scroll_right";
+			}
+			onActionRelease {
+				set "cmd" "map_stop";
+			}
+		}
+		windowDef scroll_center
+		{
+			background	"textures/chex/guis/map_center"
+			matcolor	0.5, 0.6, 0.6, "desktop::map_button_alpha"
+			rect		28, 235, 20, 20
+			onAction {
+				set "cmd" "map_scroll_center";
+			}
+		}
+		windowDef zoom_in
+		{
+			background	"textures/chex/guis/map_arrow_up"
+			matcolor	0.5, 0.6, 0.6, "desktop::map_button_alpha"
+			rect		28, 300, 20, 20
+			onAction {
+				set "cmd" "map_zoom_in";
+			}
+			onActionRelease {
+				set "cmd" "map_stop";
+			}
+		}
+		windowDef zoom_out
+		{
+			background	"textures/chex/guis/map_arrow_up"
+			rotate 180
+			matcolor	0.5, 0.6, 0.6, "desktop::map_button_alpha"
+			rect		28, 330, 20, 20
+			onAction {
+				set "cmd" "map_zoom_out";
+			}
+			onActionRelease {
+				set "cmd" "map_stop";
+			}
+		}
+        windowDef hudmap_open
+        {
+            rect 0, 0, 0, 0
+            backcolor 0, 0, 0, 0
+            notime 1
+            onTime 0 {
+                set "faded_map::matcolor" "1 1 1 0" ;
+                set "map::matcolor" "1 1 1 0" ;
+                set "desktop::map_button_alpha" "0" ;
+            }
+            onTime 5 {
+                set "gui::HudMap" "1" ;
+                //set "cmd" "map_scroll_center" ; onTime can't use cmd
+                transition "desktop::map_button_alpha" "0" "1" "400";
+            }
+            onTime 100 {
+                transition "faded_map::matcolor" "1 1 1 0" "1 1 1 .25" "50";
+                transition "map::matcolor" "1 1 1 0" "1 1 1 1" "50";
+            }
+            onTime 150 {
+                transition "faded_map::matcolor" "1 1 1 .25" "1 1 1 0" "50";
+                transition "map::matcolor" "1 1 1 1" "1 1 1 0" "50";
+            }
+            onTime 250 {
+                transition "faded_map::matcolor" "1 1 1 0" "1 1 1 .25" "200";
+                transition "map::matcolor" "1 1 1 0" "1 1 1 1" "200";
+            }
+        }
+        windowDef hudmap_close
+        {
+            rect 0, 0, 0, 0
+            backcolor 0, 0, 0, 0
+            onTime 0 {
+                transition "desktop::map_button_alpha" "1" "0" "400";
+            }
+            onTime 400 {
+                set "faded_map::matcolor" "1 1 1 0" ;
+                set "map::matcolor" "1 1 1 0" ;
+                set "desktop::map_button_alpha" "0" ;
+                set "gui::HudMap" "0" ;
+            }
+        }
+		windowDef mapbox
+		{
+			//IMPORTANT!
+			//If you change the size of this you must fix the scaling factors!
+			rect		75,10,570,390
+			backcolor   0.5, 0.6, 0.6, 0.3 * "desktop::map_button_alpha"
+			bordercolor 0.5, 0.6, 0.6, "desktop::map_button_alpha"
+			bordersize  1
+
+			windowDef faded_map
+			{	
+				rect	"gui::map_pos_x" * 570 / 640, "gui::map_pos_y" * 390 / 480, "gui::map_w"  * 570 / 640, "gui::map_h" * 390 / 480
+				matcolor	1, 1, 1, .25 * "desktop::map_button_alpha"
+				background	"gui::hud_map_faded_mtr"
+			}
+
+			windowDef map
+			{	
+				rect	"gui::map_pos_x" * 570 / 640, "gui::map_pos_y" * 390 / 480, "gui::map_w"  * 570 / 640, "gui::map_h" * 390 / 480
+				matcolor	1, 1, 1, "desktop::map_button_alpha"
+				background	"gui::hud_map_mtr"
+			}
+
+			windowDef objective_1
+			{
+				rect	"gui::map_obj1_x" * 570 / 640, "gui::map_obj1_y" * 390 / 480, 32, 32
+				background	"gui::map_obj1"
+				matcolor	1, 1, 1, "desktop::map_button_alpha"
+				visible "gui::map_obj1_v"
+				onAction {
+					set "obj_title::visible" "1";
+					set "obj_text::visible" "1";
+					set "obj_title::text" "gui::map_obj1_tle";
+					set "obj_text::text" "gui::map_obj1_txt";
+				}
+				onEvent {
+					if( "gui::map_obj1_c" == 1 ) {
+						set matcolor "1 0 0 1";
+					}
+					if( "gui::map_obj1_c" == 2 ) {
+						set matcolor "0 1 0 1";
+					}
+					if( "gui::map_obj1_c" == 3 ) {
+						set matcolor "1 1 1 1";
+					}
+				}
+			}
+			windowDef objective_2
+			{
+				rect	"gui::map_obj2_x" * 570 / 640, "gui::map_obj2_y" * 390 / 480, 32, 32
+				background	"gui::map_obj2"
+				matcolor	1, 1, 1, "desktop::map_button_alpha"
+				visible "gui::map_obj2_v"
+				onAction {
+					set "obj_title::visible" "1";
+					set "obj_text::visible" "1";
+					set "obj_title::text" "gui::map_obj2_tle";
+					set "obj_text::text" "gui::map_obj2_txt";
+				}
+                onEvent {
+					if( "gui::map_obj2_c" == 1 ) {
+						set matcolor "1 0 0 1";
+					}
+					if( "gui::map_obj2_c" == 2 ) {
+						set matcolor "0 1 0 1";
+					}
+					if( "gui::map_obj2_c" == 3 ) {
+						set matcolor "1 1 1 1";
+					}
+				}
+			}
+			windowDef objective_3
+			{
+				rect	"gui::map_obj3_x" * 570 / 640, "gui::map_obj3_y" * 390 / 480, 32, 32
+				background	"gui::map_obj3"
+				matcolor	1, 1, 1, "desktop::map_button_alpha"
+				visible "gui::map_obj3_v"
+				onAction {
+					set "obj_title::visible" "1";
+					set "obj_text::visible" "1";
+					set "obj_title::text" "gui::map_obj3_tle";
+					set "obj_text::text" "gui::map_obj3_txt";
+				}
+                onEvent {
+					if( "gui::map_obj3_c" == 1 ) {
+						set matcolor "1 0 0 1";
+					}
+					if( "gui::map_obj3_c" == 2 ) {
+						set matcolor "0 1 0 1";
+					}
+					if( "gui::map_obj3_c" == 3 ) {
+						set matcolor "1 1 1 1";
+					}
+				}
+			}
+			windowDef objective_4
+			{
+				rect	"gui::map_obj4_x" * 570 / 640, "gui::map_obj4_y" * 390 / 480, 32, 32
+				background	"gui::map_obj4"
+				matcolor	1, 1, 1, "desktop::map_button_alpha"
+				visible "gui::map_obj4_v"
+				onAction {
+					set "obj_title::visible" "1";
+					set "obj_text::visible" "1";
+					set "obj_title::text" "gui::map_obj4_tle";
+					set "obj_text::text" "gui::map_obj4_txt";
+				}
+                onEvent {
+					if( "gui::map_obj4_c" == 1 ) {
+						set matcolor "1 0 0 1";
+					}
+					if( "gui::map_obj4_c" == 2 ) {
+						set matcolor "0 1 0 1";
+					}
+					if( "gui::map_obj4_c" == 3 ) {
+						set matcolor "1 1 1 1";
+					}
+				}
+			}
+			windowDef objective_5
+			{
+				rect	"gui::map_obj5_x" * 570 / 640, "gui::map_obj5_y" * 390 / 480, 32, 32
+				background	"gui::map_obj5"
+				matcolor	1, 1, 1, "desktop::map_button_alpha"
+				visible "gui::map_obj5_v"
+				onAction {
+					set "obj_title::visible" "1";
+					set "obj_text::visible" "1";
+					set "obj_title::text" "gui::map_obj5_tle";
+					set "obj_text::text" "gui::map_obj5_txt";
+				}
+                onEvent {
+					if( "gui::map_obj5_c" == 1 ) {
+						set matcolor "1 0 0 1";
+					}
+					if( "gui::map_obj5_c" == 2 ) {
+						set matcolor "0 1 0 1";
+					}
+					if( "gui::map_obj5_c" == 3 ) {
+						set matcolor "1 1 1 1";
+					}
+				}
+			}
+			windowDef map_direction
+			{
+				rect	"gui::player_x" * 570 / 640, "gui::player_y" * 390 / 480, 32, 32
+				background	"textures/chex/hud/map_direction"
+				matcolor	1, 1, 1, "desktop::map_button_alpha"
+				rotate	"gui::player_direction"
+			}
+		}
+		windowDef obj_title
+		{
+			rect		75,405,250,20
+			backcolor   0.5, 0.6, 0.6, 0.3 * "desktop::map_button_alpha"
+			bordercolor 0.5, 0.6, 0.6, "desktop::map_button_alpha"
+			bordersize  1
+			textalign 0
+			textscale .25
+			visible 0
+			text ""
+		}
+		windowDef obj_text
+		{
+			rect		75,430,570,49
+			backcolor   0.5, 0.6, 0.6, 0.3 * "desktop::map_button_alpha"
+			bordercolor 0.5, 0.6, 0.6, "desktop::map_button_alpha"
+			bordersize  1
+			textalign 0
+			textscale .25
+			visible 0
+			text ""
+		}
+	}
+	
+    //
+    //BUTTONS
+    //
+//PDA NAVIGATION BUTTONS
+	windowDef DDWin1
+	{
+		rect	10,10,165,82
+		visible	1
+		windowDef DDText1BG
+		{
+			rect	2,12,160,15
+			matcolor	1, 1, 1, 1
+			background	"guis/assets/pda/pda_button"
+			visible	0
+		}
+		windowDef DDText1BG1
+		{
+			rect	2,12,1,15
+			matcolor	1, 1, 1, 1
+			background	"guis/assets/pda/pda_button2"
+			visible	0
+		}
+		windowDef DDText1BG2
+		{
+			rect	11,12,1,15
+			matcolor	1, 1, 1, 1
+			background	"guis/assets/pda/pda_button2"
+			visible	1
+		}
+		windowDef DDText1BG3
+		{
+			rect	162,12,1,15
+			matcolor	1, 1, 1, 1
+			background	"guis/assets/pda/pda_button2"
+			visible	0
+		}
+		windowDef DDText2BG
+		{
+			rect	2,34,133,15
+			matcolor	1, 1, 1, 1
+			background	"guis/assets/pda/pda_button"
+			visible	0
+		}
+		windowDef DDText2BG1
+		{
+			rect	2,34,1,15
+			matcolor	1, 1, 1, 1
+			background	"guis/assets/pda/pda_button2"
+			visible	0
+		}
+		windowDef DDText2BG2
+		{
+			rect	5,34,1,15
+			matcolor	1, 1, 1, 1
+			background	"guis/assets/pda/pda_button2"
+			visible	1
+		}
+		windowDef DDText2BG3
+		{
+			rect	135,34,1,15
+			matcolor	1, 1, 1, 1
+			background	"guis/assets/pda/pda_button2"
+			visible	0
+		}
+		windowDef DDText3BG
+		{
+			rect	2,56,133,15
+			matcolor	1, 1, 1, 1
+			background	"guis/assets/pda/pda_button"
+			visible		0//1
+		}
+		windowDef DDText3BG1
+		{
+			rect	2,56,1,15
+			matcolor	1, 1, 1, 1
+			background	"guis/assets/pda/pda_button2"
+			visible		0//1
+		}
+		windowDef DDText3BG2
+		{
+			rect	5,56,1,15
+			matcolor	1, 1, 1, 1
+			background	"guis/assets/pda/pda_button2"
+			visible		1
+		}
+		windowDef DDText3BG3
+		{
+			rect	135,56,1,15
+			matcolor	1, 1, 1, 1
+			background	"guis/assets/pda/pda_button2"
+			visible		0//1
+		}
+		
+		windowDef DDBtn1Test
+		{
+			rect	-100,4,256,32 //-76
+			matcolor	.65, 1, 0, 0.6  //0.8, 1, 1, 0.6
+			background	"guis/assets/pda/nbutton"
+			visible		1
+		}
+		windowDef DDBtn2Test
+		{
+			rect	-100,26,256,32
+			matcolor	.65, 1, 0, 0.6
+			background	"guis/assets/pda/nbutton"
+			visible		1
+		}
+		windowDef DDBtn3Test
+		{
+			rect	-100,48,256,32
+			matcolor	.65, 1, 0, 0.6
+			background	"guis/assets/pda/nbutton"
+			visible		1
+		}
+		
+//Stats Button
+		windowDef DDText1
+		{
+			rect	34,12,128,16
+			text	"STATS"
+			foreColor	1,1,1,1
+			textscale	0.2
+			textalign	2
+			textaligny	-3
+			matcolor	0.5, 0.7, 0, 1  //0.6, 0.7, 0.7, 1
+			background	"guis/assets/pda/hlight"
+			noevents	1
+			visible	1
+			font	"fonts/micro"
+
+			onMouseEnter {
+				localSound	"guisounds_ping" ;
+				transition "forecolor" ".5 1 0 1" "1 1 1 1" "200" ;
+				transition "rect" "0 12 136 16" "0 12 137 16" "50" ;
+				transition "ddbtn1test::matcolor" ".65 1 0 0.6" ".35 0 1 1" "200" ;
+			}
+
+			onMouseExit {
+				transition "forecolor" "1 1 1 1" ".5 1 0 1" "200" ;
+				transition "rect" "0 12 137 16" "0 12 136 16" "50" ;
+				transition "ddbtn1test::matcolor" ".35 0 1 1" ".65 1 0 0.6" "200" ;
+			}
+
+			onAction {
+                if ("desktop::ddset" == 4) {
+                    set "gui::HudMap" "0" ;
+                    resetTime "hudmap_close" "0" ;
+                    set "cmd" "map_stop";
+                }
+				if ("desktop::Ddset" == 4) {
+					transition "DDText3BG::rect" "2 56 160 15" "2 56 133 15" "200" "0" "1" ;
+					transition "DDText3BG2::rect" "11 56 1 13" "5 56 1 15" "200" "0" "1" ;
+					transition "DDText3BG3::rect" "162 56 1 13" "135 56 1 15" "200" "0" "1" ;
+					transition "DDWinHighlight::rect" "3 58 6 11" "3 14 6 11" "200" "0" "0.8" ;
+
+					set "desktop::ddset" "1" ;
+				} else {
+					transition "DDText2BG::rect" "2 34 160 15" "2 34 133 15" "200" "0" "1" ;
+					transition "DDText2BG2::rect" "11 34 1 13" "5 34 1 15" "200" "0" "1" ;
+					transition "DDText2BG3::rect" "162 34 1 13" "135 34 1 15" "200" "0" "1" ;
+					transition "DDWinHighlight::rect" "3 36 6 11" "3 14 6 11" "200" "0" "0.8" ;
+					
+					set "desktop::ddset" "1" ;
+				}
+				
+				resetTime "ClickCatch" "0" ;
+				transition "forecolor" "1 1 1 1" "1 1 1 1" "200" ;
+				localSound	"guisounds_ping2" ;
+				transition "ddbtn1test::matcolor" ".35 0 1 1" ".65 1 0 0.6" "200" ;
+				transition "matcolor" "0.5 0.7 0 0" "0.5 0.7 0 1" "200" ;
+				transition "rect" "0 12 137 15" "34 12 128 16" "200" "0" "1" ;
+				transition "DDText1BG::rect" "2 12 134 15" "2 12 160 15" "200" "0" "1" ;	
+				transition "DDText1BG2::rect" "2 12 1 15" "11 12 1 15" "100" "0" "1" ;
+				transition "DDText1BG3::rect" "135 12 1 13" "162 12 1 15" "200" "0" "1" ;
+				transition "DDtext2::matcolor" "1 1 1 0" "1 1 1 0" "200" ;
+				transition "DDtext2::matcolor" "1 1 1 0" "1 1 1 0" "200" ;
+				set "DDText1::noevents" "1" ;
+				set "DDText2::noevents" "0" ;
+				set "DDText3::noevents" "0" ;
+				transition "DDtext2::forecolor" ".5 1 0 1" ".5 1 0 1" "200" ;
+				transition "DDtext3::forecolor" ".5 1 0 1" ".5 1 0 1" "200" ;
+				resetTime "DDColorSwitch1" "0" ;
+				transition "DDtext2::rect" "0 34 136 16" "0 34 136 16" "200" ;
+				transition "DDtext3::rect" "0 56 136 16" "0 56 136 16" "200" ;
+                
+                resetTime "DDUIDBox1" "0" ;
+			}
+
+		}
+        
+//VIDEO DISK ACTION BUTTON -- CHANGED TO EMAIL
+		windowDef DDText2
+		{
+			rect	0,34,136,16
+			text	"OBJECTIVES"
+			foreColor	.5, 1, 0, 1
+			textscale	0.2
+			textalign	2
+			textaligny	-3
+			background	"guis/assets/pda/hlight"
+			matcolor	1, 1, 1, 0
+			visible	1
+			font	"fonts/micro"
+
+			onMouseEnter {
+				localSound	"guisounds_ping" ;
+				transition "forecolor" ".5 1 0 1" "1 1 1 1" "200" ;
+				transition "rect" "0 34 136 16" "0 34 137 16" "50" ;
+				transition "ddbtn2test::matcolor" ".65 1 0 0.6" ".35 0 1 1" "200" ;
+			}
+
+			onMouseExit {
+				transition "forecolor" "1 1 1 1" ".5 1 0 1" "200" ;
+				transition "rect" "0 34 137 16" "0 34 136 16" "50" ;
+				transition "ddbtn2test::matcolor" ".35 0 1 1" ".65 1 0 0.6" "200" ;
+			}
+
+			onAction {
+                if ("desktop::ddset" == 4) {
+                    set "gui::HudMap" "0" ;
+                    resetTime "hudmap_close" "0" ;
+                    set "cmd" "map_stop";
+                }
+                if ("desktop::ddset" == 1) {
+                    resetTime "stats_close" "0";
+                }
+				if ("desktop::ddset" == 1) {
+					transition "DDText1BG::rect" "2 12 160 15" "2 12 133 15" "200" "0" "1" ;
+					transition "DDText1BG2::rect" "11 12 1 13" "5 12 1 15" "200" "0" "1" ;
+					transition "DDText1BG3::rect" "162 12 1 13" "135 12 1 15" "200" "0" "1" ;
+					transition "DDWinHighlight::rect" "3 14 6 11" "3 36 6 11" "200" "0" "0.8" ;
+					set "desktop::ddset" "3" ;
+				} else {
+					transition "DDText3BG::rect" "2 56 160 15" "2 56 133 15" "200" "0" "1" ;
+					transition "DDText3BG2::rect" "11 56 1 13" "5 56 1 15" "200" "0" "1" ;
+					transition "DDText3BG3::rect" "162 56 1 13" "135 56 1 15" "200" "0" "1" ;
+					transition "DDWinHighlight::rect" "3 58 6 11" "3 36 6 11" "200" "0" "0.8" ;
+					set "desktop::ddset" "3" ;
+				}
+				//resetTime "ClickCatch" "0" ;
+				transition "forecolor" "1 1 1 1" "1 1 1 1" "200" ;
+				localSound	"guisounds_ping2" ;
+				
+				transition "ddbtn2test::matcolor" ".35 0 1 1" ".65 1 0 0.6" "200" ;
+				transition "matcolor" "0.5 0.7 0 0" "0.5 0.7 0 1" "200" ;
+				transition "rect" "0 34 137 16" "34 34 128 16" "200" "0" "1" ;
+				transition "DDText2BG::rect" "2 34 134 15" "2 34 160 15" "200" "0" "1" ;	
+				transition "DDText2BG2::rect" "2 34 1 15" "11 34 1 15" "100" "0" "1" ;
+				transition "DDText2BG3::rect" "135 34 1 13" "162 34 1 15" "200" "0" "1" ;
+				transition "DDtext1::matcolor" "1 1 1 0" "1 1 1 0" "200" ;
+				transition "DDtext3::matcolor" "1 1 1 0" "1 1 1 0" "200" ;
+				set "DDText1::noevents" "0" ;
+				set "DDText2::noevents" "1" ;
+				set "DDText3::noevents" "0" ;
+				transition "DDtext1::forecolor" ".5 1 0 1" ".5 1 0 1" "200" ;
+				transition "DDtext3::forecolor" ".5 1 0 1" ".5 1 0 1" "200" ;
+				transition "DDtext1::rect" "0 12 136 16" "0 12 136 16" "200" ;
+				transition "DDtext3::rect" "0 56 136 16" "0 56 136 16" "200" ;
+			}
+		}
+//MAP BUTTON
+		windowDef DDText3
+		{
+			rect	0,56,136,16
+			text	"MAP"
+			foreColor	.5, 1, 0, 1
+			textscale	0.2
+			textalign	2
+			textaligny	-3
+			background	"guis/assets/pda/hlight"
+			matcolor	1, 1, 1, 0
+			visible	1
+			font	"fonts/micro"
+
+			onMouseEnter {
+				localSound	"guisounds_ping" ;
+				transition "forecolor" ".5 1 0 1" "1 1 1 1" "200" ;
+				transition "rect" "0 56 136 16" "0 56 137 16" "50" ;
+				transition "ddbtn3test::matcolor" ".65 1 0 0.6" ".35 0 1 1" "200" ;
+			}
+
+			onMouseExit {
+				transition "forecolor" "1 1 1 1" ".5 1 0 1" "200" ;
+				transition "rect" "0 56 137 16" "0 56 136 16" "50" ;
+				transition "ddbtn3test::matcolor" ".35 0 1 1" ".65 1 0 0.6" "200" ;
+			}
+
+			onAction {
+                if ("desktop::ddset" == 1) {
+                    resetTime "stats_close" "0";
+                }
+				if ("desktop::ddset" == 1) {
+					transition "DDText1BG::rect" "2 12 160 15" "2 12 133 15" "200" "0" "1" ;
+					transition "DDText1BG2::rect" "11 12 1 13" "5 12 1 15" "200" "0" "1" ;
+					transition "DDText1BG3::rect" "162 12 1 13" "135 12 1 15" "200" "0" "1" ;
+					transition "DDWinHighlight::rect" "3 14 6 11" "3 58 6 11" "200" "0" "0.8" ;
+					set "desktop::ddset" "4" ;
+				} else {
+					transition "DDText2BG::rect" "2 34 160 15" "2 34 133 15" "200" "0" "1" ;
+					transition "DDText2BG2::rect" "11 34 1 13" "5 34 1 15" "200" "0" "1" ;
+					transition "DDText2BG3::rect" "162 34 1 13" "135 34 1 15" "200" "0" "1" ;
+					transition "DDWinHighlight::rect" "3 36 6 11" "3 58 6 11" "200" "0" "0.8" ;
+					set "desktop::ddset" "4" ;
+				}
+				//resetTime "ClickCatch" "0" ;
+				transition "forecolor" "1 1 1 1" "1 1 1 1" "200" ;
+				localSound	"guisounds_ping2" ;
+				
+				transition "ddbtn3test::matcolor" ".35 0 1 1" ".65 1 0 0.6" "200" ;
+				transition "matcolor" "0.5 0.7 0 0" "0.5 0.7 0 1" "200" ;
+				transition "rect" "0 56 137 16" "34 56 128 16" "200" "0" "1" ;
+				transition "DDText3BG::rect" "2 56 134 15" "2 56 160 15" "200" "0" "1" ;	
+				transition "DDText3BG2::rect" "2 56 1 15" "11 56 1 15" "100" "0" "1" ;
+				transition "DDText3BG3::rect" "135 56 1 13" "162 56 1 15" "200" "0" "1" ;
+				transition "DDtext1::matcolor" "1 1 1 0" "1 1 1 0" "200" ;
+				transition "DDtext2::matcolor" "1 1 1 0" "1 1 1 0" "200" ;
+				set "DDText1::noevents" "0" ;
+				set "DDText2::noevents" "0" ;
+				set "DDText3::noevents" "1" ;
+				transition "DDtext1::forecolor" ".5 1 0 1" ".5 1 0 1" "200" ;
+				transition "DDtext2::forecolor" ".5 1 0 1" ".5 1 0 1" "200" ;
+				transition "DDtext2::rect" "0 34 136 16" "0 34 136 16" "200" ;
+				transition "DDtext1::rect" "0 12 136 16" "0 12 136 16" "200" ;
+                
+                //open the map
+                set "cmd" "map_scroll_center" ;
+                resetTime "hudmap_open" "0" ;
+			}
+		}
+		windowDef DDWinHighlight
+		{
+			rect	3,14,6,11
+			visible	1
+			backcolor	0.5, 0.7, 0, .8
+		}
+	}
+}

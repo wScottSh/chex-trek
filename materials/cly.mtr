@@ -1,0 +1,119 @@
+models/md5/chex/clybase
+{
+	//noSelfShadow
+	forceOverlays	
+	diffusemap models/md5/chex/cly_base
+	specularmap models/md5/chex/cly_base_s
+	{	// burning corpse effect
+		if	parm7			// only when dead
+		// make a burned away alpha test for the normal skin
+		blend	gl_zero, gl_one			// don't draw anything
+		
+		map models/monsters/spectre/global_dis.tga	// replace this with a monster-specific texture
+		alphaTest 0.05 + 1.5 * (time - parm7)
+	}
+	{
+	   blend add
+	   map models/md5/chex/cly_base
+	   rgb   0.1
+	}
+	{
+	   blend add
+	   map models/md5/chex/cly_base_add
+	}
+	{
+	   blend add
+	   map models/md5/chex/cly_base_jetadd
+	   rgb flickerblink[  3 * time ]
+	}
+	{
+	   blend bumpmap
+	   map addnormals( models/md5/chex/cly_base_local.tga , heightmap(models/md5/chex/cly_base_h.tga,25))
+	}
+}
+//this material is funky but I kinda like how it turned out
+//yeah, I like it too
+models/md5/chex/clyglass
+{
+	noselfshadow
+	noshadows
+	//twosided
+	translucent
+	glass
+	forceoverlays
+	{
+		if parm7==0
+		map textures/sfx/vp1
+		blend bumpmap
+	}
+	/*{
+                program           heathaze.vfp
+                vertexparm              0       time * 0 , time * 0 // texture scrolling
+                vertexparm              1       .4         // magnitude of the distortion
+                fragmentprogram			heathaze.vfp
+                fragmentmap             0       _currentrender
+                fragmentmap             1       textures/sfx/vp1   // the normal map for distortion
+             
+    }*/
+	{	
+		maskcolor				
+	    map	makealpha(textures/glass/glass2)
+	}
+	{
+		if parm7==0
+		blend gl_dst_alpha, gl_one
+	    //maskalpha
+       	cubemap		env/gen2
+			red		parm0
+	        green   parm1
+	        blue	parm2
+       texgen		reflect
+	}
+}
+
+models/md5/chex/clybody
+{
+	//noSelfShadow
+	diffusemap models/md5/chex/cly_body
+	specularmap	models/md5/chex/cly_body_s
+	{	// burning corpse effect
+		if	parm7			// only when dead
+		// make a burned away alpha test for the normal skin
+		blend	gl_zero, gl_one			// don't draw anything
+		
+		map models/monsters/spectre/global_dis.tga	// replace this with a monster-specific texture
+		alphaTest 0.05 + 1.5 * (time - parm7)
+	}	
+	{
+	   blend bumpmap
+	   map addnormals( textures/chex/slug/slug_local.tga , heightmap(textures/chex/slug/slug_h.tga,50))
+	}
+	{
+	   blend add
+	   map models/md5/chex/cly_body
+	   rgb   0.2
+	}
+	{
+	   blend add
+	   map models/md5/chex/cly_body_add
+	   rgb 0.5
+	}
+}
+models/md5/chex/clytubes
+{
+	//noSelfShadow
+	diffusemap models/md5/chex/cly_tubes_d
+	{	// burning corpse effect
+		if	parm7			// only when dead
+		// make a burned away alpha test for the normal skin
+		blend	gl_zero, gl_one			// don't draw anything
+		
+		map models/monsters/spectre/global_dis.tga	// replace this with a monster-specific texture
+		alphaTest 0.05 + 1.5 * (time - parm7)
+	}	
+	{
+	   blend add
+	   map models/md5/chex/cly_tubes_add
+	   scroll	time * -.5, 0
+	}
+}

@@ -1,0 +1,834 @@
+windowDef Desktop
+{
+	rect	0, 0, 640, 480
+	backcolor	0, 0, 0, 0
+	visible	1
+	nocursor	1
+	
+// 	onNamedEvent invPickup {
+// 		resetTime "InvItem" "0" ; 
+// 	}
+	onNamedEvent itemPickup1 {
+		resetTime "ItemPickup1" "0" ; 
+	}
+	onNamedEvent itemPickup2 {
+		resetTime "ItemPickup2" "0" ; 
+	}	
+	onNamedEvent itemPickup3 {
+		resetTime "ItemPickup3" "0" ; 
+	}	
+	onNamedEvent itemPickup4 {
+		resetTime "ItemPickup4" "0" ; 
+	}	
+	onNamedEvent itemPickup5 {
+		resetTime "ItemPickup5" "0" ; 
+	}	
+
+	onNamedEvent tipLeftWindowUp {
+		set "TipPopBox::visible" "1" ;
+		resetTime "TipPopBoxU" "0" ;		
+	}
+	onNamedEvent tipWindowUp {
+		set "TipPopBox::visible" "1" ;
+		resetTime "TipPopBoxU" "0" ;		
+	}
+
+	onNamedEvent tipWindowDown {
+		resetTime "TipPopBoxD" "0" ;
+	}
+	onNamedEvent updateAmmo {
+		if( "gui::player_clips" >= 1 ) {
+			set "clip1::matcolor" "1 1 1 1" ;
+		} else {
+			set "clip1::matcolor" ".5 .5 .5 1" ;
+		}
+		if( "gui::player_clips" >= 2 ) {
+			set "clip2::matcolor" "1 1 1 1" ;
+		} else {
+			set "clip2::matcolor" ".5 .5 .5 1" ;
+		}
+		if( "gui::player_clips" >= 3 ) {
+			set "clip3::matcolor" "1 1 1 1" ;
+		} else {
+			set "clip3::matcolor" ".5 .5 .5 1" ;
+		}
+		if( "gui::player_clips" >= 4 ) {
+			set "clip4::matcolor" "1 1 1 1" ;
+		} else {
+			set "clip4::matcolor" ".5 .5 .5 1" ;
+		}
+		if( "gui::player_clips" >= 5 ) {
+			set "clip5::matcolor" "1 1 1 1" ;
+		} else {
+			set "clip5::matcolor" ".5 .5 .5 1" ;
+		}
+		if( "gui::player_clips" >= 6 ) {
+			set "clip6::matcolor" "1 1 1 1" ;
+		} else {
+			set "clip6::matcolor" ".5 .5 .5 1" ;
+		}
+		if( "gui::player_clips" >= 7 ) {
+			set "clip7::matcolor" "1 1 1 1" ;
+		} else {
+			set "clip7::matcolor" ".5 .5 .5 1" ;
+		}
+		if( "gui::weapon0" == 2 || "gui::weapon9" == 2 || "gui::weapon10" == 2 || "gui::weapon11" == 2 ) {
+				set "clip1::matcolor" ".5 .5 .5 1" ;
+				set "clip2::matcolor" ".5 .5 .5 1" ;
+				set "clip3::matcolor" ".5 .5 .5 1" ;
+				set "clip4::matcolor" ".5 .5 .5 1" ;
+				set "clip5::matcolor" ".5 .5 .5 1" ;
+				set "clip6::matcolor" ".5 .5 .5 1" ;
+				set "clip7::matcolor" ".5 .5 .5 1" ;
+		}
+	}
+	
+	onNamedEvent weaponChange {
+		if( "gui::weapon9" == 2 || "gui::weapon10" == 2 || "gui::weapon11" == 2 ) {
+			set "weap0::forecolor" "1 1 1 1" ;
+			set "chargepercent::text" "N/A" ;
+		} else {
+			if ( "gui::weapon10" == 1 ) {
+				set "weap0::forecolor" ".5 .5 .5 1" ;
+			} else {
+				set "weap0::forecolor" ".25 .25 .25 1" ;
+			}
+		}
+		
+		if( "gui::weapon0" == 2 ) {
+			set "weap1::forecolor" "1 1 1 1" ;
+			set "chargepercent::text" "N/A" ;
+		} else { 
+			if ( "gui::weapon0" == 1 ) {
+				set "weap1::forecolor" ".5 .5 .5 1" ;
+			} else {
+				set "weap1::forecolor" ".25 .25 .25 1" ;
+			}
+		}
+		
+		if( "gui::weapon1" == 2 ) {
+			set "weap2::forecolor" "1 1 1 1" ;
+			set "chargepercent::text" "gui::player_ammopercent" ;
+		} else {
+			if ( "gui::weapon1" == 1 ) {
+				set "weap2::forecolor" ".5 .5 .5 1" ;
+			} else {
+				set "weap2::forecolor" ".25 .25 .25 1" ;
+			}
+		}
+		
+		if( "gui::weapon2" == 2 ) {
+			set "weap3::forecolor" "1 1 1 1" ;
+			set "chargepercent::text" "gui::player_ammopercent" ;
+		} else {
+			if ( "gui::weapon2" == 1 ) {
+				set "weap3::forecolor" ".5 .5 .5 1" ;
+			} else {
+				set "weap3::forecolor" ".25 .25 .25 1" ;
+			}
+		}
+		
+		if( "gui::weapon3" == 2 ) {
+			set "weap4::forecolor" "1 1 1 1" ;
+			set "chargepercent::text" "gui::player_ammopercent" ;
+		} else {
+			if ( "gui::weapon3" == 1 ) {
+				set "weap4::forecolor" ".5 .5 .5 1" ;
+			} else {
+				set "weap4::forecolor" ".25 .25 .25 1" ;
+			}
+		}
+		
+		if( "gui::weapon4" == 2 ) {
+			set "weap5::forecolor" "1 1 1 1" ;
+			set "chargepercent::text" "gui::player_ammopercent" ;
+		} else {
+			if ( "gui::weapon4" == 1 ) {
+				set "weap5::forecolor" ".5 .5 .5 1" ;
+			} else {
+				set "weap5::forecolor" ".25 .25 .25 1" ;
+			}
+		}
+		
+		if( "gui::weapon5" == 2 ) {
+			set "weap6::forecolor" "1 1 1 1" ;
+			set "chargepercent::text" "gui::player_ammopercent" ;
+		} else {
+			if ( "gui::weapon5" == 1 ) {
+				set "weap6::forecolor" ".5 .5 .5 1" ;
+			} else {
+				set "weap6::forecolor" ".25 .25 .25 1" ;
+			}
+		}
+		
+		if( "gui::weapon6" == 2 ) {
+			set "weap7::forecolor" "1 1 1 1" ;
+			set "chargepercent::text" "gui::player_ammopercent" ;
+		} else {
+			if ( "gui::weapon6" == 1 ) {
+				set "weap7::forecolor" ".5 .5 .5 1" ;
+			} else {
+				set "weap7::forecolor" ".25 .25 .25 1" ;
+			}
+		}
+		
+		if( "gui::weapon7" == 2 ) {
+			set "weap8::forecolor" "1 1 1 1" ;
+			set "chargepercent::text" "gui::player_ammopercent" ;
+		} else {
+			if ( "gui::weapon7" == 1 ) {
+				set "weap8::forecolor" ".5 .5 .5 1" ;
+			} else {
+				set "weap8::forecolor" ".25 .25 .25 1" ;
+			}
+		}
+		
+		if( "gui::weapon8" == 2 ) {
+			set "weap9::forecolor" "1 1 1 1" ;
+			set "chargepercent::text" "gui::player_ammopercent" ;
+		} else {
+			if ( "gui::weapon8" == 1 ) {
+				set "weap9::forecolor" ".5 .5 .5 1" ;
+			} else {
+				set "weap9::forecolor" ".25 .25 .25 1" ;
+			}
+		}
+	}
+	
+	onNamedEvent newWeapon {
+	
+	
+	}
+
+	
+	windowDef TipPopBox
+	{
+		rect	220,300,233,152
+		matcolor	1,1,1,0
+		visible	1
+		background	"textures/chex/guis/tipwindow"
+		windowDef tiptitle
+		{
+			rect	10,18,215,26
+			visible	1
+			textalign	1
+			text	"gui::tiptitle"
+			textscale	0.4
+			forecolor	1,1,0,0
+		}
+		windowDef tip
+		{
+			rect	10,45,215,98
+			visible	1
+			text	"gui::tip"
+			forecolor	1,1,1,0
+			textscale	0.3
+			textalign	1
+		}
+	}
+	windowDef TipPopBoxU
+	{
+		rect	0, 0, 0, 0
+		visible	0
+		notime	1
+
+		onTime 0 {
+			transition "TipPopBox::matcolor" "1 1 1 0" "1 1 1 1" "350" ;
+		}
+
+		onTime 350 {
+			transition "tip::forecolor" "1 1 1 0" "1 1 1 1" "200" ;
+			transition "tiptitle::forecolor" "1 1 0 0" "1 1 0 1" "200" ;
+		}
+
+	}
+	windowDef TipPopBoxD
+	{
+		rect	0, 0, 0, 0
+		visible	0
+		notime	1
+
+		onTime 0 {
+			transition "tip::forecolor" "1 1 1 1" "1 1 1 0" "200" ;
+			transition "tiptitle::forecolor" "1 1 0 1" "1 1 0 0" "200" ;		
+		}
+
+		onTime 200 {
+			transition "TipPopBox::matcolor" "1 1 1 1" "1 1 1 0" "350" ;
+		}
+
+		onTime 550 {
+			set "TipPopBox::visible" "0" ;
+		}
+
+	}
+	windowDef weaponinv
+	{
+		rect	454,447,180,27
+		visible	1
+		background	"textures/chex/guis/inv"
+		matcolor	1,1,1,1
+	}
+	windowDef healthbar
+	{
+		rect	6,8, ("gui::player_health" * 1.99),11
+		visible	1
+		background	"textures/chex/guis/healthbar"
+		matcolor	("gui::player_health" / 100),1,1,1
+	}
+	windowDef armorbar
+	{
+		rect	6,23, ("gui::player_armor" * 1.17),6
+		visible	1
+		background	"textures/chex/guis/armorbar"
+	}
+	windowDef healthborder
+	{
+		rect	5,7,202,13
+		visible	1
+		background	"textures/chex/guis/hparmbord"
+	}
+	windowDef armorborder
+	{
+		rect	5,22,148,8
+		visible	1
+		background	"textures/chex/guis/hparmbord"
+	}
+	windowDef ammocharge
+	{
+		rect	16,335,50,103
+		visible	1
+		background	"textures/chex/guis/bat_meter"
+		matcolor	"gui::player_ammo" / ("gui::player_clipsize"+.0001),1,1,1
+	}
+	windowDef batteryborder
+	{
+		rect	11,325,59,116
+		visible	1
+		background	"textures/chex/guis/batt"
+		matcolor	1,1,1,1
+	}
+	windowDef chargepercent
+	{
+		rect	16,375,50,20
+		visible	1
+		forecolor	1,1,1,1
+		text	"gui::player_ammopercent"
+	}
+	windowDef clip1
+	{
+		rect	10,443,31,29
+		visible	1
+		background	"textures/chex/guis/clip"
+		matcolor	.5,.5,.5,1
+	}
+	windowDef clip2
+	{
+		rect	41,443,31,29
+		visible	1
+		background	"textures/chex/guis/clip"
+		matcolor	.5,.5,.5,1
+	}
+	windowDef clip3
+	{
+		rect	72,443,31,29
+		visible	1
+		background	"textures/chex/guis/clip"
+		matcolor	.5,.5,.5,1
+	}
+	windowDef clip4
+	{
+		rect	72,414,31,29
+		visible	1
+		background	"textures/chex/guis/clip"
+		matcolor	.5,.5,.5,1
+	}
+	windowDef clip5
+	{
+		rect	72,385,31,29
+		visible	1
+		background	"textures/chex/guis/clip"
+		matcolor	.5,.5,.5,1
+	}
+	windowDef clip6
+	{
+		rect	72,356,31,29
+		visible	1
+		background	"textures/chex/guis/clip"
+		matcolor	.5,.5,.5,1
+	}
+	windowDef clip7
+	{
+		rect	72,327,31,29
+		visible	1
+		background	"textures/chex/guis/clip"
+		matcolor	.5,.5,.5,1
+	}
+	windowDef weap1
+	{
+		rect	456,443,16,30
+		visible	1
+		text	"1"
+		textscale	.5
+		textalign	1
+	}
+	windowDef weap2
+	{
+		rect	472,443,16,30
+		visible	1
+		text	"2"
+		textscale	.5
+		textalign	1
+	}
+	windowDef weap3
+	{
+		rect	489,443,16,30
+		visible	1
+		text	"3"
+		textscale	.5
+		textalign	1
+	}
+	windowDef weap4
+	{
+		rect	507,443,16,30
+		visible	1
+		text	"4"
+		textscale	.5
+		textalign	1
+	}
+	windowDef weap5
+	{
+		rect	527,443,16,30
+		visible	1
+		text	"5"
+		textscale	.5
+		textalign	1
+	}
+	windowDef weap6
+	{
+		rect	545,443,16,30
+		visible	1
+		text	"6"
+		textscale	.5
+		textalign	1
+	}
+	windowDef weap7
+	{
+		rect	562,443,16,30
+		visible	1
+		text	"7"
+		textscale	.5
+		textalign	1
+	}
+	windowDef weap8
+	{
+		rect	580,443,16,30
+		visible	1
+		text	"8"
+		textscale	.5
+		textalign	1
+	}
+	windowDef weap9
+	{
+		rect	598,443,16,30
+		visible	1
+		text	"9"
+		textscale	.5
+		textalign	1
+	}
+	windowDef weap0
+	{
+		rect	615,443,16,30
+		visible	1
+		text	"0"
+		textscale	.5
+		textalign	1
+	}
+
+//////**********************************************************************
+//  Item Pickup
+//////**********************************************************************
+
+// 	windowDef InvItem
+// 	{
+// 		rect -350,205,350,0
+// 		notime 1
+// 		
+// 		onTime 0 {
+// 			set "InvItem::visible" "1" ;
+// 			transition "InvItem::rect" "-120 205 350 0" "-120 205 350 115" "400" "0.2" "0.8" ;
+// 			transition "InvPopBg2T::matcolor" "1 1 1 0" "1 1 1 0.7" "600" "0.2" "0.8" ;
+// 			transition "InvPopBg2TR::matcolor" "1 1 1 0" "1 1 1 0.7" "600" "0.2" "0.8" ;
+// 			transition "InvPopBg2B::matcolor" "1 1 1 0" "1 1 1 0.7" "600" "0.2" "0.8" ;
+// 			transition "InvPopBg2BR::matcolor" "1 1 1 0" "1 1 1 0.7" "600" "0.2" "0.8" ;
+// 			transition "InvTitleBG1::rect" "120 27 0 14" "120 27 155 14" "400" "0.2" "0.8" ;
+// 			transition "InvTitleBG1::backcolor" "0.8 1 1 0" "0.8 1 1 0.1" "600" ;
+// 		}
+// 		onTime 400 {	
+// 			transition "InvTitle::forecolor" "1 1 1 1" "1 0.6 0.2 1" "200" ;
+// 			transition "InvTitle2::forecolor" "0 0 0 0" "0 0 0 0.6" "200" ;
+// 		}
+// 		onTime 600 {
+// 			transition "ObjectItem::matcolor" "1 1 1 0" "1 1 1 1" "200" ;
+// 		}
+// 		onTime 3000 {
+// 			set "ObjectItem::matcolor" "1 1 1 0" ;
+// 			transition "InvTitle::forecolor" "1 0.6 0.2 1" "1 1 1 0" "200" ;
+// 			transition "InvTitle2::forecolor" "0 0 0 0.6" "0 0 0 0" "200" ;
+
+// 			transition "InvItem::rect" "-120 205 350 115" "-120 205 350 0" "400" "0.2" "0.8" ;
+// 			transition "InvPopBg2T::matcolor" "1 1 1 0.7" "1 1 1 0" "400" "0.2" "0.8" ;
+// 			transition "InvPopBg2TR::matcolor" "1 1 1 0.7" "1 1 1 0" "400" "0.2" "0.8" ;
+// 			transition "InvPopBg2B::matcolor" "1 1 1 0.7" "1 1 1 0" "400" "0.2" "0.8" ;
+// 			transition "InvPopBg2BR::matcolor" "1 1 1 0.7" "1 1 1 0" "400" "0.2" "0.8" ;
+// 			transition "InvTitleBG1::rect" "120 27 155 14" "120 27 0 14" "400" "0.2" "0.8" ;
+// 			transition "InvTitleBG1::backcolor" "0.8 1 1 0.1" "0.8 1 1 0" "400" ;			
+// 		}
+// 		onTime 3400 {
+// 			set "InvItem::visible" "0" ;
+// 		}
+// 		
+// 		
+// 		windowDef InvPopBg2TClip
+// 		{
+// 			rect	0,0,300,50		
+// 			windowDef InvPopBg2T
+// 			{
+// 				rect	0,10,270,68
+// 				matcolor	1, 1, 1, 0
+// 				background	"gui/pda/2_tb"
+// 				visible	1
+// 			}
+// 			windowDef InvPopBg2TR
+// 			{
+// 				rect	270,10,14,68
+// 				matcolor	1, 1, 1, 0
+// 				background	"gui/pda/2_c"
+// 				visible	1
+// 			}
+// 		}
+// 		windowDef InvPopBg2BClip
+// 		{
+// 			rect	0,50,300,60			
+// 			windowDef InvPopBg2B
+// 			{
+// 				rect	0,-3,270,-68
+// 				matcolor	1, 1, 1, 0
+// 				background	"gui/pda/2_tb"
+// 				visible	1
+// 			}
+// 			windowDef InvPopBg2BR
+// 			{
+// 				rect	270,-3,14,-68
+// 				matcolor	1, 1, 1, 0
+// 				background	"gui/pda/2_c"
+// 				visible	1
+// 			}
+// 		}
+// 		windowDef InvTitleBG1 {
+// 			rect		120 ,27 ,0 ,14 
+// 			backcolor	0.8,1,1,0
+// 			visible		1
+// 		}
+// 		windowDef InvTitle2 {
+// 			rect		124 ,22 ,300 ,20 
+// 			forecolor	0 ,0 ,0 ,0
+// 			text		"#str_02027"
+// 			textscale	0.25
+// 			font		"fonts/bank"
+// 			visible		1
+// 		}
+// 		windowDef InvTitle {
+// 			rect		123 ,21 ,300 ,20 
+// 			forecolor	1, 0.6, 0.2, 0
+// 			text		"#str_02027"
+// 			textscale	0.25
+// 			font		"fonts/bank"
+// 			visible		1
+// 		}
+// 		windowDef ObjectItem {
+// 			rect		165 ,39 ,64, 64 
+// 			background	"gui::itemicon"
+// 		//	background	"guis/assets/hud/items/redkey"
+// 			variablebackground 1
+// 			matcolor	1, 1, 1, 0
+// 			visible		1
+// 		}		
+// 	}
+
+	windowDef ItemPickup1
+	{
+		rect	462,347,150,16
+		visible	1
+		notime	1
+		float	"winactive"	0
+
+		onTime 0 {
+			transition "ItemText1::forecolor" "1 1 1 0.4" "0.9 0.9 0.9 0.7" "200" ;
+			transition "ItemText1BG::forecolor" "0 0 0 0" "0 0 0 1" "200" ;
+			transition "rect" "470 347 150 16" "462 347 150 16" "200" ;
+			set "winactive" "1" ;
+			if ("ItemPickup5::winactive" == 1) { 
+				transition "ItemPickup5::rect" "462 347 150 16" "462 367 150 16" "200" "0" "0.4" ;	
+			}
+			if ("ItemPickup4::winactive" == 1) { 
+				transition "ItemPickup4::rect" "462 367 150 16" "462 387 150 16" "200" "0" "0.4" ;	
+			}
+			if ("ItemPickup3::winactive" == 1) { 
+				transition "ItemPickup3::rect" "462 387 150 16" "462 407 150 16" "200" "0" "0.4" ;	
+			}
+			if ("ItemPickup2::winactive" == 1) { 
+				transition "ItemPickup2::rect" "462 407 150 16" "462 427 150 16" "200" "0" "0.4" ;	
+			}			
+		}
+
+		onTime 1500 {
+			transition "ItemText1::forecolor" "0.9 0.9 0.9 0.7" "0.9 0.9 0.9 0" "200" ;
+			transition "ItemText1BG::forecolor" "0 0 0 1" "0 0 0 0" "200" ;
+			set "winactive" "0" ;
+		}
+
+		windowDef ItemText1BG
+		{
+			text	"gui::itemtext1"
+			rect	1 ,1 ,142 ,15
+			forecolor	0, 0, 0, 0
+			font	"fonts/bank"
+			textscale	0.25
+			visible	1
+			textalign	2
+			textaligny	-5
+		}
+		windowDef ItemText1
+		{
+			text	"gui::itemtext1"
+			rect	0 ,0 ,142 ,15
+			forecolor	0.6, 0.8, 0.8, 0
+			font	"fonts/bank"
+			textscale	0.25
+			visible	1
+			textalign	2
+			textaligny	-5
+		}
+	}
+	windowDef ItemPickup2
+	{
+		rect	470,367,150,16
+		visible	1
+		notime	1
+		float	"winactive"	0
+
+		onTime 0 {
+			transition "ItemText2::forecolor" "1 1 1 0.4" "0.9 0.9 0.9 0.7" "200" ;
+			transition "ItemText2BG::forecolor" "0 0 0 0" "0 0 0 1" "200" ;
+			transition "rect" "470 347 150 16" "462 347 150 16" "200" ;
+			set "winactive" "1" ;
+			if ("ItemPickup1::winactive" == 1) { 
+				transition "ItemPickup1::rect" "462 347 150 16" "462 367 150 16" "200" "0" "0.4" ;	
+			}
+			if ("ItemPickup5::winactive" == 1) { 
+				transition "ItemPickup5::rect" "462 367 150 16" "462 387 150 16" "200" "0" "0.4" ;	
+			}
+			if ("ItemPickup4::winactive" == 1) { 
+				transition "ItemPickup4::rect" "462 387 150 16" "462 407 150 16" "200" "0" "0.4" ;	
+			}
+			if ("ItemPickup3::winactive" == 1) { 
+				transition "ItemPickup3::rect" "462 407 150 16" "462 427 150 16" "200" "0" "0.4" ;	
+			}			
+		}
+
+		onTime 1500 {
+			transition "ItemText2::forecolor" "0.9 0.9 0.9 0.7" "0.9 0.9 0.9 0" "200" ;
+			transition "ItemText2BG::forecolor" "0 0 0 1" "0 0 0 0" "200" ;
+			set "winactive" "0" ;
+		}
+
+		windowDef ItemText2BG
+		{
+			text	"gui::itemtext2"
+			rect	1 ,1 ,142 ,15
+			forecolor	0, 0, 0, 0
+			font	"fonts/bank"
+			textscale	0.25
+			visible	1
+			textalign	2
+			textaligny	-5
+		}
+		windowDef ItemText2
+		{
+			text	"gui::itemtext2"
+			rect	0 ,0 ,142 ,15
+			forecolor	0.6, 0.8, 0.8, 0
+			font	"fonts/bank"
+			textscale	0.25
+			visible	1
+			textalign	2
+			textaligny	-5
+		}
+	}
+	windowDef ItemPickup3
+	{
+		rect	470,387,150,16
+		visible	1
+		notime	1
+		float	"winactive"	0
+
+		onTime 0 {
+			transition "ItemText3::forecolor" "1 1 1 0.4" "0.9 0.9 0.9 0.7" "200" ;
+			transition "ItemText3BG::forecolor" "0 0 0 0" "0 0 0 1" "200" ;
+			transition "rect" "470 347 150 16" "462 347 150 16" "200" ;
+			set "winactive" "1" ;
+			if ("ItemPickup2::winactive" == 1) { 
+				transition "ItemPickup2::rect" "462 347 150 16" "462 367 150 16" "200" "0" "0.4" ;	
+			}
+			if ("ItemPickup1::winactive" == 1) { 
+				transition "ItemPickup1::rect" "462 367 150 16" "462 387 150 16" "200" "0" "0.4" ;	
+			}
+			if ("ItemPickup5::winactive" == 1) { 
+				transition "ItemPickup5::rect" "462 387 150 16" "462 407 150 16" "200" "0" "0.4" ;	
+			}
+			if ("ItemPickup4::winactive" == 1) { 
+				transition "ItemPickup4::rect" "462 407 150 16" "462 427 150 16" "200" "0" "0.4" ;	
+			}			
+		}
+
+		onTime 1500 {
+			transition "ItemText3::forecolor" "0.9 0.9 0.9 0.7" "0.9 0.9 0.9 0" "200" ;
+			transition "ItemText3BG::forecolor" "0 0 0 1" "0 0 0 0" "200" ;
+			set "winactive" "0" ;
+		}
+
+		windowDef ItemText3BG
+		{
+			text	"gui::itemtext3"
+			rect	1 ,1 ,142 ,15
+			forecolor	0, 0, 0, 0
+			font	"fonts/bank"
+			textscale	0.25
+			visible	1
+			textalign	2
+			textaligny	-5
+		}
+		windowDef ItemText3
+		{
+			text	"gui::itemtext3"
+			rect	0 ,0 ,142 ,15
+			forecolor	0.6, 0.8, 0.8, 0
+			font	"fonts/bank"
+			textscale	0.25
+			visible	1
+			textalign	2
+			textaligny	-5
+		}
+	}
+	windowDef ItemPickup4
+	{
+		rect	470,407,150,16
+		visible	1
+		notime	1
+		float	"winactive"	0
+
+		onTime 0 {
+			transition "ItemText4::forecolor" "1 1 1 0.4" "0.9 0.9 0.9 0.7" "200" ;
+			transition "ItemText4BG::forecolor" "0 0 0 0" "0 0 0 1" "200" ;
+			transition "rect" "470 347 150 16" "462 347 150 16" "200" ;
+			set "winactive" "1" ;
+			if ("ItemPickup3::winactive" == 1) { 
+				transition "ItemPickup3::rect" "462 347 150 16" "462 367 150 16" "200" "0" "0.4" ;	
+			}
+			if ("ItemPickup2::winactive" == 1) { 
+				transition "ItemPickup2::rect" "462 367 150 16" "462 387 150 16" "200" "0" "0.4" ;	
+			}
+			if ("ItemPickup1::winactive" == 1) { 
+				transition "ItemPickup1::rect" "462 387 150 16" "462 407 150 16" "200" "0" "0.4" ;	
+			}
+			if ("ItemPickup5::winactive" == 1) { 
+				transition "ItemPickup5::rect" "462 407 150 16" "462 427 150 16" "200" "0" "0.4" ;	
+			}			
+		}
+
+		onTime 1500 {
+			transition "ItemText4::forecolor" "0.9 0.9 0.9 0.7" "0.9 0.9 0.9 0" "200" ;
+			transition "ItemText4BG::forecolor" "0 0 0 1" "0 0 0 0" "200" ;
+			set "winactive" "0" ;
+		}
+
+		windowDef ItemText4BG
+		{
+			text	"gui::itemtext4"
+			rect	1 ,1 ,142 ,15
+			forecolor	0, 0, 0, 0
+			font	"fonts/bank"
+			textscale	0.25
+			visible	1
+			textalign	2
+			textaligny	-5
+		}
+		windowDef ItemText4
+		{
+			text	"gui::itemtext4"
+			rect	0 ,0 ,142 ,15
+			forecolor	0.6, 0.8, 0.8, 0
+			font	"fonts/bank"
+			textscale	0.25
+			visible	1
+			textalign	2
+			textaligny	-5
+		}
+	}
+	windowDef ItemPickup5
+	{
+		rect	470,427,150,16
+		visible	1
+		notime	1
+		float	"winactive"	0
+
+		onTime 0 {
+			transition "ItemText5::forecolor" "1 1 1 0.4" "0.9 0.9 0.9 0.7" "200" ;
+			transition "ItemText5BG::forecolor" "0 0 0 0" "0 0 0 1" "200" ;
+			transition "rect" "470 347 150 16" "462 347 150 16" "200" ;
+			set "winactive" "1" ;
+			if ("ItemPickup4::winactive" == 1) { 
+				transition "ItemPickup4::rect" "462 347 150 16" "462 367 150 16" "200" "0" "0.4" ;	
+			}
+			if ("ItemPickup3::winactive" == 1) { 
+				transition "ItemPickup3::rect" "462 367 150 16" "462 387 150 16" "200" "0" "0.4" ;	
+			}
+			if ("ItemPickup2::winactive" == 1) { 
+				transition "ItemPickup2::rect" "462 387 150 16" "462 407 150 16" "200" "0" "0.4" ;	
+			}
+			if ("ItemPickup1::winactive" == 1) { 
+				transition "ItemPickup1::rect" "462 407 150 16" "462 427 150 16" "200" "0" "0.4" ;	
+			}			
+		}
+
+		onTime 1500 {
+			transition "ItemText5::forecolor" "0.9 0.9 0.9 0.7" "0.9 0.9 0.9 0" "200" ;
+			transition "ItemText5BG::forecolor" "0 0 0 1" "0 0 0 0" "200" ;
+			set "winactive" "0" ;
+		}
+
+		windowDef ItemText5BG
+		{
+			text	"gui::itemtext5"
+			rect	1 ,1 ,142 ,15
+			forecolor	0, 0, 0, 0
+			font	"fonts/bank"
+			textscale	0.25
+			visible	1
+			textalign	2
+			textaligny	-5
+		}
+		windowDef ItemText5
+		{
+			text	"gui::itemtext5"
+			rect	0 ,0 ,142 ,15
+			forecolor	0.6, 0.8, 0.8, 0
+			font	"fonts/bank"
+			textscale	0.25
+			visible	1
+			textalign	2
+			textaligny	-5
+		}
+	}
+}

@@ -1,0 +1,127 @@
+windowDef Desktop
+{
+	comment	"gui_parm1=runScript on open, gui_parm2=runScript on close, gui_parm3 == 0 => no close gui_parm3 == 1 => no open, gui_parm4 top text, gui_parm5 open text, gui_parm6 close text"
+	rect	0,0,640,480
+	backcolor	0,0,0,0
+	visible	1
+	float	"notouchin"	0
+	windowDef nothing
+	{
+		rect	0,0,640,480
+		backcolor	0,0,0,0
+		visible	0
+	}
+	windowDef top
+	{
+		rect	12,2,619,107
+		visible	1
+		background	"textures/chex/guis/hangartop"
+	}
+	windowDef bottom
+	{
+		rect	13,435,617,45
+		visible	1
+		background	"textures/chex/guis/hangarbottom"
+	}
+	windowDef open
+	{
+		rect	177,157,282,92
+		visible	1
+		background	"textures/chex/guis/button"
+		matcolor	.5,.5,.5,1
+
+		onAction {
+			if( "desktop::notouchin" == 0 && "gui::gui_parm3" == 0 ) {
+				runScript "gui::gui_parm1" ;
+				resetTime "0";
+				set "cmd" "play guisounds_click1" ;
+				set "desktop::notouchin" "1" ;
+				transition "open::matcolor" ".5 .5 .5 1" "1 1 1 1" "400" ;
+				transition "opentext::forecolor" "0 0 0 .6" ".9 .9 .1 1" "400" ;
+			} else {
+				set "cmd" "play guisounds_error" ;
+			}
+		}
+
+		onTime 400 {
+			transition "open::matcolor" "1 1 1 1" ".5 .5 .5 1" "400" ;
+			transition "opentext::forecolor" ".9 .9 .1 1" "0 0 0 .6" "400" ;
+		}
+
+		onTime 800 {
+			set "desktop::notouchin" "0" ;
+		}
+
+	}
+	windowDef close
+	{
+		rect	178,293,282,92
+		matcolor	.5,.5,.5,1
+		visible	1
+		background	"textures/chex/guis/button"
+
+		onAction {
+			if( "desktop::notouchin" == 0 && "gui::gui_parm3" == 1 ) {
+				runScript "gui::gui_parm2" ;
+				resetTime "0";
+				set "cmd" "play guisounds_click1" ;
+				set "desktop::notouchin" "1" ;
+				transition "close::matcolor" ".5 .5 .5 1" "1 1 1 1" "400" ;
+				transition "closetext::forecolor" "0 0 0 .6" ".9 .9 .1 1" "400" ;
+			} else {
+				set "cmd" "play guisounds_error" ;
+			}
+		}
+
+		onTime 400 {
+			transition "close::matcolor" "1 1 1 1" ".5 .5 .5 1" "400" ;
+			transition "closetext::forecolor" ".9 .9 .1 1" "0 0 0 .6" "400" ;
+		}
+
+		onTime 800 {
+			set "desktop::notouchin" "0" ;
+		}
+
+	}
+	windowDef grid
+	{
+		rect	43,123,552,293
+		visible	1
+		background	"textures/chex/guis/redgrid"
+	}
+	windowDef bb
+	{
+		rect	11,109,620,325
+		visible	1
+		background	"textures/chex/guis/blueborder"
+	}
+	windowDef topname
+	{
+		rect	24,18,597,68
+		visible	1
+		text	"gui::gui_parm4"
+		textalign	1
+		textscale	1
+		forecolor	0,0,0,.6
+		shadow	0
+		font	"fonts/micro"
+	}
+	windowDef opentext
+	{
+		rect	181,171,273,68
+		visible	1
+		text	"gui::gui_parm5"
+		textalign	1
+		textscale	1
+		forecolor	0,0,0,.6
+	}
+	windowDef closetext
+	{
+		rect	184,306,273,68
+		visible	1
+		text	"gui::gui_parm6"
+		textalign	1
+		textscale	1
+		forecolor	0,0,0,.6
+	}
+}

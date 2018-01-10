@@ -1,0 +1,13 @@
+Version 2
+// entity 0
+{
+"classname" "worldspawn"
+}
+// entity 1
+{
+"classname" "target_setinfluence"
+"name" "target_setinfluence_1"
+"origin" "0 0 0"
+"influenceLevel" "2"
+"triggerActivate" "1"
+}

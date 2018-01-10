@@ -1,0 +1,19 @@
+
+mapDef e1m1 {
+	"name"		"Landing Zone"
+	"devname"		"e1m1"
+	"singleplayer"		"1"
+	"size0"		"171547663"
+	"size1"		"171547663"
+	"size2"		"171547663"
+	"size3"		"171547663"
+}
+mapDef sf_923 {
+	"name"		"Storage Facility"
+	"devname"		"sf"
+	"singleplayer"		"1"
+	"size0"		"247914790"
+	"size1"		"247914790"
+	"size2"		"247914790"
+	"size3"		"247914790"
+}

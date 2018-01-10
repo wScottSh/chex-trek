@@ -1,0 +1,119 @@
+/*===============================================
+  monster_chex_cly
+  ===============================================*/
+
+model monster_chex_cly {
+	mesh							models/md5/chex/cly.md5mesh
+	offset							( 0 0 20 )
+	channel torso					( *origin )
+	anim af_pose					models/md5/chex/clyinitial.md5anim
+	
+	//anim initial					models/md5/chex/clyinitial.md5anim
+	
+	anim idle						models/md5/chex/clyidle.md5anim
+	
+	anim range_attack1				models/md5/chex/clyfire1.md5anim {
+		frame 1 						sound sound/chex/monsters/cly_range
+		frame 7							create_missile carm3
+		frame 13						launch_missile carm3
+	}
+	anim range_attack2				models/md5/chex/clyfire2.md5anim {
+		frame 1 						sound sound/chex/monsters/cly_range
+		frame 9							create_missile rarm3
+		frame 15						launch_missile rarm3
+		frame 16						create_missile larm3
+		frame 21						launch_missile larm3
+	}
+	anim melee_attack1				models/md5/chex/clymelee1.md5anim {
+		frame 1 						sound sound/chex/monsters/cly_melee
+		frame 14						melee melee_cacodemon
+	}
+	anim fly						models/md5/chex/clywalk.md5anim
+	anim pain_chest1					models/md5/chex/clyfire1.md5anim
+		
+	anim evade_right				models/md5/chex/cly_dodge_r.md5anim {
+	//	frame 1						sound sound/chex/monsters/flemoid_bugee
+	}
+
+	anim evade_left					models/md5/chex/cly_dodge_l.md5anim {
+	//	frame 1						sound sound/chex/monsters/flemoid_bugee
+	}
+}
+
+entityDef monster_chex_cly {
+	"inherit"						"monster_default"
+	"scriptobject"					"monster_chex_cly"
+	"model"							"monster_chex_cly"
+	"ragdoll"						"monster_chex_cly"
+	
+	"size"							"48 48 48"
+	"use_aas"						"aas48"
+	
+	"team"							"1"
+	"rank"							"1"
+	
+	"health"						"110"
+	
+	"melee_range"					"70"
+	
+	"def_projectile"				"projectile_chex_slime"
+	
+	"attack_cone"					"50"
+	"attack_accuracy"				"0"
+	
+	"turn_rate"						"150"
+	"fly_offset"					"15"
+	"fly_speed"						"125"
+	"fly_seek_scale"				"4"
+	"fly_roll_max"					"60"
+	"fly_roll_scale"				"100"
+	"fly_pitch_scale"				"45"
+	"fly_pitch_max"					"25"
+	
+	"mass"							"100" //thought he was thrown bit much - zl1
+	
+	//spawnArg added in SDK for notilt
+	//"no_flytilt"					"0"   //I like the tilt dude. -Stoney
+	//"bone_flytilt"					"I DON'T F'IN WANT TILT"
+
+	"smokeParticleSystem"			"cly_flame-origin"   //this was going to be the particle spawned out the sides of his mouth when he shoots, but no.
+	//"smokeParticleSystem2"			"caco_mouthfire"
+	//"smokeParticleSystem3"			"caco_mouthfire2"
+	//"smokeParticleSystem4"			"caco_mouthfire2a"
+
+	"burnaway"						"0.25"
+	"smoke_burnParticleSystem"			"zorch.prt-Headlo"
+	
+	//"damage_zone head"				"*Head -*LeftSide -*RightSide"
+	//"damage_zone chest"			"*Waist -*Rshldr -*Lshldr -*Neck"
+	//"damage_zone left_arm"			"*LeftSide"
+	//"damage_zone right_arm"			"*RightSide"
+	//"damage_zone legs"				"*Tail1"
+	"damage_zone chest"				"*origin"
+
+	"snd_chatter"				"sound/chex/monsters/cly_idle"
+	"snd_chatter_combat"			"sound/chex/monsters/cly_idle"
+	"snd_death"					"sound/chex/monsters/cly_death"
+//	"snd_pain_small"					"sound/chex/monsters/cly_pain"
+//	"snd_pain_medium"				"sound/chex/monsters/cly_pain"
+	"snd_pain_large"				"sound/chex/monsters/cly_pain"
+	"snd_pain_huge"				"sound/chex/monsters/cly_pain"
+	
+
+
+	//"snd_ambient"					"monster_demon_cacodemon_walk"
+	//"snd_sight"						"monster_demon_cacodemon_sight"
+	//"snd_sight2"					"monster_demon_cacodemon_sight2"
+	//"snd_chatter"					"monster_demon_cacodemon_chatter"
+	//"snd_chatter_combat"			"monster_demon_cacodemon_chatter"
+	//"snd_melee"						"monster_demon_cacodemon_melee"
+	//"snd_pain"						"monster_demon_cacodemon_pain"
+	//"snd_attackmissile"				"monster_demon_cacodemon_attackmissile"
+	//"snd_death"						"monster_demon_cacodemon_die"
+	//"snd_burn"						"monster_demon_cacodemon_burn"
+	
+	//"fx_teleport"					"fx/teleporter_fly.fx"
+	//"fx_teleport1"					"fx/teleporter1_fly.fx"
+	//"fx_teleport2"					"fx/teleporter2_fly.fx"
+	//"fx_teleport3"					"fx/teleporter3_fly.fx"
+}

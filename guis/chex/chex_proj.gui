@@ -1,0 +1,28 @@
+windowDef desktop {
+	rect	0,0,640,480
+		
+	windowDef fed_logo {
+		float "newycoord"   0
+		rect 200,120,250,250
+		matcolor 1,1,1,1
+		background "textures/chex/guis/logo_poster"
+	}
+	
+	windowDef chex_sign {
+		background "textures/chex/guis/chex_poster"
+		matcolor 1,1,1,1
+		visible "0"
+		rect 0,0,640,480
+	}
+	
+	onTime 16000 {
+		set "fed_logo::visible" "0" ;
+		set "chex_sign::visible" "1" ;
+	}
+	
+	onTime 31000 {
+		set "fed_logo::visible" "1" ;
+		set "chex_sign::visible" "0" ;
+		resetTime 0 ;
+	}
+}

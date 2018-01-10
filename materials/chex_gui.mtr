@@ -1,0 +1,271 @@
+table chex_man { snap { 0, 1 } }
+
+textures/chex/hud/blue_background
+{
+	{
+		nopicmip
+		map textures/chex/guis/blue_background
+	}
+}	
+textures/chex/hud/map_scope
+{
+	{
+		nopicmip
+		map textures/chex/guis/map_scope
+		blend gl_one, gl_one
+	}
+}
+textures/chex/hud/map_direction
+{
+	{
+		alpha ( chex_man[ time + .5 ] )
+		map textures/chex/guis/chex_man_1 //map_direction
+		blend gl_src_alpha, gl_one_minus_src_alpha
+		nopicmip
+		nearest
+	}
+	
+	{
+		alpha ( chex_man[ time ] )
+		map textures/chex/guis/chex_man_2 //map_direction
+		blend gl_src_alpha, gl_one_minus_src_alpha
+		nopicmip
+		nearest
+	}
+}
+guis/hud_maps/e1m10
+{
+	translucent
+	//noShadows
+	{
+		maskcolor
+		map textures/guis/hudmap_alpha0
+		nopicmip
+		nearest
+		//blend gl_zero, gl_one
+	}
+	{
+		maskalpha
+		map textures/chex/maps/e1m1
+		blend gl_dst_alpha, gl_one
+		nopicmip
+		nearest
+	}
+}	
+guis/hud_maps/sf_9230
+{
+	translucent
+	//noShadows
+	{
+		maskcolor
+		map textures/guis/hudmap_alpha0
+		nopicmip
+		nearest
+	}
+	{
+		maskalpha
+		map textures/chex/maps/sf
+		blend gl_dst_alpha, gl_one
+		nopicmip
+		nearest
+	}
+}	
+textures/chex/winned
+{
+	{
+		nopicmip
+		map textures/chex/guis/winned.tga
+	}
+}
+console
+{
+	{
+		linear
+		scroll 0, .075 * time
+		map textures/chex/guis/console
+	}
+}
+textures/chex/trim/proj_screen
+{
+	diffusemap textures/chex/trim/proj_screen_d
+	bumpmap textures/chex/trim/proj_screen_local
+}
+textures/chex/guis/chex_poster
+{
+	{
+		map textures/chex/walls/bigchexposter_d
+		blend gl_dst_color, gl_zero
+	}
+}
+textures/chex/guis/logo_poster
+{
+	{
+		map textures/chex/guis/fedlogo_alpha
+		blend gl_dst_color, gl_one_minus_src_alpha
+	}
+}
+textures/chex/guis/fed_logo_alpha
+{
+	{
+		map textures/chex/guis/fedlogo_alpha
+		blend gl_src_alpha, gl_one_minus_src_alpha
+	}
+}
+textures/chex/guis/bat_meter
+{
+	{
+		nopicmip
+		nearest
+		maskcolor
+		map makealpha( guis/bat_mask.tga )
+		scale 0, .5
+		translate 0, parm0
+	}
+	{
+		nopicmip
+		nearest
+		map guis/charge
+		maskalpha
+		blend gl_dst_alpha, gl_one_minus_dst_alpha
+	}
+}
+textures/chex/guis/tipwindow
+{
+	{
+		nopicmip
+		nearest
+		map guis/update
+		colored
+		blend GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA
+	}
+}
+textures/chex/guis/clip
+{
+	{
+		nopicmip
+		nearest
+		map guis/clip
+		blend GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA
+		colored
+	}
+}
+textures/chex/guis/armorbar
+{
+	{
+		map guis/armorbar
+		nopicmip
+		nearest
+	}
+}
+textures/chex/guis/batt
+{
+	{
+		map guis/batt
+		blend GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA
+		nopicmip
+		nearest
+	}
+}
+textures/chex/guis/charge
+{
+	{
+		map guis/charge
+		nopicmip
+		nearest
+	}
+}
+textures/chex/guis/healthbar
+{
+	{
+		map _ramp //guis/healthbar
+		red		1 - parm0
+		blue	0
+		green	parm0
+		nopicmip
+		nearest
+	}
+	{
+		map guis/sinewave
+		maskalpha
+		red		1 - parm0
+		blue	0
+		green	parm0
+		translate time, 0
+		//scale parm0 * .03, 1
+		//nopicmip
+		//nearest
+		blend add
+		//blend gl_zero, gl_src_color
+	}
+}
+textures/chex/guis/hparmbord
+{
+	{
+		map guis/hparmbord
+		blend GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA
+		nopicmip
+		nearest
+	}
+}
+textures/chex/guis/inv
+{
+	{
+		map guis/inv
+		blend GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA
+		nopicmip
+		nearest
+	}
+}
+textures/chex/guis/map_center
+{
+	{
+		map textures/chex/guis/map_center
+		colored
+		blend GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA
+		nopicmip
+		nearest
+	}
+}
+textures/chex/guis/map_arrow_up
+{
+	{
+		map textures/chex/guis/map_arrow_up
+		colored
+		blend GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA
+		nopicmip
+		nearest
+	}
+}
+textures/chex/guis/map_investigate
+{
+	clamp
+	{
+		map textures/chex/guis/map_investigate
+		colored
+		blend GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA
+		nopicmip
+		nearest
+		rotate time * .25
+	}
+}
+
+textures/chex/guis/userid2
+{
+	{
+		blend GL_DST_COLOR, GL_zero
+		map textures/chex/guis/dduser.tga
+		colored
+		clamp
+	}
+}
+
+textures/chex/guis/card
+{
+	{
+		blend GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA
+		map textures/chex/guis/card
+		colored
+		clamp
+	}
+}
+

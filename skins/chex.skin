@@ -1,0 +1,38 @@
+skin skins/airtank_green
+{
+	models/mapobjects/washroom/airtank	models/mapobjects/washroom/airtank_green
+}
+
+skin skins/chex/key_red
+{
+	models/chex/keys/key_blue		models/chex/keys/key_red
+}
+
+skin skins/chex/cagelight
+{
+	models/mapobjects/lights/cagelight/cagelight models/chex/cagelight
+}
+
+skin skins/chex/bay_floor_low
+{
+	textures/chex/floors/cementblack_mirror textures/chex/floors/cementblack
+}
+
+skin skins/chex/mp_to_sp
+{
+    models/monsters/skeleton/skeleton01head     textures/common/nodraw
+    models/items/powerups/blite3                textures/common/nodraw
+    models/items/powerups/blite2                textures/common/nodraw
+    models/items/powerups/blite1                textures/common/nodraw
+    models/items/powerups/berserkerfx           textures/common/nodraw
+    models/items/powerups/berserkerflame1       textures/common/nodraw
+    models/items/powerups/berserker             textures/common/nodraw
+    models/items/powerups/atom                  textures/common/nodraw
+    models/monsters/skeleton/skeleton01         textures/common/nodraw
+    models/monsters/skeleton/skeleton01head     textures/common/nodraw
+}
+
+skin skins/chex/player_jumpsuit
+{
+	models/characters/male_npc/jumpsuit/jumpsuit	models/chex/chexguy/jumpsuit_chex
+}

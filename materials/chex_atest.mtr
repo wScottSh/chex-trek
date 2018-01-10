@@ -1,0 +1,38 @@
+textures/chex/atest/sflgrate2adiag
+{
+	twoSided
+	forceOverlays
+	qer_editorimage		textures/base_floor/sflgrate2adiag_d.tga
+	{
+		alphaTest .1
+		map makealpha( textures/base_floor/sflgrate2diag_d.tga )
+		maskColor
+	}
+	bumpmap			textures/base_floor/sflgrate2diag_local.tga
+	diffusemap		textures/base_floor/sflgrate2adiag_d.tga
+	specularmap		textures/base_floor/sflgrate2diag_s.tga
+	{
+		rgb .2
+		blend add
+		map textures/base_floor/sflgrate2adiag_d.tga
+	}
+}
+textures/chex/atest/sflgrate2a
+{
+	twoSided
+	forceOverlays
+	qer_editorimage	textures/base_floor/sflgrate2a_d.tga
+	{
+		alphaTest .1
+		map makealpha( textures/base_floor/sflgrate2_d.tga )
+		maskColor
+	}
+	bumpmap		addnormals (textures/base_floor/sflgrate2_local.tga, heightmap (textures/base_floor/sflgrate2a_bmp.tga, 2))
+	diffusemap	textures/base_floor/sflgrate2a_d.tga
+	specularmap	textures/base_floor/sflgrate2_s.tga
+	{
+		rgb .2
+		blend add
+		map textures/base_floor/sflgrate2a_d.tga
+	}
+}

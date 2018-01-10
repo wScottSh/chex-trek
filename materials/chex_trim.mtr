@@ -1,0 +1,59 @@
+textures/chex/trim/blue_trim
+{
+	qer_editorimage textures/chex/trim/blue_key_add
+	diffusemap textures/chex/trim/blue_key_d
+	bumpmap textures/chex/trim/blue_key_local
+	{
+		map textures/chex/trim/blue_key_add
+		blend add
+	}
+}
+textures/chex/trim/red_trim
+{
+	qer_editorimage textures/chex/trim/blue_key_add
+	diffusemap textures/chex/trim/blue_key_d
+	bumpmap textures/chex/trim/blue_key_local
+	{
+		map textures/chex/trim/red_key_add
+		blend add
+	}
+}
+textures/chex/glass
+ {
+	noselfshadow
+	noshadows
+	//twosided
+	translucent
+	glass
+	forceoverlays
+
+	qer_editorimage textures/glass/glass2
+
+	{
+                program           heathaze.vfp
+                vertexparm              0       time * 0 , time * 0 // texture scrolling
+                vertexparm              1       .4         // magnitude of the distortion
+                fragmentprogram			heathaze.vfp
+                fragmentmap             0       _currentrender
+                fragmentmap             1       textures/sfx/vp1   // the normal map for distortion
+             
+    }
+
+	{	
+		maskcolor				
+	    map	makealpha(textures/glass/glass2)
+	}
+	
+	{
+	    blend gl_dst_alpha, gl_one
+	    maskalpha
+       	cubemap		env/gen2
+			red		parm0
+	        green   parm1
+	        blue	parm2
+        texgen		reflect
+
+	}
+
+		
+}

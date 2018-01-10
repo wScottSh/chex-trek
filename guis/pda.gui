@@ -1,0 +1,335 @@
+windowDef Desktop
+{
+	rect	0,0,640,480
+	menugui 1
+	
+    /*
+    set "cmd" "StopPDAVideo" ;
+    set	"cmd"	"stopPDAAudio ; StopPDAVideo" ;
+    set	"cmd"	"updatePDA2 ; playpdavideo" ;
+    set	"cmd"	"playPDAAudio" ;
+    set "cmd" "updatepda" ;	
+    "gui::pda_personal" == 1
+    text	"gui::pda_name"
+    text	"gui::pda_id"
+    text	"gui::pda_location"
+    text	"gui::pda_title"
+    text	"gui::PDASecurityClearance"
+    text    	"gui::PDAVideoTitle"
+    background	"gui::PDAVideoIcon"
+    background	"gui::PDAVideoVid"
+    text    	"gui::PDAVideoInfo"
+    "gui::audioLogCount" == 0
+    text		"gui::missionobjective"
+    text	"gui::PDAEmailTitle"
+    text    "gui::PDAEmailText"
+    gui::weapon0-11
+    "gui::inv_count" == 0)
+    ackground	"gui::inv_icon_0"
+    text	"gui::inv_name_0"
+    */
+    
+	onActivate {
+		resetTime "ActivateAnim" "0" ;
+	}
+
+	onNamedEvent showPDATip {
+		resetTime "TutorialAnim1" "0" ;
+	}
+		
+	onNamedEvent playerPDANotActive {
+		
+	}
+	onNamedEvent playerPDAActive {
+		
+	}	
+	
+	//MATT
+	windowDef hudmap
+	{
+		rect	0, 0, 640, 480
+		matcolor	1, 1, 1, 1
+		backcolor   0, 0, 0, 0.9
+		visible	"gui::HudMap"
+		windowDef scroll_up
+		{
+			rect		28, 210, 20, 20
+			background	"textures/chex/guis/map_arrow_up"
+			matcolor	0.5, 0.6, 0.6, 1
+			backcolor   0.5, 0.6, 0.6, 0.3
+			bordercolor 0.5, 0.6, 0.6, 1
+			bordersize  1
+			onAction {
+				set "cmd" "map_scroll_up";
+			}
+			onActionRelease {
+				set "cmd" "map_stop";
+			}
+		}
+		windowDef scroll_down
+		{
+			background	"textures/chex/guis/map_arrow_up"
+			rotate 180
+			matcolor	0.5, 0.6, 0.6, 1
+			rect		28, 260, 20, 20
+			backcolor   0.5, 0.6, 0.6, 0.3
+			bordercolor 0.5, 0.6, 0.6, 1
+			bordersize  1
+			onAction {
+				set "cmd" "map_scroll_down";
+			}
+			onActionRelease {
+				set "cmd" "map_stop";
+			}
+		}
+		windowDef scroll_left
+		{
+			background	"textures/chex/guis/map_arrow_up"
+			rotate 90
+			matcolor	0.5, 0.6, 0.6, 1
+			rect		5, 235, 20, 20
+			backcolor   0.5, 0.6, 0.6, 0.3
+			bordercolor 0.5, 0.6, 0.6, 1
+			bordersize  1
+			onAction {
+				set "cmd" "map_scroll_left";
+			}
+			onActionRelease {
+				set "cmd" "map_stop";
+			}
+		}
+		windowDef scroll_right
+		{
+			background	"textures/chex/guis/map_arrow_up"
+			rotate -90
+			matcolor	0.5, 0.6, 0.6, 1
+			rect		51, 235, 20, 20
+			backcolor   0.5, 0.6, 0.6, 0.3
+			bordercolor 0.5, 0.6, 0.6, 1
+			bordersize  1
+			onAction {
+				set "cmd" "map_scroll_right";
+			}
+			onActionRelease {
+				set "cmd" "map_stop";
+			}
+		}
+		windowDef scroll_center
+		{
+			background	"textures/chex/guis/map_center"
+			matcolor	0.5, 0.6, 0.6, 1
+			rect		28, 235, 20, 20
+			backcolor   0.5, 0.6, 0.6, 0.3
+			bordercolor 0.5, 0.6, 0.6, 1
+			bordersize  1
+			onAction {
+				set "cmd" "map_scroll_center";
+			}
+		}
+		windowDef zoom_in
+		{
+			background	"textures/chex/guis/map_arrow_up"
+			matcolor	0.5, 0.6, 0.6, 1
+			rect		28, 300, 20, 20
+			backcolor   0.5, 0.6, 0.6, 0.3
+			bordercolor 0.5, 0.6, 0.6, 1
+			bordersize  1
+			onAction {
+				set "cmd" "map_zoom_in";
+			}
+			onActionRelease {
+				set "cmd" "map_stop";
+			}
+		}
+		windowDef zoom_out
+		{
+			background	"textures/chex/guis/map_arrow_up"
+			rotate 180
+			matcolor	0.5, 0.6, 0.6, 1
+			rect		28, 330, 20, 20
+			backcolor   0.5, 0.6, 0.6, 0.3
+			bordercolor 0.5, 0.6, 0.6, 1
+			bordersize  1
+			onAction {
+				set "cmd" "map_zoom_out";
+			}
+			onActionRelease {
+				set "cmd" "map_stop";
+			}
+		}
+		windowDef mapbox
+		{
+			//IMPORTANT!
+			//If you change the size of this you must fix the scaling factors!
+			rect		75,10,570,390
+			backcolor   0.5, 0.6, 0.6, 0.3
+			bordercolor 0.5, 0.6, 0.6, 1
+			bordersize  1
+
+			windowDef faded_map
+			{	
+				rect	"gui::map_pos_x" * 570 / 640, "gui::map_pos_y" * 390 / 480, "gui::map_w"  * 570 / 640, "gui::map_h" * 390 / 480
+				matcolor	1, 1, 1, .25
+				background	"gui::hud_map_faded_mtr"
+			}
+
+			windowDef map
+			{	
+				rect	"gui::map_pos_x" * 570 / 640, "gui::map_pos_y" * 390 / 480, "gui::map_w"  * 570 / 640, "gui::map_h" * 390 / 480
+				matcolor	1, 1, 1, 1
+				background	"gui::hud_map_mtr"
+			}
+
+			windowDef objective_1
+			{
+				rect	"gui::map_obj1_x" * 570 / 640, "gui::map_obj1_y" * 390 / 480, 32, 32
+				background	"gui::map_obj1"
+				matcolor	1, 1, 1, 1
+				visible "gui::map_obj1_v"
+				onAction {
+					set "obj_title::visible" "1";
+					set "obj_text::visible" "1";
+					set "obj_title::text" "gui::map_obj1_tle";
+					set "obj_text::text" "gui::map_obj1_txt";
+				}
+				onEvent {
+					if( "gui::map_obj1_c" == 1 ) {
+						set matcolor "1 0 0 1";
+					}
+					if( "gui::map_obj1_c" == 2 ) {
+						set matcolor "0 1 0 1";
+					}
+					if( "gui::map_obj1_c" == 3 ) {
+						set matcolor "1 1 1 1";
+					}
+				}
+			}
+			windowDef objective_2
+			{
+				rect	"gui::map_obj2_x" * 570 / 640, "gui::map_obj2_y" * 390 / 480, 32, 32
+				background	"gui::map_obj2"
+				matcolor	1, 1, 1, 1
+				visible "gui::map_obj2_v"
+				onAction {
+					set "obj_title::visible" "1";
+					set "obj_text::visible" "1";
+					set "obj_title::text" "gui::map_obj2_tle";
+					set "obj_text::text" "gui::map_obj2_txt";
+				}
+                onEvent {
+					if( "gui::map_obj2_c" == 1 ) {
+						set matcolor "1 0 0 1";
+					}
+					if( "gui::map_obj2_c" == 2 ) {
+						set matcolor "0 1 0 1";
+					}
+					if( "gui::map_obj2_c" == 3 ) {
+						set matcolor "1 1 1 1";
+					}
+				}
+			}
+			windowDef objective_3
+			{
+				rect	"gui::map_obj3_x" * 570 / 640, "gui::map_obj3_y" * 390 / 480, 32, 32
+				background	"gui::map_obj3"
+				matcolor	1, 1, 1, 1
+				visible "gui::map_obj3_v"
+				onAction {
+					set "obj_title::visible" "1";
+					set "obj_text::visible" "1";
+					set "obj_title::text" "gui::map_obj3_tle";
+					set "obj_text::text" "gui::map_obj3_txt";
+				}
+                onEvent {
+					if( "gui::map_obj3_c" == 1 ) {
+						set matcolor "1 0 0 1";
+					}
+					if( "gui::map_obj3_c" == 2 ) {
+						set matcolor "0 1 0 1";
+					}
+					if( "gui::map_obj3_c" == 3 ) {
+						set matcolor "1 1 1 1";
+					}
+				}
+			}
+			windowDef objective_4
+			{
+				rect	"gui::map_obj4_x" * 570 / 640, "gui::map_obj4_y" * 390 / 480, 32, 32
+				background	"gui::map_obj4"
+				matcolor	1, 1, 1, 1
+				visible "gui::map_obj4_v"
+				onAction {
+					set "obj_title::visible" "1";
+					set "obj_text::visible" "1";
+					set "obj_title::text" "gui::map_obj4_tle";
+					set "obj_text::text" "gui::map_obj4_txt";
+				}
+                onEvent {
+					if( "gui::map_obj4_c" == 1 ) {
+						set matcolor "1 0 0 1";
+					}
+					if( "gui::map_obj4_c" == 2 ) {
+						set matcolor "0 1 0 1";
+					}
+					if( "gui::map_obj4_c" == 3 ) {
+						set matcolor "1 1 1 1";
+					}
+				}
+			}
+			windowDef objective_5
+			{
+				rect	"gui::map_obj5_x" * 570 / 640, "gui::map_obj5_y" * 390 / 480, 32, 32
+				background	"gui::map_obj5"
+				matcolor	1, 1, 1, 1
+				visible "gui::map_obj5_v"
+				onAction {
+					set "obj_title::visible" "1";
+					set "obj_text::visible" "1";
+					set "obj_title::text" "gui::map_obj5_tle";
+					set "obj_text::text" "gui::map_obj5_txt";
+				}
+                onEvent {
+					if( "gui::map_obj5_c" == 1 ) {
+						set matcolor "1 0 0 1";
+					}
+					if( "gui::map_obj5_c" == 2 ) {
+						set matcolor "0 1 0 1";
+					}
+					if( "gui::map_obj5_c" == 3 ) {
+						set matcolor "1 1 1 1";
+					}
+				}
+			}
+			windowDef map_direction
+			{
+				rect	"gui::player_x" * 570 / 640, "gui::player_y" * 390 / 480, 32, 32
+				background	"gui::map_player"
+				matcolor	1, 1, 1, 1
+				rotate	"gui::player_direction"
+			}
+		}
+		windowDef obj_title
+		{
+			rect		75,405,250,20
+			backcolor   0.5, 0.6, 0.6, 0.3
+			bordercolor 0.5, 0.6, 0.6, 1
+			bordersize  1
+			textalign 0
+			textscale .25
+			visible 0
+			text ""
+		}
+		windowDef obj_text
+		{
+			rect		75,430,570,49
+			backcolor   0.5, 0.6, 0.6, 0.3
+			bordercolor 0.5, 0.6, 0.6, 1
+			bordersize  1
+			textalign 0
+			textscale .25
+			visible 0
+			text ""
+		}
+	}
+	
+}

@@ -1,0 +1,105 @@
+TODO:
+-----------------------
+Get some voice acting done!***
+Skin Bootspoon
+Skin Mini-Zorcher
+Skin Large-Zorcher
+Skin Bipedicus
+Make the pipe textures
+
+
+12/30/05
+-----------------------
+really need to fix the footprints/slimesplats/slimetrail to be consistent with the rest of the slime decals. they need the same brightness and color if at all possible.
+
+
+10/18-19/05
+-----------------------
+Finally got sadistic on the SVN server...
+biped is modeled and should be UVed today
+Spoon is to be finished today and UVed
+Did some intense beta testing for CDoom for their LMS merge/gameplay thingy.
+Added projectile_minizorchblast entityDef
+shotty, chaingun, pistol all use minizorchblast
+did some scientist voice acting... I hope they really suck so someone else feels obligated to do them better. :P
+admired Sergey Brin for his ability to surpass the Bill of Gates with income and market schemes.
+
+
+10/17/05
+-----------------------
+played with more sounds and made some
+mom lost social security card when purse was stolen... that bites
+attempting to make biped def file
+not working for some reason...
+changed difficulties strings in .lang file
+added little _jetadd flicker to cly
+trying to get tweaked cdoom_credit.gui to werk!
+I got the credits werking! YAY!... only took me the entire day... :(
+fixed cly glass!
+
+
+10/16/05
+-----------------------
+zl1 finished the shakeyness
+and the cinematic
+made white tiled floor
+played with flemoid sounds
+made hole on bottom of cly black
+
+
+10/15/05
+-----------------------
+Messed with cly skin a bit more (added dehydrator bump to base)
+played with HUD a bit more - ???Percntage numbers???
+Laid the smack down cuz I was depressed and told everyone that I needed a release... SOON!
+zl1 and sadistic are great! started doing what I told them to do immediately! I wonder why they keep doing this and don't get all pissed at moi.
+-zl1
+--shakey camera
+--flemoid cinematics
+-Sadistic
+--bipedicus
+added the little jet engine to bottom of cly.
+
+
+10/14/05
+-----------------------
+started messing with HUD display
+
+
+10/12/05
+-----------------------
+Made bumps and specs for cly
+cly burns away like the flem now.
+skinned contaner and added colored tag into .mtr
+
+
+10/9/05
+-----------------------
+Laughed at TV screen while watching hitchhikers guide to the galaxy
+Added crappy lookin' skin to cly .mtr file.
+turned tilt back on for cly cuz I like it. (If it can be updated, why stick with the old technologies limitations?)
+changed caco_fireball to slime_projectile thingy.
+Added specularmap to snotball
+played chex trek straight through and almost felt like I was playing an actual game!
+Replaced shotgun dudes and pinkey in e1m1 with cly
+messed with flemoid and cly .def for a bit.
+Really reduced cly mass so it bounces around when shot... YAY!
+sorta updated cly skins as well as material file.
+
+
+10/2/95
+-----------------------
+doors fixed
+Grabbed the subversion from corvette
+Merged them together
+?DOORS DON’T WORK?
+Beta skin for the cyclopticus
+skinned snotball
+
+
+9/1/05
+------------------------
+Reduced texture size to powers of 8
+went to the friggin doctor!
+organized some of the mtr files.
+tons of text based item switching in e1m1

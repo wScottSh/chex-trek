@@ -1,0 +1,68 @@
+textures/chex/guis/button
+{
+	{
+		map textures/chex/guis/button_g
+		colored
+		blend gl_src_alpha, gl_one_minus_src_alpha
+	}
+}
+textures/chex/guis/redgrid
+{
+	{
+		map textures/chex/guis/red_back
+		rgb .8 + .2 * sinTable[ time ]
+		blend add
+	}
+}
+textures/chex/guis/hangartop
+{
+	{
+		map textures/chex/guis/hangartop_a
+		blend gl_src_alpha, gl_one_minus_src_alpha
+	}
+}
+textures/chex/guis/hangarbottom
+{
+	{
+		map textures/chex/guis/bottombar
+		blend gl_src_alpha, gl_one_minus_src_alpha
+	}
+}
+textures/chex/guis/blueborder
+{
+	{
+		map textures/chex/guis/blueborder_a
+		blend gl_src_alpha, gl_one_minus_src_alpha
+	}
+}
+textures/chex/guis/logoadd
+{	
+	{
+		blend add
+		map textures/chex/guis/fedlogo_alpha
+		red	parm0
+		green	parm1
+		blue	parm2
+	}
+}
+textures/chex/guis/comm_down
+{
+	{
+		blend add
+		map textures/chex/guis/comm_down_a
+	}
+}
+textures/chex/guis/security_down
+{
+	{
+		blend add
+		map textures/chex/guis/security_down_a
+	}
+}
+textures/chex/guis/blue
+{
+	{
+		map textures/chex/walls/bluemarble_d
+		blend gl_one, gl_one
+	}
+}

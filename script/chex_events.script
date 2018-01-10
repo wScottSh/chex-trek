@@ -1,0 +1,4 @@
+
+scriptEvent	void	openDoors( entity doorEnt );
+scriptEvent	void	setProj( string def );
+scriptEvent	entity	spawnDict( string def );

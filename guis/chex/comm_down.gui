@@ -1,0 +1,8 @@
+windowDef Desktop
+{
+	comment	"static secuity down gui"
+	rect	0,0,640,480
+	backcolor	0,0,0,0
+	background "textures/chex/guis/comm_down"
+	visible	1
+}

@@ -1,0 +1,15 @@
+models/wipes/hst_mars
+{
+    noselfShadow
+	noshadows
+
+        		diffusemap	textures/menu/hst_mars.tga
+				bumpmap 	heightmap(textures/menu/hst_mars_h.tga, 6 ) 
+              //specularmap	textures/menu/hst_mars_s.tga
+   {
+             blend   add //gl_one, gl_dst_alpha
+      map   textures/menu/hst_mars.tga
+      rgb 0.3
+   } 
+				
+}

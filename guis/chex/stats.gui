@@ -1,0 +1,253 @@
+windowDef Desktop
+{
+	rect	0, 0, 640, 480
+	visible	1
+	backcolor	0, 0, 0, 1
+	menugui	1
+	windowDef ai_title
+	{
+		rect	45,138,387,51
+		visible	1
+		text	"FLEMOIDS RETURNED"
+		forecolor	0, 1, 0, 1
+		textscale	.75
+		border	1
+		bordercolor	0, 1, 0, 1
+		bordersize	2
+		textalign	1
+	}
+	windowDef item_title
+	{
+		rect	44,206,387,50
+		visible	1
+		text	"ITEMS FOUND"
+		forecolor	0, 1, 0, 1
+		textscale	.75
+		border	1
+		bordercolor	0, 1, 0, 1
+		bordersize	2
+		textalign	1
+	}
+	windowDef secret_title
+	{
+		rect	44,275,387,50
+		visible	1
+		text	"SECRETS FOUND"
+		forecolor	0, 1, 0, 1
+		textscale	.75
+		border	1
+		bordercolor	0, 1, 0, 1
+		bordersize	2
+		textalign	1
+	}
+	windowDef ai_slash
+	{
+		rect	501,123,25,43
+		visible	1
+		forecolor	0, 1, 0, 1
+		text	/
+		textscale	.75
+		textalign	1
+	}
+	windowDef ai_total
+	{
+		rect	522,123,79,43
+		visible	1
+		forecolor	0, 1, 0, 1
+		text	"gui::ai_total"
+		textscale	.75
+		textalign	1
+	}
+	windowDef ai_killed
+	{
+		rect	433,124,80,43
+		visible	1
+		forecolor	0, 1, 0, 1
+		text	"gui::ai_killed"
+		textscale	.75
+		textalign	1
+	}
+	windowDef ai_percent
+	{
+		rect	464,150,79,43
+		visible	1
+		forecolor	0, 1, 0, 1
+		text	"gui::ai_percent"
+		textscale	.75
+		textalign	1
+	}
+	windowDef percent_ai
+	{
+		rect	531,149,52,43
+		visible	1
+		forecolor	0, 1, 0, 1
+		text	%
+		textscale	.75
+		textalign	1
+	}
+	windowDef items_found
+	{
+		rect	432,192,80,43
+		visible	1
+		forecolor	0, 1, 0, 1
+		text	"gui::items_found"
+		textscale	.75
+		textalign	1
+	}
+	windowDef items_percent
+	{
+		rect	463,218,79,43
+		visible	1
+		forecolor	0, 1, 0, 1
+		text	"gui::items_percent"
+		textscale	.75
+		textalign	1
+	}
+	windowDef percent_item
+	{
+		rect	530,217,52,43
+		visible	1
+		forecolor	0, 1, 0, 1
+		text	%
+		textscale	.75
+		textalign	1
+	}
+	windowDef items_total
+	{
+		rect	521,191,79,43
+		visible	1
+		forecolor	0, 1, 0, 1
+		text	"gui::items_total"
+		textscale	.75
+		textalign	1
+	}
+	windowDef secret_found
+	{
+		rect	432,261,80,43
+		visible	1
+		forecolor	0, 1, 0, 1
+		text	"gui::secrets_found"
+		textscale	.75
+		textalign	1
+	}
+	windowDef secret_percent
+	{
+		rect	463,287,79,43
+		visible	1
+		forecolor	0, 1, 0, 1
+		text	"gui::secrets_percent"
+		textscale	.75
+		textalign	1
+	}
+	windowDef percent_secret
+	{
+		rect	530,286,52,43
+		visible	1
+		forecolor	0, 1, 0, 1
+		text	%
+		textscale	.75
+		textalign	1
+	}
+	windowDef secret_total
+	{
+		rect	521,260,79,43
+		visible	1
+		forecolor	0, 1, 0, 1
+		text	"gui::secrets_total"
+		textscale	.75
+		textalign	1
+	}
+	windowDef item_slash
+	{
+		rect	501,190,25,43
+		visible	1
+		forecolor	0, 1, 0, 1
+		text	/
+		textscale	.75
+		textalign	1
+	}
+	windowDef secret_slash
+	{
+		rect	501,260,25,43
+		visible	1
+		forecolor	0, 1, 0, 1
+		text	/
+		textscale	.75
+		textalign	1
+	}
+	windowDef levelcomplete
+	{
+		rect	127,71,387,51
+		visible	1
+		text	"LEVEL COMPLETE"
+		forecolor	0, 1, 0, 1
+		textscale	.75
+		border	1
+		bordercolor	0, 1, 0, 1
+		bordersize	2
+		textalign	1
+	}
+	windowDef time_title
+	{
+		rect	44,346,388,51
+		visible	1
+		text	TIME
+		forecolor	0, 1, 0, 1
+		textscale	.75
+		border	1
+		bordercolor	0, 1, 0, 1
+		bordersize	2
+		textalign	1
+	}
+	windowDef leveltime
+	{
+		rect	435,349,206,43
+		visible	1
+		forecolor	0, 1, 0, 1
+		text	"gui::level_time"
+		textscale	.75
+		textalign	1
+	}
+	windowDef skip
+	{
+		rect	43,411,196,51
+		visible	1
+		text	SKIP
+		forecolor	0, 1, 0, 1
+		textscale	.75
+		border	1
+		bordercolor	0, 1, 0, 1
+		bordersize	2
+		textalign	1
+		onAction {
+			set "cmd" "skip" ;
+		}
+	}
+	windowDef nextmap
+	{
+		rect	405,411,196,51
+		visible	1
+		text	NEXTMAP
+		forecolor	0, 1, 0, 1
+		textscale	.75
+		border	1
+		bordercolor	0, 1, 0, 1
+		bordersize	2
+		textalign	1
+		onAction {
+			set "cmd" "nextmap" ;
+		}
+	}
+	windowDef mapname
+	{
+		rect	14,9,615,51
+		visible	1
+		text	"gui::mapname"
+		forecolor	0, 1, 0, 1
+		textscale	.75
+		border	1
+		bordercolor	0, 1, 0, 1
+		bordersize	2
+		textalign	1
+	}
+}

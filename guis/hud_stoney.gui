@@ -1,0 +1,92 @@
+windowDef Desktop
+{
+	rect	0, 0, 640, 480
+	backcolor	0, 0, 0, 0
+	visible	1
+	nocursor	1
+	windowDef map_darken
+	{
+		rect	0, 0, 640, 480
+		background	"textures/chex/hud/dark_screen"
+		visible	"gui::HudMap"
+	}
+	windowDef map_scope
+	{
+		rect	0,0,640,480
+		background	"textures/chex/hud/map_scope"
+		text	"gui::stats"
+		visible	"gui::HudMap"
+	}
+	windowDef map
+	{
+		rect	"gui::map_pos_x", "gui::map_pos_y", "gui::map_scale_x", "gui::map_scale_y"
+		background	"gui::hud_map_mtr"
+		visible	"gui::HudMap"
+	}
+	windowDef map_direction
+	{
+		rect	304, 224, 32, 32
+		background	"textures/chex/hud/map_direction"
+		rotate	"gui::player_direction"
+		visible	"gui::HudMap"
+	}
+	windowDef weaponinv
+	{
+		rect	454,447,180,27
+		visible	1
+		background	"guis/inv"
+		matcolor	1,1,1,1
+	}
+	windowDef healthbar
+	{
+		rect	6,8, ("gui::player_health" * 1.99),11
+		visible	1
+		background	"guis/healthbar"
+	}
+	windowDef armorbar
+	{
+		rect	6,23, ("gui::player_armor" * 1.17),6
+		visible	1
+		background	"guis/armorbar"
+	}
+	windowDef healthborder
+	{
+		rect	5,7,200,13
+		visible	1
+		background	"guis/hparmbord"
+	}
+	windowDef armorborder
+	{
+		rect	5,22,118,8
+		visible	1
+		background	"guis/hparmbord"
+	}
+	windowDef ammocharge
+	{
+		rect	11,368,50,103
+		visible	1
+		background	"textures/chex/guis/bat_meter"
+		matcolor	"gui::player_ammo" / ("gui::player_clipsize"+.0001),1,1,1
+	}
+	windowDef batteryborder
+	{
+		rect	6,358,59,116
+		visible	1
+		background	"guis/batt"
+		matcolor	1,1,1,1
+	}
+	windowDef chargepercent
+	{
+		rect	11,408,50,20
+		visible	1
+		forecolor	1,1,1,1
+		text	"gui::player_ammopercent"
+	}
+	windowDef chargereserve
+	{
+		rect	67,459,"gui::player_totalammo",15
+		visible	1
+		background	"guis/healthbar"
+		matcolor	1,1,1,0.50980395
+	}
+}

@@ -1,0 +1,3 @@
+void endLevel() {
+	sys.setCamera( $camera_end_level );
+}

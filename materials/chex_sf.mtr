@@ -1,0 +1,18 @@
+textures/chex/sf/remotescreen
+{   
+   qer_editorimage   textures/editor/camera.tga
+   noshadows
+   noimpact   
+   discrete
+   forceOpaque
+
+   diffusemap   _black
+
+   {
+      nopicmip
+   	  blend add
+      remoteRenderMap   256 256   // width / height of render image
+      scale 1 , -1      // the render view ars upside down otherwise
+      translate 0, -1
+   }
+}

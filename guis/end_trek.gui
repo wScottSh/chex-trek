@@ -1,0 +1,97 @@
+windowDef Desktop
+{
+	rect	0,0,640,480
+	menugui	1
+	visible 1
+	backcolor 0,0,0,1
+	
+	windowDef BootBlackBG
+	{
+		rect	0,0,640,480
+		visible	1
+		background	"guis/assets/common/bg_rc"
+		matcolor	0,0,0,1
+	}
+	windowDef DoomLogo1
+	{
+		rect	0,0,640,480
+		background	"textures/chex/e1m1/splash"
+		matcolor	1 ,1 ,1 ,0.1
+		noevents	1
+		visible	1
+	}
+	windowDef Black
+	{
+		rect	0,0,640,480
+		backcolor	0,0,0,1
+		//notime	1
+		visible	1
+
+		onTime 0 {
+			transition "backcolor" "0 0 0 1" "0 0 0 0" "1000" ;
+		}
+
+	}
+	windowDef finished
+	{
+		rect	67,102,502,45
+		visible	1
+		text	"You've finished the beta of Chex Trek"
+		textscale	.5
+		forecolor	.7,.9,1,.8
+	}
+	windowDef end
+	{
+		rect	263,264,133,45
+		visible	1
+		text	"End Game"
+		textscale	.5
+		forecolor	.7,.9,1,.8
+		onTime 0 {
+			resetTime 10000;
+		}
+		onTime 100 {
+			transition "forecolor" ".7 .9 1 .8" "1 1 1 1" "500";
+		}
+		onTime 600 {
+			transition "forecolor" "1 1 1 1" ".7 .9 1 .8" "500";
+		}
+	}
+	windowDef end_button {
+		rect	263,264,133,45
+		visible	1
+		backcolor 0,0,0,0
+		onAction {
+			resetTime end 100;
+			//we need to handle everything in a script because gui
+			//scripts are the suck
+			set "cmd" "runScript map_storage_facility::end_trek_credits" ;
+		}
+	}
+	windowDef e1m1
+	{
+		rect	128,207,392,45
+		visible	1
+		text	"Play Chex Quest E1M1 Remake"
+		textscale	.5
+		forecolor	.7,.9,1,.8
+		onTime 0 {
+			resetTime 10000;
+		}
+		onTime 100 {
+			transition "forecolor" ".7 .9 1 .8" "1 1 1 1" "500";
+		}
+		onTime 600 {
+			transition "forecolor" "1 1 1 1" ".7 .9 1 .8" "500";
+		}
+	}
+	windowDef e1m1_button {
+		rect	128,207,392,45
+		visible	1
+		backcolor 0,0,0,0
+		onAction {
+			resetTime e1m1 100;
+			set "cmd" "runScript map_storage_facility::end_trek_e1m1" ;
+		}
+	}
+}

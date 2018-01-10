@@ -1,0 +1,7 @@
+video chex_intro {
+	name		"Chex Quest :: Mission Review"
+	info		"Creator: Chex Squadron\nDate: 03/05/45\n\nGood Luck -Chex Squadron"
+	video		"video/chex_intro"
+	audio		"sound/chex/chex_intro"
+	preview	"textures/chex/floors/federlogo_d.tga"
+}

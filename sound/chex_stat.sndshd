@@ -1,0 +1,6 @@
+sound/chex/level_stats
+{
+	no_dups
+	global
+	sound/chex/items/h2o.wav
+}

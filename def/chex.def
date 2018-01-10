@@ -1,0 +1,173 @@
+entityDef chex_map {
+	"inherit"				"item_default"
+	"editor_color"			".3 .3 1"
+	"editor_mins"			"-16 -16 0"
+	"editor_maxs"			"16 16 32"
+
+	"editor_usage"			"Area Map"
+	"editor_model"			"models/chex/amap.ase"
+
+	"spawnclass"			"idItem"
+	"model" 				"models/chex/amap.ase"
+	"size"					"32 32 32"
+	"inv_carry"				"1"
+	"inv_name"				"Area Map"
+	"inv_id_chexmap"		"1"
+	"inv_item"				"1"
+	"snd_acquire"			"guisounds_item"
+}
+
+entityDef chex_key_blue {
+	"inherit"				"item_default"
+	"editor_color"			".3 .3 1"
+	"editor_mins"			"-16 -16 0"
+	"editor_maxs"			"16 16 32"
+
+	"editor_usage"			"Blue Key"
+	"editor_model"			"models/chex/keys/key_b.ase"
+
+	"spawnclass"			"idItem"
+	"model" 				"models/chex/keys/key_b.ase"
+	"size"					"32 32 32"
+	"inv_carry"				"1"
+	"inv_name"				"Blue Key"
+	"inv_id_bluekey"		"1"
+	"inv_item"				"1"
+	"snd_acquire"			"guisounds_item"
+}
+
+entityDef chex_key_red {
+	"inherit"				"item_default"
+	"editor_color"			".3 .3 1"
+	"editor_mins"			"-16 -16 0"
+	"editor_maxs"			"16 16 32"
+
+	"editor_usage"			"Red Key"
+	"editor_model"			"models/chex/keys/key_b.ase"
+
+	"spawnclass"			"idItem"
+	"model" 				"models/chex/keys/key_b.ase"
+	"skin"					"skins/chex/key_red"
+	"size"					"32 32 32"
+	"inv_carry"				"1"
+	"inv_name"				"Red Key"
+	"inv_id_redkey"			"1"
+	"inv_item"				"1"
+	"snd_acquire"			"guisounds_item"
+}
+
+entityDef chex_water_bottle {
+	"inherit"				"item_default"
+	"editor_color"			".3 .3 1"
+	"editor_mins"			"-16 -16 0"
+	"editor_maxs"			"16 16 32"
+
+	"editor_usage"			"H2o"
+
+	"spawnclass"			"idItem"
+	"model" 				"models/chex/water_bottle.ase"
+	"size"					"32 32 32"
+	"inv_name"				"H2o"
+	
+	//matt: hud does support health2 yet (health over 100%)
+	//"inv_health2"			"1"
+	"inv_health"			"1"
+	
+	"inv_item"				"2"
+	"snd_acquire"			"sound/chex/items/h2o"
+	"level_item"			"1"
+}
+
+entityDef chex_fruit_bowl {
+	"inherit"				"item_default"
+	"editor_color"			".3 .3 1"
+	"editor_mins"			"-16 -16 0"
+	"editor_maxs"			"16 16 32"
+
+	"editor_usage"			"Bowl of Fruit"
+
+	"spawnclass"			"idItem"
+	"model" 				"models/chex/bowl.ase"
+	"size"				"32 32 32"
+	"inv_name"				"Bowl of Fruit"
+	"inv_health"			"25"
+	"inv_item"				"2"
+	"snd_acquire"			"sound/chex/items/fruitbowl"
+	"level_item"			"1"
+}
+
+entityDef chex_bfast {
+	"inherit"				"item_default"
+	"editor_color"			".3 .3 1"
+	"editor_mins"			"-16 -16 0"
+	"editor_maxs"			"16 16 32"
+
+	"editor_usage"			"Supercharged Breakfast"
+
+	"spawnclass"			"idItem"
+	"model" 				"models/chex/sc_chexbfast/chex_breakfast.ase"
+	"size"				"32 32 32"
+	"inv_name"				"Supercharged Breakfast"
+	"inv_health"			"100"
+	"inv_item"				"2"
+	"snd_acquire"			"sound/chex/items/fruitbowl"
+	"level_item"			"1"
+}
+
+entityDef chex_slime_off {
+	"inherit"				"item_default"
+	"editor_color"			".3 .3 1"
+	"editor_mins"			"-16 -16 0"
+	"editor_maxs"			"16 16 32"
+
+	"editor_usage"			"Slime OFF"
+
+	"spawnclass"			"idItem"
+	"model" 				"models/chex/slimeoff.ase"
+	"snd_acquire"			"sound/chex/items/slimeoff2.wav"
+	"size"					"32 32 32"
+	"inv_name"				"Slime OFF!"
+	"inv_armor" 			"5"
+	"level_item"			"1"
+}
+
+entityDef chex_large_zorch {
+	"editor_color"			".3 .3 1"
+	"editor_mins"			"-16 -16 0"
+	"editor_maxs"			"16 16 32"
+	"editor_rotatable"			"1"
+
+	"editor_usage"			"Large zorch"
+
+	"spawnclass"			"idItem"
+	"model"					"models/chex/large_recharge.ase"
+	"snd_acquire"			"sound/chex/items/zorchpickup.wav"
+	"size"					"32 32 32"
+	"inv_ammo_bullets"		"50"
+	"inv_item"				"4"
+	"inv_name"				"Zorch"
+	"editor_copy100"			"inv_item"
+	"snd_respawn"			"sound/chex/items/zorchpickup.wav"
+}
+
+entityDef chex_small_zorch {
+	"editor_color"			".3 .3 1"
+	"editor_mins"			"-16 -16 0"
+	"editor_maxs"			"16 16 32"
+	"editor_rotatable"		"1"
+
+	"editor_usage"			"Small zorch"
+
+	"spawnclass"			"idItem"
+	"model"					"models/chex/health_plus.ase"
+	"snd_acquire"			"sound/chex/items/zorchpickup.wav"
+	"size"					"32 32 32"
+	"inv_ammo_bullets"		"12"
+	"inv_item"				"4"
+	"inv_name"				"Zorch"
+	"editor_copy100"			"inv_item"
+	"snd_respawn"			"sound/chex/items/zorchpickup.wav"
+	"level_item"			"1"
+	
+}
+

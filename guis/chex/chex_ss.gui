@@ -1,0 +1,48 @@
+windowDef desktop {
+	rect	0,0,640,480
+	backcolor 0,0,0,.8
+	windowDef fed_logo {
+		float "xcoord"   0
+		float "ycoord" 0
+//		float "newycoord"   0
+		rect xcoord,ycoord,200,200
+		matcolor 1,1,1,1
+		background "textures/chex/guis/fed_logo_alpha"
+		onEvent {
+			
+		}
+		onTime 1 {
+			transition "fed_logo::xcoord" "0" "440" "3000" ;
+			//transition "fed_logo::ycoord" "0" "280" "2000" ;
+		}
+		onTime 3001 {
+			transition "fed_logo::xcoord" "440" "0" "3000" ;
+			transition "fed_logo::ycoord" "0" "280" "3000" ;
+		}
+		onTime 6001 {
+			transition "fed_logo::xcoord" "0" "440" "3000" ;
+			//transition "fed_logo::ycoord" "280" "0" "2000" ;
+		}
+		onTime 9001 {
+			transition "fed_logo::xcoord" "440" "0" "3000" ;
+			transition "fed_logo::ycoord" "280" "0" "3000" ;
+		}
+		onTime 12001 {
+			resetTime fed_logo 0 ;
+		}
+	}
+	windowDef marquee {
+		text "gui::gui_parm1"
+		forecolor .75,.75,.3,1
+		rect 0,140,2000,400
+		textscale 2.5
+		onTime 1 {
+			set "marquee::forecolor" "gui::gui_parm11" ;
+			transition "rect" "640 140 2000 400" "-2000 140 2000 400" "10000" ;
+		}
+		onTime 10000 {
+			resetTime marquee 0 ;
+		}
+	}
+
+}

@@ -1,0 +1,501 @@
+//SHIP
+models/chex/ship
+{
+	//renderbump foo/bar.ase
+	diffusemap models/chex/ship_d
+	bumpmap models/chex/ship_local
+	{
+		map _white
+		blend specularmap
+		rgb .4
+	}
+	{
+		map _white
+		maskcolor
+		alpha .7
+	}
+	{
+		texgen reflect
+		cubeMap env/gen2
+		blend gl_dst_color, gl_dst_alpha
+	}
+//AMBIENT LIGHTING
+   {
+             blend   add //gl_one, gl_dst_alpha
+      map   models/chex/ship_d
+      rgb 0.1
+   } 
+}
+
+//LAMP
+models/chex/lamp
+{
+	{
+		map models/chex/lamp_d.tga
+		blend diffusemap
+	}
+	{
+		map _white
+		rgb .2
+		blend specularmap
+	}
+	bumpmap models/chex/lamp_local.tga
+//AMBIENT LIGHTING
+   {
+             blend   add //gl_one, gl_dst_alpha
+      map   models/chex/lamp_d.tga
+      rgb 0.1
+   } 
+}
+models/chex/lamp_bulb
+{
+	noShadows
+	{
+		map _white
+		red 1
+		blue .8
+		green .9
+		blend add
+	}
+}
+
+//FLAG
+models/chex/flag_b
+{
+//twoSided
+diffusemap models/chex/flag_b_d.tga
+bumpmap addnormals( models/chex/flag_local.tga, heightmap( models/chex/flag_hm.tga, 3 ) )
+//AMBIENT LIGHTING
+   {
+             blend   add //gl_one, gl_dst_alpha
+      map   models/chex/flag_b_d.tga
+      rgb 0.1
+   } 
+}
+models/chex/flag_pole
+{
+	{
+		map _white
+		blend specularmap
+	}
+	{
+		map _white
+		blend diffusemap
+	}
+
+	{
+		texgen reflect
+		cubemap models/chex/pole
+		blend gl_dst_color, gl_zero
+	}
+}
+
+//AIRTANK
+models/mapobjects/washroom/airtank_green
+{
+	renderbump  	-size 64 256 -aa 2 models/mapobjects/washroom/airtank_local.tga models/mapobjects/washroom/work/airtank_hp.lwo		
+	bumpmap			models/mapobjects/washroom/airtank_local
+	diffusemap		models/mapobjects/washroom/airtank_grn
+	specularmap		models/mapobjects/washroom/airtank_s
+//AMBIENT LIGHTING
+   {
+             blend   add //gl_one, gl_dst_alpha
+      map   models/mapobjects/washroom/airtank_grn
+      rgb 0.1
+   } 
+}
+
+//TESLA COIL
+models/chex/tesla
+{
+	//renderbump -size 128 256 -aa 2 models/chex/tesla_local.tga models/chex/tesla_hi.lwo
+	{
+		map models/chex/tesla_local
+		blend bumpmap
+	}
+	{
+		map models/chex/tesla_d
+		blend diffusemap
+	}
+	{
+		map models/chex/tesla_a
+		blend gl_src_alpha, gl_one_minus_src_alpha
+	}
+	{
+		map models/chex/tesla_a
+		maskColor
+	}
+	{
+		map models/chex/tesla_sweep
+		translate time * .25, 0
+		blend gl_dst_alpha, gl_one
+	}
+//AMBIENT LIGHTING
+   {
+             blend   add //gl_one, gl_dst_alpha
+      map   models/chex/tesla_d
+      rgb 0.1
+   } 
+}
+models/chex/tesla_glass
+{
+	{
+		map models/chex/tesla_g
+		translate sinTable[ .3 * time ], time
+		rotate sinTable[ .1 * time ]
+		blend add
+	}
+}
+//h2o bottle
+models/chex/water_bottle
+{
+	renderbump -size 256 128 -aa 1 models/chex/water_bottle_local.tga models/chex/water_bottle_hi.lwo
+	bumpmap models/chex/water_bottle_local
+	{
+		texgen reflect
+		cubeMap env/gen2
+		ignoreAlphaTest
+		blend gl_one, gl_one
+	}
+    {
+		map models/chex/water_bottle_d
+		alphaTest .5
+		blend diffusemap
+	}
+}
+//projector
+models/chex/projector
+{
+	renderbump -size 256 256 -aa 1 -trace .1 models/chex/projector_local.tga models/chex/proj_high.ase
+	diffusemap models/chex/projector_d
+	bumpmap models/chex/projector_local
+	{
+		map models/chex/projector_d
+		rgb .2
+		blend add
+	}
+	{
+		map models/chex/projector_add
+		blend add
+	}
+}
+//container
+models/chex/container
+{
+	{
+		colored       
+      		blend	diffuseMap  
+		map	models/chex/container_d.tga
+	}
+	bumpmap models/chex/container_local
+	specularmap models/chex/container_s
+
+//AMBIENT LIGHTING
+   {
+             blend   add //gl_one, gl_dst_alpha
+      map   models/chex/container_d.tga
+      rgb 0.1
+   } 
+}
+
+
+//CEREAL BOX
+models/chex/chex_box
+{
+	diffusemap models/chex/chex_box_d
+//AMBIENT LIGHTING
+   {
+             blend   add //gl_one, gl_dst_alpha
+      map   models/chex/chex_box_d
+      rgb 0.1
+   } 
+}
+
+//FLEMOID SHIP
+models/chex/shipflem
+{
+	forceOverlays
+	noShadows //kills the atest not sure why :(
+	{
+		blend diffusemap
+		map models/chex/flemship_d.tga
+	}
+	specularmap	textures/flem/flem_s.tga
+	{
+	   blend bumpmap
+	   map addnormals( textures/chex/slug/slug_local.tga , heightmap(textures/chex/slug/slug_h.tga,50))
+	   scroll	time * .009 , time * -0.1
+	}
+	{
+	   blend add
+	   map models/chex/flemship_slimeadd.tga
+	   rgb   0.2
+	}
+	{
+	   blend add
+	   map models/chex/flemship_engineadd.tga
+	}
+}
+models/chex/shipflem_glass
+{
+	noselfshadow
+	noshadows
+	//twosided
+	translucent
+	glass
+	forceoverlays
+	qer_editorimage textures/glass/glass2
+	{
+                program           heathaze.vfp
+                vertexparm              0       time * 0 , time * 0 // texture scrolling
+                vertexparm              1       .4         // magnitude of the distortion
+                fragmentprogram			heathaze.vfp
+                fragmentmap             0       _currentrender
+                fragmentmap             1       textures/sfx/vp1   // the normal map for distortion           
+    }
+
+	{	
+		maskcolor				
+	    map	makealpha(textures/glass/glass2)
+	}
+	
+	{
+	    blend gl_dst_alpha, gl_one
+	    maskalpha
+       	cubemap		env/gen2
+			red		parm0
+	        green   parm1
+	        blue	parm2
+        texgen		reflect
+	}
+}
+
+models/chex/chair/chair
+{
+	//renderbump -size 512 512 -aa 1 -trace .1 models/chex/chair/chair_local_rb.tga models/chex/chair/chair_hi.ase
+	//diffusemap models/chex/chair/chair_d
+	//bumpmap models/chex/chair/chair_local
+	diffusemap _white
+}
+
+models/chex/sc_chexbfast/bf_orange
+{
+    diffusemap models/chex/sc_chexbfast/bf_orange_d
+    bumpmap models/chex/sc_chexbfast/bf_orange_local
+    specularmap models/chex/sc_chexbfast/bf_orange_s
+    {
+        blend       add
+        map         models/chex/sc_chexbfast/bf_orange_d
+        rgb         0.15
+    }
+}
+
+models/chex/sc_chexbfast/bf_bowl
+{
+    diffusemap models/chex/sc_chexbfast/bf_bowl_d
+    bumpmap models/chex/sc_chexbfast/bf_bowl_local
+    {
+        blend       add
+        map         models/chex/sc_chexbfast/bf_bowl_d
+        rgb         0.15
+    }
+}
+
+models/chex/sc_chexbfast/bf_box
+{
+    diffusemap models/chex/sc_chexbfast/bf_box_d
+    specularmap models/chex/sc_chexbfast/bf_box_s
+    {
+        blend       add
+        map         models/chex/sc_chexbfast/bf_box_d
+        rgb         0.15
+    }
+}
+
+models/chex/sc_chexbfast/bf_plate
+{
+    diffusemap models/chex/sc_chexbfast/bf_plate_d
+    specularmap models/chex/sc_chexbfast/bf_plate_s
+    {
+        blend       add
+        map         models/chex/sc_chexbfast/bf_plate_d
+        rgb         0.15
+    }
+}
+
+models/chex/sc_chexbfast/bf_toast
+{
+    diffusemap models/chex/sc_chexbfast/bf_toast_d
+    bumpmap models/chex/sc_chexbfast/bf_toast_local
+    specularmap models/chex/sc_chexbfast/bf_toast_s
+    {
+        blend       add
+        map         models/chex/sc_chexbfast/bf_toast_d
+        rgb         0.15
+    }
+}
+
+models/chex/sc_chexbfast/bf_juice
+{
+    diffusemap models/chex/sc_chexbfast/bf_juice_d
+    {
+        blend       add
+        map         models/chex/sc_chexbfast/bf_juice_d
+        rgb         0.15
+    }
+    {
+        map _white
+        rgb .4
+        blend specularmap
+    }
+}
+        
+models/chex/fountain/sculp
+{
+    {
+        map     models/chex/fountain/sculp_d
+        blend   diffusemap
+        colored
+    }
+    bumpmap models/chex/fountain/sculp_local
+    specularmap models/chex/fountain/sculp_s
+    {
+        map     models/chex/fountain/sculp_d
+        blend   add
+        red     parm0 * .1
+        green   parm1 * .1
+        blue    parm2 * .1
+    }
+}
+
+models/chex/fountain/fount
+{
+    {
+        map     models/chex/fountain/fount_d
+        blend   diffusemap
+        colored
+    }
+    bumpmap models/chex/fountain/fount_local
+    specularmap models/chex/fountain/fount_s
+    {
+        map     models/chex/fountain/fount_d
+        blend   add
+        red     parm0 * .1
+        green   parm1 * .1
+        blue    parm2 * .1
+    }
+}
+
+models/chex/fountain/water
+{        
+    qer_editorimage models/chex/fountain/water_local
+	noselfshadow
+	noshadows
+	//twosided
+	translucent
+	forceoverlays
+    {
+                program           heatHaze.vfp
+                vertexparm              0       time * 0 , time * .5 // texture scrolling
+                vertexparm              1       1         // magnitude of the distortion
+                fragmentmap             0       _currentrender
+                fragmentmap             1       models/chex/fountain/water_local   // the normal map for distortion           
+    }
+    {	
+		maskcolor
+        scroll	 time * 0 , time * .5
+	    map	makealpha(models/chex/fountain/water_a)
+	}	
+	{
+	    blend gl_dst_alpha, gl_one
+	    maskalpha
+       	cubemap		env/gen2
+			red		parm0
+	        green   parm1
+	        blue	parm2
+        texgen		reflect
+	}
+    {
+        map         models/chex/fountain/water_local
+        blend       bumpmap
+    }
+}
+
+models/chex/fountain/water_pool
+{
+    qer_editorimage models/chex/fountain/water_local
+	noselfshadow
+	noshadows
+	//twosided
+	translucent
+	forceoverlays
+    {
+                program           heatHaze.vfp
+                vertexparm              0       .1 * cosTable[ .2*time ] , .1 * sinTable[ .2*time ] // texture scrolling
+                vertexparm              1       1         // magnitude of the distortion
+                fragmentmap             0       _currentrender
+                fragmentmap             1       models/chex/fountain/water_local   // the normal map for distortion           
+    }
+    {	
+		maskcolor
+        scroll	 .1 * cosTable[ .2*time ] , .1 * sinTable[ .2*time ]
+	    map	makealpha(models/chex/fountain/water_a)
+	}
+	{
+	    blend gl_dst_alpha, gl_one
+	    maskalpha
+       	cubemap		env/gen2
+			red		parm0
+	        green   parm1
+	        blue	parm2
+        texgen		reflect
+	}
+    {
+        map         models/chex/fountain/water_local
+        blend       bumpmap
+    }
+}
+
+
+
+models/chex/chexguy/jumpsuit_chex
+{
+    noselfShadow
+	clamp
+	//unsmoothedTangents
+	flesh
+	forceOverlays
+
+    {	// burning corpse effect
+		if	parm7			// only when dead
+		// make a burned away alpha test for the normal skin
+		blend	gl_zero, gl_one			// don't draw anything
+		
+		map models/monsters/spectre/dis2.tga	// replace this with a monster-specific texture
+		alphaTest 0.05 + 2 * (time - parm7)
+	}
+
+	renderbump  -size 1024 1024 -trace 0.03 -colorMap -aa 2  models/characters/male_npc/jumpsuit/jumpsuit_local.tga models/characters/male_npc/jumpsuit/jumpsuit_hi.lwo
+
+	diffusemap	  models/chex/chexguy/jumpsuit_chex.tga
+
+    {
+        blend bumpmap
+        map  addnormals(models/chex/chexguy/jumpsuit_local.tga, heightmap(models/chex/chexguy/jumpsuit_h.tga, 5 ) ) 		  
+    }
+	specularmap	models/chex/chexguy/jumpsuit_s.tga
+}
+
+models/chex/chexian_armor
+{
+    diffusemap models/chex/chexian_armor_d
+    forceOverlays
+    bumpmap	addnormals (models/chex/chexian_armor_local, heightmap (models/chex/chexian_armor_h.tga, 6) )
+    specularmap models/chex/chexian_armor_s
+    {
+        blend       add
+        map         models/chex/chexian_armor_d
+        rgb         0.15
+    }
+}
+    

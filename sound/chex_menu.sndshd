@@ -1,0 +1,24 @@
+guisounds_menustart {
+	volume	-5
+	looping
+	onDemand
+
+	sound/music/chexintro.ogg
+}
+
+
+guisounds_menupause {
+	volume	-5
+	looping
+	onDemand
+	
+	sound/music/chexpause.ogg
+
+}
+
+chexfinishgame {
+	volume 1
+	onDemand
+
+	sound/music/chextheme.ogg
+}

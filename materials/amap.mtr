@@ -1,0 +1,16 @@
+models/chex/amap
+{
+	diffusemap models/chex/amap_d
+	bumpmap models/chex/amap_local
+	{
+		map models/chex/amap_add
+		rgb  .2 * sinTable[ .30 * time ] + .3
+		blend add
+	}
+//AMBIENT LIGHTING
+   {
+             blend   add //gl_one, gl_dst_alpha
+      map   models/chex/amap_d
+      rgb 0.2
+   } 
+}

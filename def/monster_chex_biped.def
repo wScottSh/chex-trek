@@ -1,0 +1,52 @@
+model monster_chex_biped {
+
+	mesh							models/md5/chex/biped.md5mesh
+
+	channel torso					( *origin )
+
+	anim af_pose					models/md5/chex/biped.md5anim
+
+	anim idle						models/md5/chex/biped_idle.md5anim
+	anim walk						models/md5/chex/biped_walk.md5anim {
+		frame 12					footprint Lfoot l
+		frame 33					footprint Rfoot r
+	}
+	anim melee_attack1				models/md5/chex/biped_melee1.md5anim {
+		frame 1							sound_weapon snd_melee_attack_1
+		frame 13						melee melee_zombie_fat_Left2
+	}
+	
+	anim melee_attack2				models/md5/chex/biped_melee2.md5anim {
+		frame 1							sound_weapon snd_melee_attack_1
+		frame 13						melee melee_zombie_fat_Left2
+	}
+	anim range_attack1				models/md5/chex/biped_range1.md5anim {
+		frame 8						launch_missile Rlarm
+		frame 13					launch_missile Llarm
+	}
+	anim range_attack2				models/md5/chex/biped_range2.md5anim  {
+		frame 13					launch_missile nose3
+	}
+	anim pain_chest1				models/md5/chex/biped_pain1.md5anim {
+		frame 1							sound_voice snd_pain
+	}
+	anim pain_chest2				models/md5/chex/biped_pain2.md5anim {
+		frame 1							sound_voice snd_pain
+	}
+}
+
+entityDef monster_chex_biped {
+	"inherit"						"monster_flemoid"
+	"model"						"monster_chex_biped"
+	"ragdoll"						"monster_chex_biped"
+	"footprint_size"					"18"
+	"footprint_scale_x"				".7"
+	"footprint_scale_y"				"1"
+	"footprint_offset_l"				"5 0 0"
+	"footprint_offset_r"				"5 0 0"
+	"mtr_footprint"					"textures/chex/decals/flemprint"
+	"hastrail"						"0"
+	//for preload only
+	"mtr_footprint1"					"textures/chex/decals/flemprint_l"
+	"mtr_footprint2"					"textures/chex/decals/flemprint_r"
+}

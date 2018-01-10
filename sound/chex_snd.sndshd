@@ -1,0 +1,160 @@
+sound/chex/chex_intro
+{
+	volume 20
+	sound/chex/intro.ogg
+}
+chex_intro
+{
+	minDistance 5
+	maxDistance 10
+	volume 6
+	sound/chex/intro.ogg
+}	
+sound/chex/dsdoropn
+{
+	volume -3
+	sound/chex/dsdoropn.wav
+}
+sound/chex/dsdorcls
+{
+	volume -3
+	sound/chex/dsdorcls.wav
+}
+sound/chex/oof
+{
+	volume 5
+	sound/chex/dsnoway.wav
+}
+sound/chex/e1m1_music
+{
+	volume -6
+	sound/music/e1m1.ogg
+}
+sound/chex/sf_923_music
+{
+	volume -6
+	sound/music/sf_923.ogg
+}
+sound/chex/monsters/cly_death
+{
+	minDistance	10
+	maxDistance	35
+	volume		20
+	sound/chex/cly_death1.wav
+}
+sound/chex/monsters/cly_idle
+{
+	minDistance	0
+	maxDistance	60
+	volume		6
+	sound/chex/cly_idle.wav
+}
+sound/chex/monsters/cly_melee
+{
+	minDistance	10
+	maxDistance	35
+	volume		5
+	sound/chex/cly_melee.wav
+}
+sound/chex/monsters/cly_pain
+{
+	minDistance	10
+	maxDistance	35
+	volume		5
+	sound/chex/cly_pain1.wav
+	sound/chex/cly_pain2.wav
+}
+sound/chex/monsters/cly_range
+{
+	minDistance	10
+	maxDistance	35
+	volume		5
+	sound/chex/cly_range.wav
+}
+sound/chex/monsters/flemoid_death
+{
+	minDistance	10
+	maxDistance	35
+	volume		20
+	sound/chex/flemoid_death1.wav
+	sound/chex/flemoid_death2.wav
+}
+sound/chex/monsters/flemoid_idle
+{
+	minDistance	10
+	maxDistance	35
+	volume		5
+	sound/chex/flemoid_idle.wav
+}
+sound/chex/monsters/flemoid_melee
+{
+	minDistance	10
+	maxDistance	35
+	volume		5
+	sound/chex/flemoid_melee.wav
+}
+sound/chex/monsters/flemoid_pain
+{
+	minDistance	10
+	maxDistance	35
+	volume		5
+	sound/chex/flemoid_pain.wav
+}
+sound/chex/monsters/flemoid_bugee
+{
+	minDistance	10
+	maxDistance	35
+	volume		5
+	sound/chex/flemoid_bugee.wav
+}
+sound/chex/monsters/flemoid_walk
+{
+	minDistance	10
+	maxDistance	35
+	volume		5
+	sound/chex/flemoid_walk.wav
+}
+sound/chex/items/slimeoff
+{
+	minDistance	10
+	maxDistance	35
+	volume		5
+	sound/chex/items/slimeoff2.wav
+}
+sound/chex/items/zorchpickup
+{
+	minDistance	10
+	maxDistance	35
+	volume		5
+	sound/chex/items/zorchpickup.wav
+}
+sound/chex/items/fruitbowl
+{
+	minDistance	10
+	maxDistance	35
+	volume		7
+	sound/chex/items/fruitbowl.wav
+}
+sound/chex/items/h2o
+{
+	minDistance	10
+	maxDistance	35
+	volume		4
+	sound/chex/items/h2o.wav
+}
+sound/chex/ship_eng
+{
+	minDistance	25
+	maxDistance 35
+	volume 15
+	looping
+	sound/chex/ship_eng.wav
+}
+sound/chex/ship_ignite
+{
+	minDistance	25
+	maxDistance 35
+	volume 15
+	shakes		0.1
+	sound/chex/ship_ignite.wav
+}

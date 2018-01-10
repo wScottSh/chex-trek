@@ -1,0 +1,10 @@
+#include "script/ai_monster_chex_flemoid.script"
+#include "script/ai_monster_chex_cly.script"
+#include "script/map_storage_facility.script"
+#include "script/weapon_zorchnade.script"
+
+
+
+
+
+

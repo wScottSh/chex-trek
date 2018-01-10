@@ -1,0 +1,70 @@
+textures/chex/e1m1/sky
+{
+		qer_editorimage	env/chexsky_left.tga
+		noFragment
+		noshadows
+		nooverlays
+		forceOpaque				// so transparent windows can draw on top of it
+		{
+			blend			add		// so transparent windows can draw on top of it
+			cameraCubeMap	env/chexsky
+			texgen			skybox
+			//texgen			wobblesky .0 .0 .0 WTF is this
+		}
+}
+textures/chex/storage_facility/sky
+{
+		qer_editorimage	env/chexspace_left.tga
+		noFragment
+		noshadows
+		nooverlays
+		forceOpaque				// so transparent windows can draw on top of it
+		{
+			blend			add		// so transparent windows can draw on top of it
+			cameraCubeMap	env/chexspace
+			texgen			skybox
+			//texgen			wobblesky .0 .0 .0
+		}
+}
+textures/chex/office/sky
+{
+		qer_editorimage	env/darkhollow_left.tga
+		noFragment
+		noshadows
+		nooverlays
+		forceOpaque				// so transparent windows can draw on top of it
+		{
+			blend			add		// so transparent windows can draw on top of it
+			cameraCubeMap	env/darkhollow
+			texgen			skybox
+			//texgen			wobblesky .0 .0 .0
+		}
+}
+textures/chex/bazoik/sky
+{
+		qer_editorimage	env/bazoik_surface_left.tga
+		noFragment
+		noshadows
+		nooverlays
+		forceOpaque				// so transparent windows can draw on top of it
+		{
+			blend			add		// so transparent windows can draw on top of it
+			cameraCubeMap	env/bazoik_surface
+			texgen			skybox
+			//texgen			wobblesky .0 .0 .0
+		}
+}
+textures/chex/space_flying/sky
+{
+		qer_editorimage	env/space_flying_left.tga
+		noFragment
+		noshadows
+		nooverlays
+		forceOpaque				// so transparent windows can draw on top of it
+		{
+			blend			add		// so transparent windows can draw on top of it
+			cameraCubeMap	env/space_flying
+			texgen			skybox
+			//texgen			wobblesky .0 .0 .0
+		}
+}

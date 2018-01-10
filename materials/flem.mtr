@@ -1,0 +1,105 @@
+//holy POO this is the craziest material EVAR! -corvette
+//Foshizzle! -Stoney
+
+flem
+{
+	forceOverlays
+	qer_editorimage textures/flem/flem_ed.tga
+	noShadows //kills the atest not sure why :(
+	{	// burning corpse effect
+		if	parm7			// only when dead
+		// make a burned away alpha test for the normal skin
+		blend	gl_zero, gl_one			// don't draw anything
+		
+		map models/monsters/spectre/global_dis.tga	// replace this with a monster-specific texture
+		alphaTest 0.05 + 1.5 * (time - parm7)
+	}	
+	
+	{
+		if (parm7 == 0)
+		blend diffusemap
+		map textures/flem/flem_d.tga
+		alphatest .1
+	}
+	specularmap	textures/flem/flem_s.tga
+    //this was giving an error, textures are missing, old revision?
+	//bumpmap addnormals( textures/flem/flem_local.tga , heightmap(textures/flem/flem_h.tga,3))
+	{
+	   blend bumpmap
+	   map addnormals( textures/chex/slug/slug_local.tga , heightmap(textures/chex/slug/slug_h.tga,50))
+	   scroll	time * .009 , time * -0.1
+	}
+	{
+	   blend add
+	   map textures/flem/flem_d.tga
+	   rgb   0.2
+	}
+	{
+	   blend add
+	   map textures/flem/flem_add.tga
+	}
+} 
+
+biped_mtr
+{
+	forceOverlays
+	qer_editorimage textures/flem/biped_d.tga
+	noShadows //kills the atest not sure why :(
+	{	// burning corpse effect
+		if	parm7			// only when dead
+		// make a burned away alpha test for the normal skin
+		blend	gl_zero, gl_one			// don't draw anything
+		
+		map models/monsters/spectre/global_dis.tga	// replace this with a monster-specific texture
+		alphaTest 0.05 + 1.5 * (time - parm7)
+	}	
+	
+	{
+		if (parm7 == 0)
+		blend diffusemap
+		map textures/flem/biped_d.tga
+		alphatest .1
+	}
+	specularmap	textures/flem/flem_s.tga
+    //this was giving an error, textures are missing, old revision?
+	//bumpmap addnormals( textures/flem/flem_local.tga , heightmap(textures/flem/flem_h.tga,3))
+	{
+	   blend bumpmap
+	   map addnormals( textures/chex/slug/slug_local.tga , heightmap(textures/chex/slug/slug_h.tga,50))
+	   scroll	time * .009 , time * -0.1
+	}
+	{
+	   blend add
+	   map textures/flem/biped_d.tga
+	   rgb   0.2
+	}
+	{
+	   blend add
+	   map textures/flem/biped_add.tga
+	}
+} 
+
+models/chex/projectiles/fball
+{
+	{
+		map models/chex/projectiles/fball_d
+		blend diffusemap
+	}
+	{
+		map textures/chex/slug/slug_local.tga
+		translate .1*time,.25*time
+		blend bumpmap
+	}
+	{
+		map models/chex/projectiles/fball_d
+		rgb .2
+		blend add
+	}
+	{
+		map models/chex/projectiles/fball_s
+		blend specularmap
+	}
+}
+
+
+

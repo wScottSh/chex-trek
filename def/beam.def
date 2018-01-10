@@ -1,0 +1,16 @@
+entityDef zorch_beam {
+	"color"				"1 .5 .3"
+	"mins"				"0 0 0"
+	"maxs"				"0 0 0"
+	"width"				"16"
+	
+	"skin" 				"textures/chex/zorch_beam" //"textures/sfx/flare"
+
+	"_color" 			"1 1 1" //".9 .2 .1"
+	
+	"spawnclass"			"idBeam"
+	"noclipmodel"			"1"
+	//"start_off"				"1"
+	"nohide"				"1"
+	"fadetime"			".5"
+}

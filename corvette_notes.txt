@@ -1,0 +1,406 @@
+---------------------------
+CHEX TREK: BEYOND THE QUEST
+---------------------------
+
+ 
+files to remove for release
+(stoney i know u changed this list but it got all conflicted and f'ed up sry)
+---------------------------
+\savegames
+\screenshots
+\DoomConfig.cfg
+\editor.cfg
+\temp.pk4
+\maps\(extra maps)
+\textures\guis\ship_hatch
+\textures\chex\maps\?
+\textures\chex\slug (is this used?){This might be used for the flem mtr}
+\textures\chex\zorch.tga (again used?){I think this one can go.}
+\textures\chex\guis\winned.tga (well depends){this is all good... gives people something to look at when they sift through our files}
+\textures\chex\map_scope.tga
+\textures\chex\chex_man_*.tga
+\textures\flem\*.psd
+\models\chex\*_hi*
+\models\chex\*.xcf
+\dds\models\monsters
+\maps\rail_1.*
+\maps\sf_floor.*
+\maps\storage_facility.*
+\maps\test_credits.*
+\maps\test_end.*
+\maps\testcam.*
+
+TODO: someday by someone
+------------------------
+-CDA
+--STATS
+4:39:59 PM: I'd like to have the health and armor up there. A picture of the chex guys head that changes with amount of damage, like the classic doom hud.
+4:40:26 PM: and a picture*
+--Objectives
+---some kinda link with the map would be cool
+
+HudMap
+-AMAP pickup needs to show the map
+-Hud map defaults to open
+-make hud map icons smaller
+-zoom for hud map
+
+-Intro map (various notes from bhenderson)
+the chex hq sits upon a spoon high over the clouds
+yeah, I was thinking there could be an elevator that goes up the shaft of the spoon
+and the top floor of chexhq would be the director's office
+he player doesn't gain control until after the elevator hits the top
+so that I could put some kind of gag in about waiting in an elevator with cheesy elevator music
+
+-Generate DDS files ie someday (dds that replace D3 ones NEED to be created)
+-Lightcarve sf_923
+-LINUX & MACOS_X builds (before release)
+-idTarget_EndLevelGUI
+--I think if you have full ammo/health items should be considered 100%
+-inventory items are saved between maps, need to remove items at EOL
+--remove item entity maybe?
+--ex: keys
+-thought I fixed the percent crap but I saw a percent w/ fists
+-trails
+--draw everywhere (not exactly effecient)
+
+Everything else
+
+8/20/06
+-------
+
+
+
+6/15/06
+-------
+Ok i've changed a bunch of stuff so I'm gonna try and list it before I forget
+-i thought the trails lasted forever, but it looks like it's back at 5secs, wtf
+-bunch of shit in SDK, mostly the map
+-modded the pda model & def?
+
+3/25/06
+-replaced loading screens and updated dds
+-replaced hangar_right/left and updated dds
+
+
+2/14/06
+-------
+SVN server HD died so took the oppurtunity to restart
+the repository
+
+1/3/06
+------
+SDK ramblings:
+trails are are "watched" by gameLocal
+trails could be extended to general renderent class pretty easily
+idActor has a pointer to the trail if it has one to fade at remove
+**A check w/ gameLocal for the trail would be a good idea
+
+Footprint stuff now checks material being stuff on w/ renderworld
+trace.  Added offset keys for trace. footprint_s_z footprint_e_z
+
+idTarget_EndLevelGUI is now more or less a general purpose GUI w/
+some overhead (level stats stuff)
+**there are new keys/commands but i dont remember 'em (sf's end
+  has good examples)
+
+spawnDict added to script system, allows spawning dicts by name,
+stuff set by setSpawnArg overrides defaults
+
+	
+12/14
+-----
+trailent mkTrail
+	keys
+		leader <string> //Actor to follow (needs the viewAxis)
+		mtr_trail <string>
+		updateDist <float> //distance from last renderent update
+		trailWidth <float> //width quads
+		anchorDist <float> //length of quads
+		maxAnchors <int> //number quads
+
+11/28 
+-----
+footprint system
+	keys
+		mtr_footprint <string> (all the time default footprint if desired)
+		mtr_footprint_surfacetype <string> (for specific material)
+		foorprint_time_surfacetype <float> (how long after contact prints appear)
+		footprint_size <float>
+		footprint_scale_x <float>
+		footprint_scale_y <float>
+		footprint_offset_l <vec3> //anim based only
+		footprint_offset_r <vec3> //anim based only
+		footprint_on_sound <bool> //display footprint when footstep played
+	anim command
+		footprint <bone> <l|r>
+
+11/23
+-----
+removed ai debug shit
+g_musicvolume on mainmenu->system
+endlevelgui modified-if no nextmap is specified activates it's targets
+
+11/21
+--------
+g_musicvolume range 0 -> 100
+use worldspawn s_shader for music
+tip_time added for target_tip controls max tip time
+shooting doesnt hide tips anymore but displacement does
+
+10/14/05
+--------
+clipsize accessible in hud gui via player_clipsize
+
+10/03/05
+--------
+-cly af done
+
+10/02/05
+--------
+-cly is all materialed so his skin can be applied
+
+10/01/05
+--------
+time to document some changes
+-AI now has noflytilt key to prevent tilting when flying
+-AI now also can open doors, key canopendoors defaults to 1
+-g_doorTraceDist cvar to control open door distance
+-doors can have lockedtext key to display custom message
+
+9/07/05
+-------
+-Setup subversion repository w/ apache2
+-using this as an excuse to try and update a file
+-ha ha ha another revision
+-seems to work ok
+
+9/04/5
+------
+-merged with stoneys build
+-put old map but for --------
+					 bboxy
+					 gsquare
+					 metals
+					 floors
+					 doors
+					 ladychex
+					 observ
+					 chexcheive
+-resized a bunch of model images
+-put e1m1 remix music in
+-put e1m1 hudmap back in
+-fixed floor was pointing to chex instead of base
+
+
+8/27/05
+-------
+rencoded e1m1.ogg, now it's about 2mb instead of 7mb
+
+=======
+8/22/05
+-------
+-Storage Facility
+--crane control room has some detail
+--added tv with chex intro
+--idea, extra room is a sleeping area... is now
+--some speakers, more speakers needed!
+-College started back up
+--why do I have to take compisition again???
+--cause i can't spell... com·po·si·tion
+
+8/??/05
+-------
+-Wrote Mac tut
+-Released mac nix builds
+-Storage Facility
+--mirror floor is a model now
+--removed ambient light, fixed light count, wrecked lighting
+
+8/17/05
+-------
+So what I haven't updated this for like ever
+-mapped, mapped some more
+--storage_facility
+---um, like elevator, crane, big hangar, other rooms
+---some new textures made (lines, a hinge, mirror floor)
+---level start screen in place
+---added kool sky by Mighty Pete
+--e1m1
+---I did something, can't remember...
+-built a linux version, ie it works
+-tried to build a mac version, ie it doesn't
+--it's the osx/apple_bool.h I KNOW IT IS!!!!
+-added common/editor textures cause they look kool
+-idTarget_EndLevelGUI
+--time count
+--commented
+--nextmap/skip button stats.gui & sdk
+-I did more, but I forget
+
+7/23-7/27/05
+-------
+-idCustomUI added
+--abstract class for implementing fullscreen uis
+--limits
+---only mouse click events are handled by sdk
+---currently won't render game when active (can be changed)
+-idTarget_EndLevelGUI added
+--keys
+---nextmap
+---gui
+---s_shader(not implemented yet)
+-storage_facility
+--crane setup
+---new gui (well new modified d3 gui)
+--replaced disappering light...
+--script put in place
+
+7/22/05
+-------
+-Secret doors should now have k/v secret/1
+-End of level counter stuff started
+----k/v needed to make it work
+----level_monster/1
+----level_item/1
+----secret/1
+
+7/21/05
+-------
+-Flemoid commonous is in game more or less WOOT!
+
+7/18/05
+-------
+-e1m1.map
+--missing secrets added
+--new door lock system put in
+--monster clipped the map
+-storage_facility.map
+--lots o work
+
+7/6/05
+------
+-Made some changes to the door lock/open system.
+--New requires key can be used to specifiy a required item to open the door
+---Ex: requires/Blue Key locked/1 no_touch/1
+---Only works with idPlayer::tryOpen/_impulse16
+--Message shown if door is locked
+-Modeled a bowl o fruit for medkit
+-chex.def updated with fruit
+-world spawn key map_scale controls inital hudmap scale
+
+7/3-5/05
+------
+-Work continues on storage facility as it will for the foreseeable future.
+
+7/1/05
+------
+-Started on the storage facility/first map
+
+6/28/05-6/30/05
+---------------
+-Pimped Chex Trek Alpha .01
+-Chex Quest skybox for e1m1
+-h2o water bottle model/def
+
+6/27/05
+-------
+-CAN YOU SAY PROGRESS!
+-Stoney has been busy make the map bling bling with slime and stuff
+-Stoney had been putting enemies in the map, for "actual" gameplay
+-Stoney has made this map into something playable!
+-AntiSlime model created/skinned(stoney)
+-Maps merged for alpha release!
+-End level created/end screen
+-added pda/intro vcd
+-chaingun uses pistol ammo
+-maxhealth2 in played.def is like the health vial limit, health that can go
+to health2 level should be defined as inv_health2 as opposed to inv_health
+changes in player.cpp/.h
+-Release 0.01.2 was send to stoney for finalization
+-zl1 went to bed on the 28th
+
+6/23/05
+-------
+-Made collision models for all models but the ship, which doesn't really need one
+-Tweaked texture for tesla coil thingy.
+
+6/22/05
+-------
+-Modeled the tesla coil type thing.
+-Worked on the chain gun a bit.
+
+6/19/05
+-------
+-Ship tweaked
+-red key skin created
+-Decided secret areas are a pain in the ass for now (added someday todos)
+
+6/17-18/05
+----------
+-played with garage sale goodies
+-managed to visit over 100 sales!!!!!
+
+6/16/05
+-------
+-Went garage saling, bought tons of shit (city wide garage sales woot!!!!!)
+-smoothed the key in max, cause blender royally pissed me off
+-added some landing gear to ship
+
+6/14/05
+-------
+-Cleaned up the code some, saving and loading will preserve the HudMap.
+-Area discovery now works with map down.
+-g_customHUD removed as I really don't need it anymore/it was dumb
+
+6/8/05
+------
+-More work on the hudmap yeehaw, area discovery works!
+-Onto secret areas, maybe, probably not.
+
+6/6/05
+------
+-optimized the hudmap a bit
+
+6/5/05
+------
+-Added some lights to e1m1
+
+6/3/05
+------
+-hud map stuff added to save game
+-cleaned up hud map stuff, added proper support for maps
+
+6/2/05
+------
+_impulse23
+Bring up the Hud map
+
+_button5
+zoom in on Hud map
+
+_button6
+zoom out on Hud map
+
+player.cpp/.h
+chex_gui.mtr & hud.gui
+
+5/30/05
+-------
+g_customHUD
+Use a custom hud instead of the default, the hud is chosen as follows
+1. if mp mphud is choosen
+2. if g_customHUD is set it is used
+3. the hud k/v in the player def is used
+
+5/23/05
+-------
+replaced _opendoor by _impulse16 cause impulse_16 is kool
+
+5/22/05
+-------
+_opendoor
+Bind to a key to trigger doors pointed at by player, set doors w/ no_touch
+to make effective.
+
+	

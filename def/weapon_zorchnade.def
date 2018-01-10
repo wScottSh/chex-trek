@@ -1,0 +1,135 @@
+model viewmodel_zorchnade
+{
+	mesh					models/md5/chex/nade/zorchnade.md5mesh
+	offset					( 6 3 -3 )
+	anim raise				models/md5/chex/nade/zorchnaderaise.md5anim
+	anim putaway			models/md5/chex/nade/zorchnadelower.md5anim
+	anim idle				models/md5/chex/nade/zorchnadeidle.md5anim
+	anim throw				models/md5/chex/nade/zorchnadethrow.md5anim
+	anim arm				models/md5/chex/nade/zorchnadearm.md5anim
+}
+
+entityDef weapon_zorchnade {
+	"editor_color"				".3 .3 1"
+	"editor_mins"				"-16 -16 0"
+	"editor_maxs"				"16 16 32"
+	"editor_usage"				"Zorch Grenade"
+	"editor_rotatable"			"1"
+
+	"spawnclass"				"idItem"
+	"size"						"32 32 32"
+	"model"						"models/items/grenade_ammo/grenade.lwo" //fixme
+	"model_view"				"viewmodel_zorchnade"
+	"model_world" 				"worldmodel_handgrenade" //fixme
+	"joint_attach"				"NADE_ATTACHER"
+	"def_dropItem"				"moveable_item_zorchnade"
+
+	"inv_name"					"Zorch Grenades"
+	"inv_weapon"				"weapon_zorchnade"
+	"inv_ammo_grenades" 		"5"
+	"inv_item"					"5"
+	"icon"						"guis/assets/hud/wpn_4"
+
+	"weapon_scriptobject"		"weapon_zorchnade"
+	"def_projectile"			"projectile_zorchnade"
+	"def_explode_inhand"		"env_grenade_explodeinhand"
+	"def_damage_inhand"			"damage_grenadeSplash_inhand"
+	"ammoType"					"ammo_grenades"
+	"ammoRequired"				"1"
+	"clipSize"					"0"
+	"silent_fire"				"1"
+
+	"hide_time"					"0.3"								// time to hide weapon when talking to npcs or looking at guis
+	"hide_distance"				"-15"								// distance to offset weapon when talking to npcs or looking at guis
+
+	"snd_acquire"				"player_grenade_use"
+	"snd_respawn"				"sound_weapon_respawn"
+	"snd_explode"				"rocket_impact"
+
+	// skin_invisible not defined, weapon code will call UpdateSkin on weapon script
+	"skin_nade"					"skins/models/weapons/nade"
+	"skin_nade_invis"			"skins/models/weapons/nade_invis"
+	"skin_nonade"				"skins/models/weapons/nonade"
+	"skin_nonade_invis"			"skins/models/weapons/nonade_invis"
+	
+	"spread"					"0"
+	
+	"primed_fuse"				"3"
+}
+
+entityDef projectile_zorchnade {
+	"spawnclass"				"idProjectile"
+	"mins"						"-3 -3 0"
+	"maxs"						"3 3 11"
+	"cylinder"					"6"
+	"model" 					"models/chex/zorchnade_world.ase"
+	"offsetModel"				"0 0 -5"
+
+	"def_damage"				"damage_grenadeDirect"
+	"def_splash_damage"			"damage_grenadeSplash"
+								
+	"launchFromBarrel"			"1"
+	"health"					"0"					// amount of damage projectile can take if damaged (0 means it can't be destroyed)
+	"velocity"					"300 0 40"			// how fast the projectile leaves the gun (or distance if fuse is 0)
+	"angular_velocity"			"10 -10 10"			// how the projectile is rotating when it leaves the gun
+	"thrust"					"0"					// the rate of acceleration (always in the direction of the projectiles model)
+	"thrust_start"				"0"					// when to start accelerating
+	"thrust_end"				"0"					// when to stop accelerating
+	"linear_friction"			"0.6"				// "air" friction
+	"angular_friction"			"0.4"
+	"contact_friction"			"0.1"
+	"bounce"					"0.9"				// how much speed a projectile retains when it bounces off of objects (coefficient of restitution).  0 means no bounce.
+	"mass"						"10"
+	"gravity"					"1066"				// how much gravity affects the trajectory.  gravity direction is same as the entity that fired it.
+	"fuse"						"3"					// how long before the projectile is removed or self-detonates.  Use 0 for beam weapons (velocity == distance).
+						
+	"detonate_on_fuse"			"1"					// whether projectile should detonate when it's fuse runs out
+	"detonate_on_death"			"0"					// whether projectile should detonate when it's "killed" (health runs out)
+	"detonate_on_world"			"0"					// whether projectile should detonate when it hits an obstacle
+	"detonate_on_actor"			"1"					// whether projectile should detonate when it hits a character in the game
+	"detonate_on_trigger"		"1"					// whether projectile should detonate when triggered by a character in the game
+								
+	"impact_damage_effect"		"1"					// whether projectile causes blood splats from characters that bleed
+	"impact_gib"				"1"					// whether projectile can gib a character or not (for example: bullets don't gib, but rockets do)
+
+	"mtr_detonate"				"textures/decals/ballburn01"
+	"decal_size"				"300" 
+
+	"model_detonate"			"zorch.prt"			// parametric particles -- temp
+
+	//"smoke_fly"					"grenadetrail.prt"			// particle effect while in the air
+	"smoke_detonate"			""								// particle effect when detonates
+	"smoke_residue"				""								// particle effect while in the air
+	"smoke_fuse"				""
+	"smoke_bounce"				"bulletricochet.prt"
+
+	"debris_count"				"6"
+	"def_debris"				"debris_largeshrapnel"
+	"def_shrapnel"				"debris_shrapnel"
+
+	"mtr_light_shader"			""
+	"light_color"				""
+	"light_radius"				""
+	"light_offset"				""
+
+	"mtr_explode_light_shader"	"muzzleflash"
+	"explode_light_color"		"1 0.8 0.4"
+	"explode_light_radius"		"200"
+	"explode_light_fadetime"	"0.25"
+	
+	"detonation_axis"			"0 0 1"
+
+	"snd_impact"				"player_handgrenade_bounce"
+	"snd_bounce"				"player_handgrenade_bounce"
+	"snd_explode"				"sound/chex/weapons/nade/explode"
+	"snd_throw"					"player_handgrenade_throw"	// For precache -- referenced in the script
+}
+
+entityDef moveable_item_zorchnade {
+	"inherit"					"weapon_zorchnade"
+	"spawnclass"				"idMoveableItem"
+	"model"						"models/chex/zorchnade_world.ase"
+	"density"					"0.05"
+	"friction"					"0.2"
+	"bouncyness"				"0"
+}

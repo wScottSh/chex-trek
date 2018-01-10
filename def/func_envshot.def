@@ -1,0 +1,40 @@
+material textures/func_envshot/purple
+{
+	{
+	map _white
+	red .5
+	green .1
+	blue .5
+	}
+}
+
+//takes an envshot at the origin of the entity, triggered by spawn w/atSpawn or the takeEnvShots command
+entityDef func_envshot
+{
+	"spawnclass"			"matt_func_envshot"
+	"editor_color"			".5 .1 .5"
+	"editor_material"			"textures/func_envshot/purple"
+	"editor_mins"			"-16 -16 -16"
+	"editor_maxs"			"16 16 16"
+	"editor_usage"			"The origin of the entity is a location for an envShot which can be taken at spawn time, or by the command takeEnvShots"
+	"editor_var size"			"size of env textures"
+	"editor_var name"			"name of textures in env dir"
+	"editor_var blends"		"blends to use"	
+	"editor_var atSpawn"		"take an envShot when this entity spawns"
+}
+
+entityDef trigger_objective
+{
+	"spawnclass"					"mkObjective"
+	"editor_color"					".5 .1 .5"
+	"editor_material"				"textures/func_envshot/purple"
+	"editor_mins"					"-16 -16 -16"
+	"editor_maxs"					"16 16 16"
+	"editor_usage"					"The origin of the entity is a location on the map for an objective, Trigger to make the objective appear, trigger again to hide"
+	"editor_var description"		"Text for in pda"
+	"editor_var title"				"name of obj"
+	"editor_var image"				"image to show on map"
+	"editor_var remove"				"Remove the entity on the second trigger"
+	"editor_var addmsg"				"ala a new objective added to your map"
+	"editor_var rmmsg"				"ala objective secure!"
+}

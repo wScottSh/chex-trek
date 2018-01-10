@@ -1,0 +1,32 @@
+models/md5/chex/nade/charge
+{
+	diffusemap models/md5/chex/nade/charge_d
+	specularmap models/md5/chex/nade/charge_s
+	{
+		map models/md5/chex/nade/charge_add
+		rgb sinTable[ time ]
+		blend add
+	}
+}
+models/md5/chex/nade/charge_button
+{
+	diffusemap models/md5/chex/nade/charge_button_d
+	bumpmap models/md5/chex/nade/charge_button_local
+	specularmap models/md5/chex/nade/charge_button_s
+}
+models/chex/nadebox
+{
+	diffusemap		models/chex/nadebox_d
+	bumpmap			models/chex/nadebox_local
+	specularmap		models/chex/nadebox_s
+	{
+		map models/chex/nadebox_add
+		rgb .66 + .33 * sinTable[ time ]
+		blend add
+	}
+	{
+		map models/chex/nadebox_d
+		rgb .3
+		blend add
+	}
+}

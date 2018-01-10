@@ -1,0 +1,456 @@
+textures/chex/metals/brushedmetal
+{
+    qer_editorimage  textures/chex/metals/brushedmetal_ed.tga       // custom DOOMEdit material preview image
+
+    diffusemap       textures/chex/metals/brushedmetal_d.tga        // color and value information for the material
+    specularmap      textures/chex/metals/brushedmetal_s.tga        // specular highlights
+    bumpmap          textures/chex/metals/brushedmetal_local.tga    // normalmap for bumpmapped appearance
+   {
+             blend   add //gl_one, gl_dst_alpha
+      map   textures/chex/metals/brushedmetal_d.tga
+      rgb 0.1
+   } 
+}
+
+textures/chex/metals/brushedmetal_colored
+{
+    qer_editorimage  textures/chex/metals/brushedmetal_ed.tga       // custom DOOMEdit material preview image
+
+    {
+        map       textures/chex/metals/brushedmetal_d.tga        // color and value information for the material
+        blend diffusemap
+        colored
+    }
+    specularmap      textures/chex/metals/brushedmetal_s.tga        // specular highlights
+    bumpmap          textures/chex/metals/brushedmetal_local.tga    // normalmap for bumpmapped appearance
+   {
+             blend   add //gl_one, gl_dst_alpha
+      map   textures/chex/metals/brushedmetal_d.tga
+      red 0.1 * parm0
+      blue 0.1 * parm1
+      green 0.1 * parm2
+   } 
+}
+
+textures/chex/walls/bluemarble
+{
+    qer_editorimage  textures/chex/walls/bluemarble_ed.tga       // custom DOOMEdit material preview image
+
+    diffusemap       textures/chex/walls/bluemarble_d.tga        // color and value information for the material
+    specularmap      textures/chex/walls/bluemarble_s.tga        // specular highlights
+    bumpmap          textures/chex/walls/bluemarble_local.tga    // normalmap for bumpmapped appearance
+   {
+             blend   add //gl_one, gl_dst_alpha
+      map   textures/chex/walls/bluemarble_d.tga
+      rgb 0.1
+   } 
+}
+
+textures/chex/floors/bluetile
+{
+    qer_editorimage  textures/chex/floors/bluetile_ed.tga       // custom DOOMEdit material preview image
+
+    diffusemap       textures/chex/floors/bluetile_d.tga        // color and value information for the material
+    specularmap      textures/chex/floors/bluetile_s.tga        // specular highlights
+    bumpmap          textures/chex/floors/bluetile_local.tga    // normalmap for bumpmapped appearance
+   {
+             blend   add //gl_one, gl_dst_alpha
+      map   textures/chex/floors/bluetile_d.tga
+      rgb 0.1
+   } 
+}
+
+textures/chex/walls/bigchexposter
+{
+    qer_editorimage  textures/chex/walls/bigchexposter_ed.tga       // custom DOOMEdit material preview image
+
+    diffusemap       textures/chex/walls/bigchexposter_d.tga        // color and value information for the material
+    specularmap      textures/chex/walls/bigchexposter_s.tga        // specular highlights
+   {
+             blend   add //gl_one, gl_dst_alpha
+      map   textures/chex/walls/bigchexposter_d.tga
+      rgb 0.1
+   } 
+}
+
+textures/chex/floors/federlogo
+{
+    qer_editorimage  textures/chex/floors/federlogo_ed.tga       // custom DOOMEdit material preview image
+
+    diffusemap       textures/chex/floors/federlogo_d.tga        // color and value information for the material
+    specularmap      textures/chex/floors/federlogo_s.tga        // specular highlights
+    bumpmap          textures/chex/floors/federlogo_local.tga    // normalmap for bumpmapped appearance
+   {
+             blend   add //gl_one, gl_dst_alpha
+      map   textures/chex/floors/federlogo_d.tga
+      rgb 0.1
+   } 
+}
+
+textures/chex/walls/redcabinet
+{
+    qer_editorimage  textures/chex/walls/redcabinet_ed.tga       // custom DOOMEdit material preview image
+
+    diffusemap       textures/chex/walls/redcabinet_d.tga        // color and value information for the material
+    specularmap      textures/chex/walls/redcabinet_s.tga        // specular highlights
+    bumpmap          textures/chex/walls/redcabinet_local.tga    // normalmap for bumpmapped appearance
+   {
+             blend   add //gl_one, gl_dst_alpha
+      map   textures/chex/walls/redcabinet_d.tga
+      rgb 0.1
+   } 
+}
+
+textures/chex/metals/ventinside
+{
+    qer_editorimage  textures/chex/metals/ventinside_ed.tga       // custom DOOMEdit material preview image
+
+    diffusemap       textures/chex/metals/ventinside_d.tga        // color and value information for the material
+    specularmap      textures/chex/metals/ventinside_s.tga        // specular highlights
+    bumpmap          textures/chex/metals/ventinside_local.tga    // normalmap for bumpmapped appearance
+   {
+             blend   add //gl_one, gl_dst_alpha
+      map   textures/chex/metals/ventinside_d.tga
+      rgb 0.1
+   } 
+}
+
+textures/chex/walls/brownboxy
+{
+    qer_editorimage  textures/chex/walls/brownboxy_ed.tga       // custom DOOMEdit material preview image
+
+    diffusemap       textures/chex/walls/brownboxy_d.tga        // color and value information for the material
+    specularmap      textures/chex/walls/brownboxy_s.tga        // specular highlights
+    bumpmap          textures/chex/walls/brownboxy_local.tga    // normalmap for bumpmapped appearance
+   {
+             blend   add //gl_one, gl_dst_alpha
+      map   textures/chex/walls/brownboxy_d.tga
+      rgb 0.1
+   } 
+}
+
+textures/chex/walls/slime
+{
+    qer_editorimage textures/chex/slug/slug_d       // custom DOOMEdit material preview image
+    diffusemap       textures/chex/slug/slug_d        // color and value information for the material
+    //specularmap      textures/chex/slug/slug_s        // specular highlights
+    bumpmap          textures/chex/slug/slug_local   // normalmap for bumpmapped appearance
+   {
+      blend   add //gl_one, gl_dst_alpha
+      map   textures/chex/slug/slug_d 
+      rgb 0.1
+   } 
+	{
+	   blend bumpmap
+	   map textures/chex/slug/slug_local
+	   scroll	time * .009 , time * -0.05
+	}
+	{
+	   blend specularmap
+	   map textures/chex/slug/slug_s
+	   scroll	time * .1 , time * 0.05
+	}
+}
+
+textures/chex/floors/cementgrey
+{
+    qer_editorimage  textures/chex/floors/cementgrey_ed.tga       // custom DOOMEdit material preview image
+
+    diffusemap       textures/chex/floors/cementgrey_d.tga        // color and value information for the material
+    specularmap      textures/chex/metals/borderedwall_s.tga          // specular highlights
+    bumpmap          textures/chex/floors/cementgrey_local.tga    // normalmap for bumpmapped appearance
+   {
+             blend   add //gl_one, gl_dst_alpha
+      map   textures/chex/floors/cementgrey_d.tga
+      rgb 0.1
+   } 
+}
+
+textures/chex/floors/cementred
+{
+    qer_editorimage  textures/chex/floors/cementred_ed.tga       // custom DOOMEdit material preview image
+
+    diffusemap       textures/chex/floors/cementred_d.tga        // color and value information for the material
+    specularmap      textures/chex/metals/borderedwall_s.tga           // specular highlights
+    bumpmap          textures/chex/floors/cementgrey_local.tga    // normalmap for bumpmapped appearance
+   {
+             blend   add //gl_one, gl_dst_alpha
+      map   textures/chex/floors/cementred_d.tga
+      rgb 0.1
+   } 
+}
+
+textures/chex/doors/redhangardoor
+{
+    qer_editorimage  textures/chex/doors/redhangardoor_ed.tga       // custom DOOMEdit material preview image
+
+    diffusemap       textures/chex/doors/redhangardoor_d.tga        // color and value information for the material
+    specularmap      textures/chex/doors/redhangardoor_s.tga        // specular highlights
+    bumpmap          textures/chex/doors/redhangardoor_local.tga    // normalmap for bumpmapped appearance
+   {
+             blend   add //gl_one, gl_dst_alpha
+      map   textures/chex/doors/redhangardoor_d.tga
+      rgb 0.1
+   } 
+}
+
+textures/chex/doors/door1
+{
+    qer_editorimage  textures/chex/doors/door1_ed.tga       // custom DOOMEdit material preview image
+
+    diffusemap       textures/chex/doors/door1_d.tga        // color and value information for the material
+    specularmap      textures/chex/doors/door1_s.tga        // specular highlights
+    bumpmap          textures/chex/doors/door1_local.tga    // normalmap for bumpmapped appearance
+   {
+             blend   add //gl_one, gl_dst_alpha
+      map   textures/chex/doors/door1_d.tga
+      rgb 0.1
+   } 
+}
+
+textures/chex/walls/hangwalltop
+{
+    qer_editorimage  textures/chex/walls/hangwalltop_ed.tga       // custom DOOMEdit material preview image
+
+    diffusemap       textures/chex/walls/hangwalltop_d.tga        // color and value information for the material
+    specularmap      textures/chex/walls/hangwalltop_s.tga        // specular highlights
+    bumpmap          textures/chex/walls/hangwalltop_local.tga    // normalmap for bumpmapped appearance
+   {
+             blend   add //gl_one, gl_dst_alpha
+      map   textures/chex/walls/hangwalltop_d.tga
+      rgb 0.1
+   } 
+}
+
+textures/chex/floors/cementblack
+{
+    qer_editorimage  textures/chex/floors/cementblack_ed.tga       // custom DOOMEdit material preview image
+
+    diffusemap       textures/chex/floors/cementblack_d.tga        // color and value information for the material
+    specularmap      textures/chex/metals/borderedwall_s.tga           // specular highlights
+    bumpmap          textures/chex/floors/cementgrey_local.tga    // normalmap for bumpmapped appearance
+   {
+             blend   add //gl_one, gl_dst_alpha
+      map   textures/chex/floors/cementblack_d.tga
+      rgb 0.1
+   } 
+}
+
+textures/chex/doors/black
+{
+    qer_editorimage  textures/chex/doors/black_ed.tga       // custom DOOMEdit material preview image
+
+    diffusemap       textures/chex/doors/black_d.tga        // color and value information for the material
+    specularmap      textures/chex/doors/black_s.tga        // specular highlights
+    bumpmap          textures/chex/doors/black_local.tga    // normalmap for bumpmapped appearance
+   {
+             blend   add //gl_one, gl_dst_alpha
+      map   textures/chex/doors/black_d.tga
+      rgb 0.1
+   } 
+}
+
+textures/chex/walls/greysquare
+{
+    qer_editorimage  textures/chex/walls/greysquare_ed.tga       // custom DOOMEdit material preview image
+
+    diffusemap       textures/chex/walls/greysquare_d.tga        // color and value information for the material
+    specularmap      textures/chex/walls/greysquare_s.tga        // specular highlights
+    bumpmap          textures/chex/walls/greysquare_local.tga    // normalmap for bumpmapped appearance
+   {
+             blend   add //gl_one, gl_dst_alpha
+      map   textures/chex/walls/greysquare_d.tga
+      rgb 0.1
+   } 
+}
+
+textures/chex/metals/borderedwall
+{
+    qer_editorimage  textures/chex/metals/borderedwall_ed.tga       // custom DOOMEdit material preview image
+
+    diffusemap       textures/chex/metals/borderedwall_d.tga        // color and value information for the material
+    specularmap      textures/chex/metals/borderedwall_s.tga        // specular highlights
+    bumpmap          textures/chex/metals/borderedwall_local.tga    // normalmap for bumpmapped appearance
+   {
+             blend   add //gl_one, gl_dst_alpha
+      map   textures/chex/metals/borderedwall_d.tga
+      rgb 0.1
+   } 
+}
+
+textures/chex/lights/squarelight
+{
+    qer_editorimage  textures/chex/lights/squarelight_d.tga       // custom DOOMEdit material preview image
+
+    diffusemap       textures/chex/lights/squarelight_d.tga        // color and value information for the material
+    //specularmap      textures/chex/lights/squarelight_s.tga        // specular highlights
+    bumpmap          textures/chex/lights/squarelight_local.tga    // normalmap for bumpmapped appearance
+   {
+             blend   add //gl_one, gl_dst_alpha
+      map   textures/chex/lights/squarelight_add.tga
+   }
+}
+
+textures/chex/trim/pipe_blue
+{
+    qer_editorimage  textures/chex/trim/pipe_blue_d.tga       // custom DOOMEdit material preview image
+
+    diffusemap       textures/chex/trim/pipe_blue_d.tga        // color and value information for the material
+    specularmap      textures/chex/trim/pipe_blue_s.tga        // specular highlights
+    bumpmap          textures/chex/trim/pipe_blue_local.tga    // normalmap for bumpmapped appearance
+   {
+             blend   add //gl_one, gl_dst_alpha
+      map   textures/chex/trim/pipe_blue_d.tga
+      rgb 0.1
+   } 
+}
+
+textures/chex/trim/white_floor
+{
+    qer_editorimage  textures/chex/trim/white_floor_d.tga       // custom DOOMEdit material preview image
+
+    diffusemap       textures/chex/trim/white_floor_d.tga        // color and value information for the material
+    specularmap      textures/chex/trim/white_floor_s.tga        // specular highlights
+    bumpmap          textures/chex/trim/white_floor_local.tga    // normalmap for bumpmapped appearance
+   {
+             blend   add //gl_one, gl_dst_alpha
+      map   textures/chex/trim/white_floor_d.tga
+      rgb 0.1
+   } 
+}
+
+textures/chex/trim/hazard_stripes
+{
+    qer_editorimage  textures/chex/trim/hazard_stripes_d.tga       // custom DOOMEdit material preview image
+
+    diffusemap       textures/chex/trim/hazard_stripes_d.tga        // color and value information for the material
+    specularmap      textures/chex/trim/hazard_stripes_s.tga        // specular highlights
+    bumpmap          textures/chex/trim/hazard_stripes_local.tga    // normalmap for bumpmapped appearance
+   {
+             blend   add //gl_one, gl_dst_alpha
+      map   textures/chex/trim/hazard_stripes_d.tga
+      rgb 0.1
+   } 
+}
+
+textures/chex/floors/cementblack_mirror
+{
+    qer_editorimage  textures/chex/floors/cementblack_ed.tga       // custom DOOMEdit material preview image
+	//discrete
+	//translucent
+	//noshadows
+  	{
+  		map        textures/chex/floors/cementblack_d.tga        // color and value information for the material
+		blend diffusemap
+	}
+	bumpmap          textures/chex/floors/cementgrey_local.tga    // normalmap for bumpmapped appearance
+  	{
+		mirrorRenderMap		256 256		// size of the texture to draw the mirror view in
+		blend	blend
+		// tint
+		red		0.7
+		green	0.7
+		blue	0.8
+		// opacity
+		alpha	0.1
+		// fix up the projection
+		translate	0.5 , 0.5
+		scale	0.5 , 0.5	
+	}
+}
+textures/chex/floors/white_lines
+{
+	//DECAL_MACRO	
+	//polygonOffset 1
+	{
+		map textures/chex/floors/white_lines_d
+		blend diffusemap
+		alphaTest .5
+	}
+	bumpmap textures/chex/floors/white_lines_local
+}
+textures/chex/metals/hinge
+{
+	diffusemap textures/chex/metals/hinge_d
+	bumpmap textures/chex/metals/hinge_local
+	specularmap textures/chex/metals/hinge_s
+}
+
+//table lightning_chex { snap {  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,.5,0,0,0,0,0,0,0,.7,0,0,0,0,0,0,0,0,0,0,0,0 }}
+textures/chex/walls/field
+{
+	{
+		map textures/chex/sf/field
+		blend add
+		rgb flickerblink[  Parm7 * time ]
+	}
+}
+
+textures/chex/floors/whitetile
+{
+    //qer_editorimage  textures/chex/floors/bluetile_ed.tga       // custom DOOMEdit material preview image
+
+    diffusemap       textures/chex/floors/whitetile_d.tga        // color and value information for the material
+    specularmap      textures/chex/floors/whitetile_s.tga        // specular highlights
+    bumpmap          textures/chex/floors/whitetile_local.tga    // normalmap for bumpmapped appearance
+   {
+             blend   add //gl_one, gl_dst_alpha
+      map   textures/chex/floors/whitetile_d.tga
+      rgb 0.1
+   } 
+}
+
+textures/chex/floors/whitetile_colored
+{
+    //qer_editorimage  textures/chex/floors/bluetile_ed.tga       // custom DOOMEdit material preview image
+
+    {
+        map       textures/chex/floors/whitetile_d.tga        // color and value information for the material
+        colored
+        blend diffusemap
+    }
+    specularmap      textures/chex/floors/whitetile_s.tga        // specular highlights
+    bumpmap          textures/chex/floors/whitetile_local.tga    // normalmap for bumpmapped appearance
+   {
+             blend   add //gl_one, gl_dst_alpha
+      map   textures/chex/floors/whitetile_d.tga
+      red 0.1 * parm0
+      blue 0.1 * parm1
+      green 0.1 * parm2
+   } 
+}
+
+textures/chex/water/pool_slow
+{
+    qer_editorimage models/chex/fountain/water_local
+	noselfshadow
+	noshadows
+	//twosided
+	translucent
+	forceoverlays
+    {
+                program           heatHaze.vfp
+                vertexparm              0       .1 * cosTable[ .05*time ] , .1 * sinTable[ .05*time ] // texture scrolling
+                vertexparm              1       1         // magnitude of the distortion
+                fragmentmap             0       _currentrender
+                fragmentmap             1       models/chex/fountain/water_local   // the normal map for distortion           
+    }
+    {	
+		maskcolor
+        scroll	 .1 * cosTable[ .05*time ] , .1 * sinTable[ .05*time ]
+	    map	makealpha(models/chex/fountain/water_a)
+	}
+	{
+	    blend gl_dst_alpha, gl_one
+	    maskalpha
+       	cubemap		env/gen2
+			red		parm0
+	        green   parm1
+	        blue	parm2
+        texgen		reflect
+	}
+    {
+        map         models/chex/fountain/water_local
+        blend       bumpmap
+    }
+}

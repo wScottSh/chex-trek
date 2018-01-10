@@ -1,0 +1,54 @@
+SCuploading
+{
+	volume 6
+	global
+	sound/chex/acting/storagefacility/SCuploading.ogg
+}
+
+SCitseems
+{
+	volume 6
+	global
+	sound/chex/acting/storagefacility/SCitseems.ogg
+}
+
+CDcomehome
+{
+	volume 6
+	global
+	sound/chex/acting/storagefacility/CDcomehome.ogg
+}
+CDlocked
+{
+	volume 4.5
+	global
+	sound/chex/acting/storagefacility/CDlocked.ogg
+}
+
+CDoffice
+{
+	volume 4.5
+	global
+	sound/chex/acting/storagefacility/CDoffice.ogg
+}
+
+CDslimemonsters
+{
+	volume 7
+	global
+	sound/chex/acting/storagefacility/CDslimemonsters.ogg
+}
+
+CDhicktopatrol
+{
+	volume 4.5
+	global
+	sound/chex/acting/storagefacility/CDhicktopatrol.ogg
+}
+
+CDtopatrol
+{
+	volume 4.5
+	global
+	sound/chex/acting/storagefacility/CDtopatrol_radio.wav
+}

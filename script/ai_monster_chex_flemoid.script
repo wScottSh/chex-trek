@@ -1,0 +1,366 @@
+/***********************************************************************
+
+ai_monster_chex_flemoid.script
+
+***********************************************************************/
+
+//#define FLEMOID_MOVE_SPEED 100
+#define FLEMOID_ATTACK_RATE		5 //was 1 wtf was i thinking?
+#define FLEMOID_NOFOVTIME		4
+#define FLEMOID_DODGE_RATE		8
+
+object monster_chex_flemoid : monster_base {
+	float		nextDodge;
+	float		nextAttack;
+	float		nextNoFOVAttack;
+	entity		combat_node;
+	//entity		trail;
+	string		range_attack_anim;
+	
+	void		state_Begin();
+	void		state_Idle();
+	void		state_Dead();
+	void		combat_range();
+	void		combat_melee();
+	void		combat_dodge_right();
+	void		combat_dodge_left();
+	void		init();
+		
+	// torso anim states
+	void		Torso_Idle();
+	void		Torso_Pain();
+	void		Torso_RangeAttack();
+	void		Torso_TurretAttack();
+	void		Torso_MeleeAttack();
+	void		Torso_Walk();
+	void		Torso_DodgeLeft();
+	void		Torso_DodgeRight();
+
+	// attacks
+	float		check_attacks();
+	void		do_attack( float attack_flags );
+};
+
+/***********************************************************************
+
+	Torso animation control
+
+***********************************************************************/
+
+void monster_chex_flemoid::Torso_Idle() {
+	idleAnim( ANIMCHANNEL_TORSO, "idle" );
+	
+	eachFrame {
+		if ( AI_FORWARD )					{ animState( ANIMCHANNEL_TORSO, "Torso_Walk", 8 ); }
+		else if ( AI_PAIN )					{ animState( ANIMCHANNEL_TORSO, "Torso_Pain", 3 ); }
+	}
+}
+
+void monster_chex_flemoid::Torso_Pain() {
+	string animname;
+	float nextpain;
+	float currenttime;
+	
+	animname = getPainAnim();
+	playAnim( ANIMCHANNEL_TORSO, animname );
+
+	nextpain = sys.getTime() + 0.25;
+	
+	while( !animDone( ANIMCHANNEL_TORSO, 3 ) ) {
+		if ( AI_PAIN ) {
+			currenttime = sys.getTime();
+			if ( currenttime > nextpain ) {
+				animState( ANIMCHANNEL_TORSO, "Torso_Pain", 3 );
+			}
+		}
+		waitFrame();
+	}
+
+	finishAction( "pain" );
+	animState( ANIMCHANNEL_TORSO, "Torso_Idle", 6 );
+}
+
+void monster_chex_flemoid::Torso_RangeAttack() {
+	string anim;
+	
+	disablePain();
+	faceEnemy();
+
+	playAnim( ANIMCHANNEL_TORSO, range_attack_anim );
+	while( !animDone( ANIMCHANNEL_TORSO, 2 ) ) {
+		lookAtEnemy( 1 );	
+		waitFrame();
+	}
+
+	allowMovement( true );
+	finishAction( "range_attack" );
+	animState( ANIMCHANNEL_TORSO, "Torso_Idle", 2 );
+}
+
+void monster_chex_flemoid::Torso_TurretAttack() {
+	allowMovement( false );
+	disablePain();
+	faceEnemy();
+
+	playAnim( ANIMCHANNEL_TORSO, "turret_attack" );
+	while( !animDone( ANIMCHANNEL_TORSO, 4 ) ) {
+		waitFrame();
+	}
+
+	finishAction( "turret_attack" );
+	allowMovement( true );
+	animState( ANIMCHANNEL_TORSO, "Torso_Idle", 4 );
+}
+
+void monster_chex_flemoid::Torso_Walk() {
+	playCycle( ANIMCHANNEL_TORSO, "walk" );
+	
+	eachFrame {
+		//matt 7/8/05
+		if ( AI_PAIN && sys.random(1) > .5 )			{ animState( ANIMCHANNEL_TORSO, "Torso_Pain", 3 ); }
+		//end matt
+		if ( !AI_FORWARD )					{ animState( ANIMCHANNEL_TORSO, "Torso_Idle", 8 ); }
+	}
+}
+
+void monster_chex_flemoid::Torso_DodgeLeft() {
+	playAnim( ANIMCHANNEL_TORSO, "evade_left" );
+
+	while( !animDone( ANIMCHANNEL_TORSO, 2 ) ) {
+		waitFrame();
+	}
+	
+	finishAction( "strafe" );
+	animState( ANIMCHANNEL_TORSO, "Torso_Idle", 2 );
+}
+
+void monster_chex_flemoid::Torso_DodgeRight() {
+	playAnim( ANIMCHANNEL_TORSO, "evade_right" );
+
+	while( !animDone( ANIMCHANNEL_TORSO, 2 ) ) {
+		waitFrame();
+	}
+
+	finishAction( "strafe" );
+	animState( ANIMCHANNEL_TORSO, "Torso_Idle", 2 );
+}
+
+void monster_chex_flemoid::Torso_MeleeAttack() {
+	playAnim( ANIMCHANNEL_TORSO, "melee_attack" );
+
+	while( !animDone( ANIMCHANNEL_TORSO, 2 ) ) {
+		waitFrame();
+	}
+	
+	finishAction( "melee_attack" );
+	animState( ANIMCHANNEL_TORSO, "Torso_Idle", 2 );
+}
+
+/***********************************************************************
+
+	AI
+
+***********************************************************************/
+
+/*
+=====================
+monster_chex_flemoid::init
+=====================
+*/
+void monster_chex_flemoid::init() {
+	setState( "state_Begin" );	
+}
+
+/*
+=====================
+monster_chex_flemoid::state_Begin
+=====================
+*/
+void monster_chex_flemoid::state_Begin() {
+	animState( ANIMCHANNEL_TORSO, "Torso_Idle", 8 );
+	//animState( ANIMCHANNEL_LEGS, "Legs_Idle", 8 );
+
+	monster_begin();
+//	setFlySpeed( FLEMOID_MOVE_SPEED );
+
+	setMoveType( MOVETYPE_ANIM );		
+	setState( "state_Idle" );
+}
+
+/*
+=====================
+monster_chex_flemoid::state_Idle
+=====================
+*/
+void monster_chex_flemoid::state_Idle() {
+	wait_for_enemy();
+	setState( "state_Combat" );
+}
+
+/***********************************************************************
+
+	attacks
+
+***********************************************************************/
+
+/*
+=====================
+monster_chex_flemoid::do_attack
+=====================
+*/
+void monster_chex_flemoid::do_attack( float attack_flags ) {
+	nextNoFOVAttack = sys.getTime() + FLEMOID_NOFOVTIME;
+	if ( attack_flags & ATTACK_DODGE_LEFT ) {
+		combat_dodge_left();
+	} else if ( attack_flags & ATTACK_DODGE_RIGHT ) {
+		combat_dodge_right();
+	} else if ( attack_flags & ATTACK_MELEE ) {
+		combat_melee();
+	} else if ( attack_flags & ATTACK_MISSILE ) {
+		combat_range();
+	}
+}
+
+/*
+=====================
+monster_chex_flemoid::combat_melee
+=====================
+*/
+void monster_chex_flemoid::combat_melee() {
+	lookAtEnemy( 100 );
+	faceEnemy();
+	animState( ANIMCHANNEL_TORSO, "Torso_MeleeAttack", 5 );
+	waitAction( "melee_attack" );
+	lookAtEnemy( 1 );
+}
+
+/*
+=====================
+monster_chex_flemoid::combat_range
+=====================
+*/
+void monster_chex_flemoid::combat_range() {
+	faceEnemy();
+	animState( ANIMCHANNEL_TORSO, "Torso_RangeAttack", 2 );
+	waitAction( "range_attack" );
+
+	// don't attack for a bit
+	nextAttack = DelayTime( FLEMOID_ATTACK_RATE );
+	nextNoFOVAttack = sys.getTime() + FLEMOID_NOFOVTIME;
+}
+
+/*
+=====================
+monster_chex_flemoid::combat_dodge_left
+=====================
+*/
+void monster_chex_flemoid::combat_dodge_left() {
+	stopMove();
+	faceEnemy();
+	animState( ANIMCHANNEL_TORSO, "Torso_DodgeLeft", 2 );
+	waitAction( "strafe" );
+	nextDodge = DelayTime( FLEMOID_DODGE_RATE );
+	moveToEnemy();
+}
+
+/*
+=====================
+monster_chex_flemoid::combat_dodge_right
+=====================
+*/
+void monster_chex_flemoid::combat_dodge_right() {
+	stopMove();
+	faceEnemy();
+	animState( ANIMCHANNEL_TORSO, "Torso_DodgeRight", 2 );	
+	waitAction( "strafe" );
+	nextDodge = DelayTime( FLEMOID_DODGE_RATE );
+	moveToEnemy();
+}
+
+
+/*
+=====================
+monster_chex_flemoid::check_attacks
+=====================
+*/
+float monster_chex_flemoid::check_attacks() {
+	float	currentTime;
+	float	canMelee;
+	float	attack_flags;
+	float	range;
+	string	anim;
+	
+	attack_flags = 0;
+	
+	canMelee = testMeleeAttack();
+	currentTime = sys.getTime();
+	if ( !canMelee ) {
+		if ( AI_PAIN && ( currentTime >= nextDodge ) ) {
+			if ( testAnimMove( "evade_left" ) ) {
+				attack_flags |= ATTACK_DODGE_LEFT;
+			}
+			if ( testAnimMove( "evade_right" ) ) {
+				attack_flags |= ATTACK_DODGE_RIGHT;
+				
+				// if we can dodge either direction, pick one
+				if ( attack_flags & ATTACK_DODGE_LEFT ) {
+					if ( sys.random( 100 ) < 50 ) {
+						attack_flags &= ~ATTACK_DODGE_RIGHT;
+					} else {
+						attack_flags &= ~ATTACK_DODGE_LEFT;
+					}
+				}
+			}
+		}
+	}
+	
+	if ( canMelee ) {
+		attack_flags |= ATTACK_MELEE;
+	}
+
+	if ( ( ( sys.getTime() > nextNoFOVAttack ) && AI_ENEMY_VISIBLE ) || AI_ENEMY_IN_FOV ) {
+		if ( !canReachEnemy() || ( currentTime >= nextAttack ) ) {
+			range_attack_anim = chooseAnim( ANIMCHANNEL_LEGS, "turret_attack" );
+			if ( canHitEnemyFromAnim( range_attack_anim ) ) {
+				attack_flags |= ATTACK_MISSILE;
+			}
+
+			anim = chooseAnim( ANIMCHANNEL_LEGS, "range_attack" );
+			if ( testAnimMoveTowardEnemy( anim ) ) {
+				if ( canHitEnemyFromAnim( anim ) ) {
+					range_attack_anim = anim;
+					attack_flags |= ATTACK_MISSILE;
+				}
+			}
+		}
+	}
+	
+	return attack_flags;
+}
+
+/*
+=====================
+monster_base::state_Dead
+=====================
+*/
+void monster_chex_flemoid::state_Dead() {
+
+	float burnDelay = getFloatKey( "burnaway" );
+	if ( burnDelay != 0 ) {
+		preBurn();
+		sys.wait( burnDelay );
+		burn();
+		startSound( "snd_burn", SND_CHANNEL_BODY, false );
+	}
+	
+	sys.wait( 3 );
+	if ( resurrect ) {
+		hide();
+		stopRagdoll();
+		restorePosition();
+
+		// wait until we're resurrected
+		waitUntil( 0 );
+	}
+	remove();
+}

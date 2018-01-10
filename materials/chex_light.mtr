@@ -1,0 +1,32 @@
+models/chex/cagelight
+{
+        noselfshadow
+	noshadows
+
+	renderbump  -size 256 256 -aa 2  models/mapobjects/lights/cagelight/cagelight_local.tga models/mapobjects/lights/cagelight/cagelight_hi.lwo
+
+                diffusemap	models/mapobjects/lights/cagelight/cagelight_d.tga
+		bumpmap		addnormals (models/mapobjects/lights/cagelight/cagelight_local.tga, heightmap (models/mapobjects/lights/cagelight/cagelight_bmp.tga, 3) )
+                specularmap	models/mapobjects/lights/cagelight/cagelight_s.tga
+  	{
+		blend 	add
+		map		models/mapobjects/lights/cagelight/cagelight_add.tga
+		red sinTable[ .5 * time ]
+		green sinTable[ 1 - ( .5 * time ) ]
+		blue 0
+	}
+}
+
+lights/chex/marker_light
+{
+	lightFalloffImage	makeintensity( lights/squarelight1a.tga )	// this will also be the falloff for any
+																	// point light shaders that don't specify one
+	{
+		forceHighQuality
+		map lights/squarelight1.tga
+		red sinTable[ .5 * time ]
+		green sinTable[ 1 - ( .5 * time ) ]
+		blue 0
+		zeroClamp
+	}
+}

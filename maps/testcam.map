@@ -1,0 +1,163 @@
+Version 2
+// entity 0
+{
+"classname" "worldspawn"
+// primitive 0
+{
+ brushDef3
+ {
+  ( 0 0 -1 -232 ) ( ( 0.015625 0 0 ) ( 0 0.015625 0 ) ) "textures/base_trim/bluetex4r_danger_d" 0 0 0
+  ( 0 0 1 -280 ) ( ( 0.015625 0 0 ) ( 0 0.015625 0 ) ) "textures/base_trim/bluetex4r_danger_d" 0 0 0
+  ( 0 -1 0 -304 ) ( ( 0.015625 0 0 ) ( 0 0.015625 0 ) ) "textures/base_trim/bluetex4r_danger_d" 0 0 0
+  ( 0 1 0 -304 ) ( ( 0.015625 0 0 ) ( 0 0.015625 0 ) ) "textures/base_trim/bluetex4r_danger_d" 0 0 0
+  ( -1 0 0 -456 ) ( ( 0.015625 0 0 ) ( 0 0.015625 0 ) ) "textures/base_trim/bluetex4r_danger_d" 0 0 0
+  ( 1 0 0 448 ) ( ( 0.015625 0 0 ) ( 0 0.015625 0 ) ) "textures/base_trim/bluetex4r_danger_d" 0 0 0
+ }
+}
+// primitive 1
+{
+ brushDef3
+ {
+  ( 0 0 -1 -232 ) ( ( 0.015625 0 0 ) ( 0 0.015625 0 ) ) "textures/base_trim/bluetex4r_danger_d" 0 0 0
+  ( 0 0 1 -280 ) ( ( 0.015625 0 0 ) ( 0 0.015625 0 ) ) "textures/base_trim/bluetex4r_danger_d" 0 0 0
+  ( 1 0 0 -544 ) ( ( 0.015625 0 0 ) ( 0 0.015625 0 ) ) "textures/base_trim/bluetex4r_danger_d" 0 0 0
+  ( 0 1 0 -304 ) ( ( 0.015625 0 0 ) ( 0 0.015625 0 ) ) "textures/base_trim/bluetex4r_danger_d" 0 0 0
+  ( -1 0 0 -456 ) ( ( 0.015625 0 0 ) ( 0 0.015625 0 ) ) "textures/base_trim/bluetex4r_danger_d" 0 0 0
+  ( 0 -1 0 296 ) ( ( 0.015625 0 0 ) ( 0 0.015625 0 ) ) "textures/base_trim/bluetex4r_danger_d" 0 0 0
+ }
+}
+// primitive 2
+{
+ brushDef3
+ {
+  ( 0 0 -1 -232 ) ( ( 0.015625 0 0 ) ( 0 0.015625 0 ) ) "textures/base_trim/bluetex4r_danger_d" 0 0 0
+  ( 0 0 1 -280 ) ( ( 0.015625 0 0 ) ( 0 0.015625 0 ) ) "textures/base_trim/bluetex4r_danger_d" 0 0 0
+  ( 0 -1 0 -304 ) ( ( 0.015625 0 0 ) ( 0 0.015625 0 ) ) "textures/base_trim/bluetex4r_danger_d" 0 0 0
+  ( 1 0 0 -544 ) ( ( 0.015625 0 0 ) ( 0 0.015625 0 ) ) "textures/base_trim/bluetex4r_danger_d" 0 0 0
+  ( 0 1 0 -304 ) ( ( 0.015625 0 0 ) ( 0 0.015625 0 ) ) "textures/base_trim/bluetex4r_danger_d" 0 0 0
+  ( -1 0 0 536 ) ( ( 0.015625 0 0 ) ( 0 0.015625 0 ) ) "textures/base_trim/bluetex4r_danger_d" 0 0 0
+ }
+}
+// primitive 3
+{
+ brushDef3
+ {
+  ( 0 0 -1 -232 ) ( ( 0.015625 0 0 ) ( 0 0.015625 0 ) ) "textures/base_trim/bluetex4r_danger_d" 0 0 0
+  ( 0 0 1 -280 ) ( ( 0.015625 0 0 ) ( 0 0.015625 0 ) ) "textures/base_trim/bluetex4r_danger_d" 0 0 0
+  ( 0 -1 0 -304 ) ( ( 0.015625 0 0 ) ( 0 0.015625 0 ) ) "textures/base_trim/bluetex4r_danger_d" 0 0 0
+  ( 1 0 0 -544 ) ( ( 0.015625 0 0 ) ( 0 0.015625 0 ) ) "textures/base_trim/bluetex4r_danger_d" 0 0 0
+  ( -1 0 0 -456 ) ( ( 0.015625 0 0 ) ( 0 0.015625 0 ) ) "textures/base_trim/bluetex4r_danger_d" 0 0 0
+  ( 0 1 0 296 ) ( ( 0.015625 0 0 ) ( 0 0.015625 0 ) ) "textures/base_trim/bluetex4r_danger_d" 0 0 0
+ }
+}
+// primitive 4
+{
+ brushDef3
+ {
+  ( 0 0 1 -280 ) ( ( 0.015625 0 0 ) ( 0 0.015625 0 ) ) "textures/base_trim/bluetex4r_danger_d" 0 0 0
+  ( 0 -1 0 -304 ) ( ( 0.015625 0 0 ) ( 0 0.015625 0 ) ) "textures/base_trim/bluetex4r_danger_d" 0 0 0
+  ( 1 0 0 -544 ) ( ( 0.015625 0 0 ) ( 0 0.015625 0 ) ) "textures/base_trim/bluetex4r_danger_d" 0 0 0
+  ( 0 1 0 -304 ) ( ( 0.015625 0 0 ) ( 0 0.015625 0 ) ) "textures/base_trim/bluetex4r_danger_d" 0 0 0
+  ( -1 0 0 -456 ) ( ( 0.015625 0 0 ) ( 0 0.015625 0 ) ) "textures/base_trim/bluetex4r_danger_d" 0 0 0
+  ( 0 0 -1 272 ) ( ( 0.015625 0 0 ) ( 0 0.015625 0 ) ) "textures/base_trim/bluetex4r_danger_d" 0 0 0
+ }
+}
+// primitive 5
+{
+ brushDef3
+ {
+  ( 0 0 -1 -232 ) ( ( 0.015625 0 0 ) ( 0 0.015625 0 ) ) "textures/base_trim/bluetex4r_danger_d" 0 0 0
+  ( 0 -1 0 -304 ) ( ( 0.015625 0 0 ) ( 0 0.015625 0 ) ) "textures/base_trim/bluetex4r_danger_d" 0 0 0
+  ( 1 0 0 -544 ) ( ( 0.015625 0 0 ) ( 0 0.015625 0 ) ) "textures/base_trim/bluetex4r_danger_d" 0 0 0
+  ( 0 1 0 -304 ) ( ( 0.015625 0 0 ) ( 0 0.015625 0 ) ) "textures/base_trim/bluetex4r_danger_d" 0 0 0
+  ( -1 0 0 -456 ) ( ( 0.015625 0 0 ) ( 0 0.015625 0 ) ) "textures/base_trim/bluetex4r_danger_d" 0 0 0
+  ( 0 0 1 224 ) ( ( 0.015625 0 0 ) ( 0 0.015625 0 ) ) "textures/base_trim/bluetex4r_danger_d" 0 0 0
+ }
+}
+}
+// entity 1
+{
+"classname" "func_static"
+"name" "func_static_444"
+"origin" "72 152 -192"
+"model" "models/chex/chexian_armor.ASE"
+}
+// entity 2
+{
+"classname" "func_static"
+"name" "func_static_440"
+"origin" "22 152 -224"
+"model" "models/chex/chair/chair.ase"
+}
+// entity 3
+{
+"classname" "func_static"
+"name" "func_static_439"
+"model" "func_static_439"
+"origin" "68 -92 -20"
+"cameraTarget" "cam1"
+// primitive 0
+{
+ brushDef3
+ {
+  ( 0 0 -1 -60 ) ( ( 0.015625 0 0 ) ( 0 0.015625 0 ) ) "textures/chex/sf/remotescreen" 0 0 0
+  ( 0 0 1 -60 ) ( ( 0.015625 0 0 ) ( 0 0.015625 0 ) ) "textures/chex/sf/remotescreen" 0 0 0
+  ( 0 -1 0 -60 ) ( ( 0.015625 0 0 ) ( 0 0.015625 0 ) ) "textures/chex/sf/remotescreen" 0 0 0
+  ( 1 0 0 -116 ) ( ( 0.015625 0 0 ) ( 0 0.015625 0 ) ) "textures/chex/sf/remotescreen" 0 0 0
+  ( 0 1 0 -60 ) ( ( 0.015625 0 0 ) ( 0 0.015625 0 ) ) "textures/chex/sf/remotescreen" 0 0 0
+  ( -1 0 0 -116 ) ( ( 0.015625 0 0 ) ( 0 0.015625 0 ) ) "textures/chex/sf/remotescreen" 0 0 0
+ }
+}
+}
+// entity 4
+{
+"classname" "light"
+"name" "light_1"
+"origin" "176 -96 80"
+"light_radius" "860 700 672"
+}
+// entity 5
+{
+"classname" "info_player_start"
+"name" "info_player_start_1"
+"origin" "-152 16 -224"
+}
+// entity 6
+{
+"classname" "func_securitycamera"
+"name" "cam1"
+"origin" "120 208 24"
+"model" "models/mapobjects/camera/camera01.ase"
+"viewoffset" "0 0 -16"
+}
+// entity 7
+{
+"classname" "func_static"
+"name" "func_static_441"
+"origin" "-8 152 -224"
+"model" "models/chex/chair/chair_l.ase"
+"rotation" "1 0 0 0 1 0 0 0 1"
+}
+// entity 8
+{
+"classname" "func_static"
+"name" "func_static_442"
+"origin" "52 152 -224"
+"model" "models/chex/chair/chair.ase"
+}
+// entity 9
+{
+"classname" "func_static"
+"name" "func_static_443"
+"origin" "82 152 -224"
+"model" "models/chex/chair/chair_r.ase"
+"rotation" "1 0 0 0 1 0 0 0 1"
+}
+// entity 10
+{
+"classname" "func_static"
+"name" "func_static_445"
+"origin" "16 152 -192"
+"model" "models/chex/chexian_armor.ASE"
+"rotation" "-1 2.68718e-007 0 -2.68718e-007 -1 0 0 0 1"
+}
