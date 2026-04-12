@@ -8,6 +8,16 @@ Skin Bipedicus
 Make the pipe textures
 
 
+4/12/26
+-----------------------
+ported to dhewm3 source port. 64-bit builds now.
+cloned dhewm3-sdk, made chextrek branch.
+rebuilt Trail.cpp and Trail.h from the changelog.
+UV ping-pong from r4 notes. flat ribbon at floor level.
+compiled first try. zero errors.
+save/restore stubbed for now.
+
+
 12/30/05
 -----------------------
 really need to fix the footprints/slimesplats/slimetrail to be consistent with the rest of the slime decals. they need the same brightness and color if at all possible.
@@ -92,7 +102,7 @@ sorta updated cly skins as well as material file.
 doors fixed
 Grabbed the subversion from corvette
 Merged them together
-?DOORS DON’T WORK?
+?DOORS DONï¿½T WORK?
 Beta skin for the cyclopticus
 skinned snotball
 
