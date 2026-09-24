@@ -49,6 +49,26 @@ class CalleeCoverage(unittest.TestCase):
         )
         self.assertEqual(len([r for r in ROWS if r.group == "custom-ui"]), 16)
 
+    def test_end_level_stats_covers_its_scope(self):
+        names = {r.function for r in ROWS if r.group == "end-level-stats" and r.status == "covered"}
+        self.assertEqual(
+            names,
+            {"idPlayer::getLevelStats", "idPlayer::incSecretsFound", "idGameLocal::GetLevelStats", "idStr::FormatTime"}
+            | {r.function for r in ROWS if r.function.startswith("idTarget_EndLevelGUI::")},
+        )
+        self.assertEqual(len([r for r in ROWS if r.group == "end-level-stats"]), 15)
+
+    def test_class_declaration_names_the_base_constructor(self):
+        """CreateInstance calls the superclass's constructor; CLASS_DECLARATION must name it."""
+        text = reference("end-level-stats")
+        macro = "CLASS_DECLARATION( idCustomUI, idTarget_EndLevelGUI )"
+        self.assertEqual(text.count(macro), 1)
+        body = verify.find_macro_body(verify.implementation_block(text), "idTarget_EndLevelGUI::CreateInstance")
+        self.assertIn("idCustomUI::idCustomUI()", body)
+        results = verify.check_group("end-level-stats", BINARY, ROWS, ALLOW,
+                                     text.replace(macro, "CLASS_DECLARATION( idEntity, idTarget_EndLevelGUI )"))
+        self.assertEqual(missing_pairs(results), {("idTarget_EndLevelGUI::CreateInstance", "idCustomUI::{base ctor}")})
+
     def test_deleting_a_call_fails_and_names_function_and_callee(self):
         text = reference("custom-ui")
         call = "\tsavefile->ReadBool( registered );\n"
@@ -437,8 +457,19 @@ class HarnessRules(unittest.TestCase):
 
     def test_allowlist_is_documented(self):
         for entry in ALLOW:
-            self.assertIn(entry.kind, {"exception-only", "abi-implicit"})
+            self.assertIn(entry.kind, {"exception-only", "abi-implicit", "stock-inline"})
             self.assertGreater(len(entry.reason), 20)
+            if entry.kind == "stock-inline":  # one exact function, and the stock code named
+                self.assertNotIn("*", entry.function)
+                self.assertRegex(entry.reason, r"idlib/\w+\.h|game/\w+\.h")
+
+    def test_every_allowlist_entry_is_used(self):
+        """No stale entries: each one excuses at least one callee of a covered function."""
+        used = set()
+        for group in COVERED_GROUPS:
+            for res in verify.check_group(group, BINARY, ROWS, ALLOW):
+                used |= {(a.function, a.pattern) for _, a in res.allowed}
+        self.assertEqual([(a.function, a.pattern) for a in ALLOW if (a.function, a.pattern) not in used], [])
 
 
 class Records(unittest.TestCase):
@@ -476,6 +507,7 @@ class Records(unittest.TestCase):
         offsets = re.findall(r"^\| `\+(0x[0-9a-f]+)` \|", text, re.M)
         self.assertIn("0x1f0c", offsets)
         self.assertIn("0x1f10", offsets)
+        self.assertIn("0x1ea4", offsets)
         self.assertEqual(len(offsets), len(set(offsets)))
 
 
@@ -559,6 +591,50 @@ class CompileSplicing(unittest.TestCase):
         stock = Path(neo, "framework/CmdSystem.h").read_text(encoding="latin-1")
         self.assertIn('\tint a; \n#line 1 "r.md"\n\n\tint b;\n\n#line 3 "../framework/CmdSystem.h"\n};', stock)
 
+    def test_job_lists_the_header_blocks_it_depends_on(self):
+        text = reference("end-level-stats")
+        self.assertEqual(verify.header_deps(text), ["custom-ui"])
+        job = verify.compile_job("end-level-stats", text)
+        dep = verify.compile_job("custom-ui", reference("custom-ui"))
+        self.assertEqual(dep["deps"], [])
+        self.assertEqual(job["deps"], [{"source": dep["source"], "header": dep["header"],
+                                        "header_line": dep["header_line"]}])
+
+    def test_unknown_or_circular_dependency_is_an_error(self):
+        body = "## Header\n```cpp\nint a;\n```\n## Implementation\n```cpp\nint b;\n```\n"
+        with self.assertRaisesRegex(ValueError, "no reference file"):
+            verify.compile_job("g", "**Depends on:** `no-such-group`\n" + body)
+        with self.assertRaisesRegex(ValueError, "circular"):
+            verify.compile_job("custom-ui", "**Depends on:** `custom-ui`\n" + body)
+
+    def test_new_class_held_by_value_goes_before_the_stock_headers(self):
+        neo = self.fake_neo({"game/Player.h": "class idPlayer : public idActor {\n};\n"})
+        header = ("struct byValue_s {\n\tint a;\n};\nstruct byPointer_s {\n\tint b;\n};\n"
+                  "class idPlayer : public idActor {\n\tbyValue_s held[ 2 ];\n\tbyPointer_s *ptr;\n};\n")
+        job = {"group": "g", "source": "r.md", "header": header, "header_line": 1, "impl": "", "impl_line": 20}
+        tu, _ = worker.prepare(neo, job)
+        game_local = tu.index('#include "Game_local.h"')
+        self.assertLess(tu.index('#line 1 "r.md"\nstruct byValue_s {'), game_local)
+        self.assertGreater(tu.index("struct byPointer_s {"), game_local)
+        self.assertEqual(tu.count("struct byValue_s {"), 1)
+
+    def test_dependency_header_blocks_come_first(self):
+        neo = self.fake_neo({"game/Player.h": "class idPlayer : public idActor {\n};\n"})
+        dep = {"source": "dep.md", "header": "class idBase;\nclass idPlayer : public idActor {\n\tidBase *b;\n};\n"
+               "class idBase {\n};\n", "header_line": 3}
+        job = {"group": "g", "source": "own.md", "header": "class idPlayer : public idActor {\n\tint own;\n};\n"
+               "class idDerived : public idBase {\n};\n", "header_line": 7, "impl": "int f;", "impl_line": 30,
+               "deps": [dep]}
+        tu, splices = worker.prepare(neo, job)
+        self.assertEqual(splices, [{"class": "idPlayer", "file": "game/Player.h", "line": 4, "from": "dep.md"},
+                                   {"class": "idPlayer", "file": "game/Player.h", "line": 7}])
+        stock = Path(neo, "game/Player.h").read_text(encoding="latin-1")
+        self.assertLess(stock.index("idBase *b;"), stock.index("int own;"))
+        self.assertLess(tu.index("class idBase;"), tu.index('#include "Game_local.h"'))
+        self.assertLess(tu.index("class idBase {"), tu.index("class idDerived"))
+        self.assertLess(tu.index("class idDerived"), tu.index("int f;"))
+        self.assertIn("(from dep.md)", verify.format_compile(verify.CompileResult("g", True, [], splices))[0])
+
     def test_ambiguous_stock_class_is_an_error(self):
         neo = self.fake_neo({"game/A.h": "class idX {\n};\n", "game/B.h": "class idX {\n};\n"})
         job = {"group": "g", "source": "r.md", "header": "class idX {\n};\n", "header_line": 1, "impl": "",
@@ -592,6 +668,13 @@ class Compile(unittest.TestCase):
             mutated = text.replace(old, new)
             jobs.append(dict(verify.compile_job("custom-ui", mutated), group=name))
             cls.lines[name] = md_line(mutated, needle)
+        ref = reference("end-level-stats")
+        jobs.append(verify.compile_job("end-level-stats", ref))
+        old = "\tplayerStats_s\t\t\tlevelStats[ 4 ];"
+        assert ref.count(old) == 1
+        mutated = ref.replace(old, "\tplayerStat_s\t\t\tlevelStats[ 4 ];")
+        jobs.append(dict(verify.compile_job("end-level-stats", mutated), group="els_spliced_member"))
+        cls.els_line = md_line(mutated, "playerStat_s\t")
         cls.toolchain, results = verify.run_compile(jobs)
         cls.results = {r.group: r for r in results}
 
@@ -608,6 +691,21 @@ class Compile(unittest.TestCase):
         self.assertEqual({(s["class"], s["file"]) for s in res.splices},
                          {("idPlayer", "game/Player.h"), ("idCmdSystem", "framework/CmdSystem.h")})
         self.assertTrue(verify.format_compile(res)[0].startswith("  ok       compiles (check 3)"))
+
+    def test_end_level_stats_compiles_on_top_of_custom_ui(self):
+        res = self.results["end-level-stats"]
+        self.assertEqual(res.errors, [])
+        self.assertTrue(res.ok)
+        self.assertEqual({(s["class"], s["file"], s.get("from")) for s in res.splices},
+                         {("idPlayer", "game/Player.h", "decomp-so/reference/custom-ui.md"),
+                          ("idCmdSystem", "framework/CmdSystem.h", "decomp-so/reference/custom-ui.md"),
+                          ("idPlayer", "game/Player.h", None), ("idGameLocal", "game/Game_local.h", None),
+                          ("idStr", "idlib/Str.h", None)})
+        res = self.results["els_spliced_member"]  # an error in a spliced member of the second group
+        self.assertFalse(res.ok)
+        lines = [int(m.group(1)) for m in (re.match(r"decomp-so/reference/end-level-stats\.md:(\d+):", e)
+                                           for e in res.errors) if m]
+        self.assertIn(self.els_line, lines, res.errors)
 
     def test_a_syntax_error_fails_and_is_reported_at_its_markdown_line(self):
         for name in self.MUTATIONS:

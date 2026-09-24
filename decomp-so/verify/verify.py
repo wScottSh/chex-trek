@@ -7,6 +7,9 @@ callees, and assert each one appears in the code of that function's definition i
 group's reference Markdown. Comments do not count, except for constructor/destructor
 callees, whose calls are usually implicit. Indirect (virtual / function-pointer) calls
 cannot be named from the binary alone and are not checked. Missing callees are reported per function.
+A stock CLASS_DECLARATION( base, cls ) / ABSTRACT_DECLARATION stands for the GetType and
+CreateInstance bodies it expands to; there `new cls` accounts for a call to base's constructor
+(cls's own constructor, when it declares none, is inline and starts with base's).
 
 Check 2 -- constants and strings. Every float/double constant and string literal the
 function reads from .rodata, and every float stored as an instruction immediate
@@ -27,7 +30,11 @@ stock class (`class idPlayer : public idActor { // ... stock members ... };`) ha
 spliced into a scratch copy of that stock declaration; each such splice is reported. Compile
 errors are reported per group, at the reference Markdown's line numbers (compile/worker.py).
 Top-level forward declarations in the header block are compiled before the stock game headers,
-so the check does not show where in the stock headers such a declaration has to go.
+and so is a new class without a base class that a spliced member holds by value (a stock
+class can hold it only if it is complete), so the check does not show where in the stock
+headers such a declaration has to go. A reference whose code builds on another group's
+header block names that group on a `**Depends on:** `group`` line; the header blocks of
+those groups (not their implementations) are compiled first, splices included.
 This proves the code is well-formed SDK code, not that it behaves like the binary.
 The container runs wherever `docker` points: locally, or on the Ghidra box with
 DOCKER_HOST=ssh://qwen. The image is built on first use (tag = hash of the Dockerfile).
@@ -40,8 +47,8 @@ DOCKER_HOST=ssh://qwen. The image is built on first use (tag = hash of the Docke
 
 Exit status is 0 only when nothing is missing or mismatched and every group compiles (a
 check 3 that cannot run fails, unless --no-compile). Callees that are never checked
-(_Unwind_Resume, __cxa_*, the PIC thunk) are listed in binary.py; exception-only and
-ABI-implicit callees are on allowlist.tsv, literals that come from stock inline code on
+(_Unwind_Resume, __cxa_*, the PIC thunk) are listed in binary.py; exception-only,
+ABI-implicit and stock-inline callees are on allowlist.tsv, literals that come from stock inline code on
 literal-allowlist.tsv. Dependencies: requirements.txt.
 """
 from __future__ import annotations
@@ -85,7 +92,10 @@ GHIDRA_INDEX = GHIDRA_DIR / "_index.tsv"
 # reference writes one of these instead of a body, the macro's stock expansion is the body.
 MACRO_BODIES = {
     "CLASS_DECLARATION": {
+        # `new {cls}` runs {cls}'s constructor, which starts with its superclass's. A class that
+        # declares no constructor gets an inline one, so the binary calls {base}'s directly.
         "CreateInstance": "idClass *{cls}::CreateInstance( void ) {{ try {{ {cls} *ptr = new {cls}; "
+        "/* {cls}::{cls}() runs {base}::{base}() */ "
         "ptr->FindUninitializedMemory(); return ptr; }} catch( idAllocError & ) {{ return NULL; }} }}",
         "GetType": "idTypeInfo *{cls}::GetType( void ) const {{ return &( {cls}::Type ); }}",
     },
@@ -412,8 +422,9 @@ def is_structor(callee_name: str) -> bool:
 def find_macro_body(impl: str, name: str) -> str | None:
     cls, member = split_qualified(name)
     for macro, bodies in MACRO_BODIES.items():
-        if member in bodies and re.search(macro + r"\s*\(\s*\w+\s*,\s*" + re.escape(cls) + r"\s*\)", impl):
-            return bodies[member].format(cls=cls)
+        m = re.search(macro + r"\s*\(\s*(\w+)\s*,\s*" + re.escape(cls) + r"\s*\)", impl)
+        if member in bodies and m:
+            return bodies[member].format(cls=cls, base=m.group(1))
     return None
 
 
@@ -528,12 +539,40 @@ class CompileResult:
     splices: list[dict]  # {"class", "file", "line"}: stock declarations the header extends
 
 
+_DEPENDS_ON = re.compile(r"^\*\*Depends on:\*\*(.*)$", re.M)
+
+
+def header_deps(markdown: str) -> list[str]:
+    """Groups named (in backticks) on the reference's `**Depends on:**` line: groups whose
+    header blocks this group's code builds on (a base class, a shared idPlayer member)."""
+    m = _DEPENDS_ON.search(markdown)
+    return re.findall(r"`([\w-]+)`", m.group(1)) if m else []
+
+
+def _dep_headers(markdown: str, chain: tuple[str, ...], out: list[dict]) -> None:
+    for dep in header_deps(markdown):
+        if dep in chain:
+            raise ValueError(f"circular **Depends on:** {' -> '.join(chain + (dep,))}")
+        source = f"decomp-so/reference/{dep}.md"
+        if any(d["source"] == source for d in out):
+            continue
+        path = REFERENCE_DIR / f"{dep}.md"
+        if not path.exists():
+            raise ValueError(f"**Depends on:** names group {dep!r}, which has no reference file")
+        text = path.read_text(encoding="utf-8")
+        _dep_headers(text, chain + (dep,), out)  # its own dependencies first
+        out.append({"source": source, "header": reference_blocks(text)[0], "header_line": cpp_block_lines(text)[0]})
+
+
 def compile_job(group: str, reference_text: str) -> dict:
-    """What worker.py needs to compile one group: its two blocks and where they start."""
+    """What worker.py needs to compile one group: its two blocks and where they start, and
+    the header blocks of the groups it depends on (compiled first, in dependency order)."""
     header, impl = reference_blocks(reference_text)
     lines = cpp_block_lines(reference_text)
+    deps: list[dict] = []
+    _dep_headers(reference_text, (group,), deps)
     return {"group": group, "source": f"decomp-so/reference/{group}.md",
-            "header": header, "header_line": lines[0], "impl": impl, "impl_line": lines[1]}
+            "header": header, "header_line": lines[0], "impl": impl, "impl_line": lines[1], "deps": deps}
 
 
 def dockerfile() -> bytes:
@@ -595,7 +634,8 @@ def format_toolchain(tc: dict) -> str:
 
 
 def format_compile(res: CompileResult) -> list[str]:
-    splices = "".join(f"; {s['class']} members spliced into stock {s['file']}" for s in res.splices)
+    splices = "".join(f"; {s['class']} members spliced into stock {s['file']}"
+                      + (f" (from {Path(s['from']).name})" if s.get("from") else "") for s in res.splices)
     if res.ok:
         return [f"  ok       compiles (check 3){splices}"]
     return [f"  COMPILE  {e}" for e in res.errors] + [f"  => does not compile: {len(res.errors)} error(s){splices}"]
@@ -668,14 +708,15 @@ def main(argv: list[str] | None = None) -> int:
     failed = False
     compiled: dict[str, CompileResult] = {}
     compile_error: str | None = None
+    job_errors: dict[str, str] = {}
     if not args.no_compile:
         jobs = []
         for g in groups:
             ref = REFERENCE_DIR / f"{g}.md"
             try:
                 jobs.append(compile_job(g, ref.read_text(encoding="utf-8")))
-            except (OSError, ValueError):
-                pass  # reported below by checks 1 and 2
+            except (OSError, ValueError) as exc:
+                job_errors[g] = f"check 3 not run: {exc}"  # a missing/malformed file also fails checks 1-2
         try:
             toolchain, results3 = run_compile(jobs) if jobs else ({}, [])
             compiled = {r.group: r for r in results3}
@@ -711,7 +752,7 @@ def main(argv: list[str] | None = None) -> int:
                 print(line)
             failed |= not compiled[g].ok
         else:
-            print(f"  FAIL     {compile_error or 'check 3 produced no result'}")
+            print(f"  FAIL     {job_errors.get(g) or compile_error or 'check 3 produced no result'}")
             failed = True
     return 1 if failed else 0
 

@@ -7,7 +7,7 @@ Which exported custom functions have a verified reference, and which do not yet.
   `scripts/NoReturnOff.java` and `scripts/targets.txt`). Enriched export (#18): each file lists the float
   constants and string literals the function reads, and the pseudo-C shows their values.
 - **Status:** `covered` = the function is in its group's reference (`reference/<group>.md`) and passes the
-  harness, checks 1 (callees) and 2 (constants and strings) (`python decomp-so/verify/verify.py <group>`).
+  harness: checks 1 (callees), 2 (constants and strings) and 3 (compile) (`python decomp-so/verify/verify.py <group>`).
   `pending` = not reconstructed yet.
 - **ELF vaddr** is the symbol-table address. The Ghidra export address is this plus `0x10000` (Ghidra's image base).
 - **Symbol** is the mangled `.symtab` name the harness uses to find the function's real byte range (`st_size`).
@@ -34,10 +34,10 @@ Edits inside stock function bodies are out of scope for spec #16.
 |---|---|---|---|---|---|
 | `idActor::Event_FootPrint` | `_ZN7idActor15Event_FootPrintEPKcS1_` | 0xb6210 | idActor_Event_FootPrint_000c6210.c | script-events | pending |
 | `idGameLocal::RemoveTrail` | `_ZN11idGameLocal11RemoveTrailEP7mkTrail` | 0xee7f0 | idGameLocal_RemoveTrail_000fe7f0.c | trails | pending |
-| `idGameLocal::GetLevelStats` | `_ZN11idGameLocal13GetLevelStatsEP13playerStats_s` | 0xf0800 | idGameLocal_GetLevelStats_00100800.c | end-level-stats | pending |
+| `idGameLocal::GetLevelStats` | `_ZN11idGameLocal13GetLevelStatsEP13playerStats_s` | 0xf0800 | idGameLocal_GetLevelStats_00100800.c | end-level-stats | covered |
 | `idGameLocal::BabySitTrail` | `_ZN11idGameLocal12BabySitTrailEP7mkTrail` | 0xf2a10 | idGameLocal_BabySitTrail_00102a10.c | trails | pending |
-| `idPlayer::incSecretsFound` | `_ZN8idPlayer15incSecretsFoundEv` | 0x14d2e0 | idPlayer_incSecretsFound_0015d2e0.c | end-level-stats | pending |
-| `idPlayer::getLevelStats` | `_ZN8idPlayer13getLevelStatsEv` | 0x14d2f0 | idPlayer_getLevelStats_0015d2f0.c | end-level-stats | pending |
+| `idPlayer::incSecretsFound` | `_ZN8idPlayer15incSecretsFoundEv` | 0x14d2e0 | idPlayer_incSecretsFound_0015d2e0.c | end-level-stats | covered |
+| `idPlayer::getLevelStats` | `_ZN8idPlayer13getLevelStatsEv` | 0x14d2f0 | idPlayer_getLevelStats_0015d2f0.c | end-level-stats | covered |
 | `idPlayer::useCustomUI` | `_ZN8idPlayer11useCustomUIEP15idUserInterfaceP10idCustomUI` | 0x14d300 | idPlayer_useCustomUI_0015d300.c | custom-ui | covered |
 | `idPlayer::clearCustomUI` | `_ZN8idPlayer13clearCustomUIEv` | 0x14d320 | idPlayer_clearCustomUI_0015d320.c | custom-ui | covered |
 | `idPlayer::MapImageCoords` | `_ZN8idPlayer14MapImageCoordsEffRK6idVec2RS0_` | 0x14d340 | idPlayer_MapImageCoords_0015d340.c | hud-map | pending |
@@ -54,15 +54,15 @@ Edits inside stock function bodies are out of scope for spec #16.
 | `idCmdSystem::ArgCompletion_GuiName` | `_ZN11idCmdSystem21ArgCompletion_GuiNameERK9idCmdArgsPFvPKcE` | 0x173a40 | idCmdSystem_ArgCompletion_GuiName_00183a40.c | custom-ui | covered |
 | `idCustomUI::GetType` | `_ZNK10idCustomUI7GetTypeEv` | 0x18d3b0 | idCustomUI_GetType_0019d3b0.c | custom-ui | covered |
 | `idCustomUI::setGUI` | `_ZN10idCustomUI6setGUIEPKc` | 0x18d3d0 | idCustomUI_setGUI_0019d3d0.c | custom-ui | covered |
-| `idTarget_EndLevelGUI::GetType` | `_ZNK20idTarget_EndLevelGUI7GetTypeEv` | 0x18d4a0 | idTarget_EndLevelGUI_GetType_0019d4a0.c | end-level-stats | pending |
-| `idTarget_EndLevelGUI::updateStats` | `_ZN20idTarget_EndLevelGUI11updateStatsEP13playerStats_sS1_` | 0x18d4c0 | idTarget_EndLevelGUI_updateStats_0019d4c0.c | end-level-stats | pending |
+| `idTarget_EndLevelGUI::GetType` | `_ZNK20idTarget_EndLevelGUI7GetTypeEv` | 0x18d4a0 | idTarget_EndLevelGUI_GetType_0019d4a0.c | end-level-stats | covered |
+| `idTarget_EndLevelGUI::updateStats` | `_ZN20idTarget_EndLevelGUI11updateStatsEP13playerStats_sS1_` | 0x18d4c0 | idTarget_EndLevelGUI_updateStats_0019d4c0.c | end-level-stats | covered |
 | `mkObjective::GetType` | `_ZNK11mkObjective7GetTypeEv` | 0x18d640 | mkObjective_GetType_0019d640.c | objectives | pending |
 | `mkObjective::CreateInstance` | `_ZN11mkObjective14CreateInstanceEv` | 0x18dc60 | mkObjective_CreateInstance_0019dc60.c | objectives | pending |
 | `idCustomUI::idCustomUI` | `_ZN10idCustomUIC1Ev` | 0x18dd60 | idCustomUI_idCustomUI_0019dd60.c | custom-ui | covered |
 | `idCustomUI::idCustomUI` | `_ZN10idCustomUIC2Ev` | 0x18ddb0 | idCustomUI_idCustomUI_0019ddb0.c | custom-ui | covered |
-| `idTarget_EndLevelGUI::CreateInstance` | `_ZN20idTarget_EndLevelGUI14CreateInstanceEv` | 0x18de00 | idTarget_EndLevelGUI_CreateInstance_0019de00.c | end-level-stats | pending |
-| `idTarget_EndLevelGUI::Spawn` | `_ZN20idTarget_EndLevelGUI5SpawnEv` | 0x18dfc0 | idTarget_EndLevelGUI_Spawn_0019dfc0.c | end-level-stats | pending |
-| `idTarget_EndLevelGUI::Save` | `_ZNK20idTarget_EndLevelGUI4SaveEP10idSaveGame` | 0x18e020 | idTarget_EndLevelGUI_Save_0019e020.c | end-level-stats | pending |
+| `idTarget_EndLevelGUI::CreateInstance` | `_ZN20idTarget_EndLevelGUI14CreateInstanceEv` | 0x18de00 | idTarget_EndLevelGUI_CreateInstance_0019de00.c | end-level-stats | covered |
+| `idTarget_EndLevelGUI::Spawn` | `_ZN20idTarget_EndLevelGUI5SpawnEv` | 0x18dfc0 | idTarget_EndLevelGUI_Spawn_0019dfc0.c | end-level-stats | covered |
+| `idTarget_EndLevelGUI::Save` | `_ZNK20idTarget_EndLevelGUI4SaveEP10idSaveGame` | 0x18e020 | idTarget_EndLevelGUI_Save_0019e020.c | end-level-stats | covered |
 | `idCustomUI::UnregisterGUI` | `_ZN10idCustomUI13UnregisterGUIEv` | 0x18e0b0 | idCustomUI_UnregisterGUI_0019e0b0.c | custom-ui | covered |
 | `idCustomUI::HandleCustomGUICommand` | `_ZN10idCustomUI22HandleCustomGUICommandEP8idEntityP7idToken` | 0x18e130 | idCustomUI_HandleCustomGUICommand_0019e130.c | custom-ui | covered |
 | `idCustomUI::Event_Hide` | `_ZN10idCustomUI10Event_HideEv` | 0x18e180 | idCustomUI_Event_Hide_0019e180.c | custom-ui | covered |
@@ -72,20 +72,20 @@ Edits inside stock function bodies are out of scope for spec #16.
 | `idCustomUI::CreateInstance` | `_ZN10idCustomUI14CreateInstanceEv` | 0x18e300 | idCustomUI_CreateInstance_0019e300.c | custom-ui | covered |
 | `mkObjective::Save` | `_ZNK11mkObjective4SaveEP10idSaveGame` | 0x18e8f0 | mkObjective_Save_0019e8f0.c | objectives | pending |
 | `mkObjective::Restore` | `_ZN11mkObjective7RestoreEP13idRestoreGame` | 0x18ede0 | mkObjective_Restore_0019ede0.c | objectives | pending |
-| `idTarget_EndLevelGUI::Restore` | `_ZN20idTarget_EndLevelGUI7RestoreEP13idRestoreGame` | 0x18eeb0 | idTarget_EndLevelGUI_Restore_0019eeb0.c | end-level-stats | pending |
-| `idTarget_EndLevelGUI::HandleCustomGUICommand` | `_ZN20idTarget_EndLevelGUI22HandleCustomGUICommandEP8idEntityP7idToken` | 0x1913c0 | idTarget_EndLevelGUI_HandleCustomGUICommand_001a13c0.c | end-level-stats | pending |
+| `idTarget_EndLevelGUI::Restore` | `_ZN20idTarget_EndLevelGUI7RestoreEP13idRestoreGame` | 0x18eeb0 | idTarget_EndLevelGUI_Restore_0019eeb0.c | end-level-stats | covered |
+| `idTarget_EndLevelGUI::HandleCustomGUICommand` | `_ZN20idTarget_EndLevelGUI22HandleCustomGUICommandEP8idEntityP7idToken` | 0x1913c0 | idTarget_EndLevelGUI_HandleCustomGUICommand_001a13c0.c | end-level-stats | covered |
 | `mkObjective::AttachToLocalPlayer` | `_ZN11mkObjective19AttachToLocalPlayerEb` | 0x1936b0 | mkObjective_AttachToLocalPlayer_001a36b0.c | objectives | pending |
 | `mkObjective::RemoveFromLocalPlayer` | `_ZN11mkObjective21RemoveFromLocalPlayerEb` | 0x193a10 | mkObjective_RemoveFromLocalPlayer_001a3a10.c | objectives | pending |
-| `idTarget_EndLevelGUI::Event_Activate` | `_ZN20idTarget_EndLevelGUI14Event_ActivateEP8idEntity` | 0x193ee0 | idTarget_EndLevelGUI_Event_Activate_001a3ee0.c | end-level-stats | pending |
+| `idTarget_EndLevelGUI::Event_Activate` | `_ZN20idTarget_EndLevelGUI14Event_ActivateEP8idEntity` | 0x193ee0 | idTarget_EndLevelGUI_Event_Activate_001a3ee0.c | end-level-stats | covered |
 | `mkObjective::Spawn` | `_ZN11mkObjective5SpawnEv` | 0x194390 | mkObjective_Spawn_001a4390.c | objectives | pending |
 | `mkObjective::Event_Activate` | `_ZN11mkObjective14Event_ActivateEP8idEntity` | 0x1956a0 | mkObjective_Event_Activate_001a56a0.c | objectives | pending |
-| `idTarget_EndLevelGUI::Event_UpdateStats` | `_ZN20idTarget_EndLevelGUI17Event_UpdateStatsEv` | 0x195760 | idTarget_EndLevelGUI_Event_UpdateStats_001a5760.c | end-level-stats | pending |
+| `idTarget_EndLevelGUI::Event_UpdateStats` | `_ZN20idTarget_EndLevelGUI17Event_UpdateStatsEv` | 0x195760 | idTarget_EndLevelGUI_Event_UpdateStats_001a5760.c | end-level-stats | covered |
 | `idCustomUI::~idCustomUI` | `_ZN10idCustomUID0Ev` | 0x199100 | idCustomUI_idCustomUI_001a9100.c | custom-ui | covered |
 | `idCustomUI::~idCustomUI` | `_ZN10idCustomUID1Ev` | 0x199150 | idCustomUI_idCustomUI_001a9150.c | custom-ui | covered |
-| `idTarget_EndLevelGUI::~idTarget_EndLevelGUI` | `_ZN20idTarget_EndLevelGUID1Ev` | 0x199180 | idTarget_EndLevelGUI_idTarget_EndLevelGUI_001a9180.c | end-level-stats | pending |
+| `idTarget_EndLevelGUI::~idTarget_EndLevelGUI` | `_ZN20idTarget_EndLevelGUID1Ev` | 0x199180 | idTarget_EndLevelGUI_idTarget_EndLevelGUI_001a9180.c | end-level-stats | covered |
 | `mkObjective::~mkObjective` | `_ZN11mkObjectiveD0Ev` | 0x199280 | mkObjective_mkObjective_001a9280.c | objectives | pending |
 | `mkObjective::~mkObjective` | `_ZN11mkObjectiveD1Ev` | 0x199330 | mkObjective_mkObjective_001a9330.c | objectives | pending |
-| `idTarget_EndLevelGUI::~idTarget_EndLevelGUI` | `_ZN20idTarget_EndLevelGUID0Ev` | 0x1993e0 | idTarget_EndLevelGUI_idTarget_EndLevelGUI_001a93e0.c | end-level-stats | pending |
+| `idTarget_EndLevelGUI::~idTarget_EndLevelGUI` | `_ZN20idTarget_EndLevelGUID0Ev` | 0x1993e0 | idTarget_EndLevelGUI_idTarget_EndLevelGUI_001a93e0.c | end-level-stats | covered |
 | `idWeapon::Event_SetProj` | `_ZN8idWeapon13Event_SetProjEPKc` | 0x19f990 | idWeapon_Event_SetProj_001af990.c | script-events | pending |
 | `idAI::OpenDoors` | `_ZN4idAI9OpenDoorsEP8idEntity` | 0x1be950 | idAI_OpenDoors_001ce950.c | door-opening | pending |
 | `idAI::Event_OpenDoors` | `_ZN4idAI15Event_OpenDoorsEP8idEntity` | 0x1cc9a0 | idAI_Event_OpenDoors_001dc9a0.c | door-opening | pending |
@@ -115,4 +115,4 @@ Edits inside stock function bodies are out of scope for spec #16.
 | `matt_func_envshot::takeEnvShots_f` | `_ZN17matt_func_envshot14takeEnvShots_fERK9idCmdArgs` | 0x2a7890 | matt_func_envshot_takeEnvShots_f_002b7890.c | env-shots | pending |
 | `matt_func_envshot::~matt_func_envshot` | `_ZN17matt_func_envshotD0Ev` | 0x2a7940 | matt_func_envshot_matt_func_envshot_002b7940.c | env-shots | pending |
 | `matt_func_envshot::~matt_func_envshot` | `_ZN17matt_func_envshotD1Ev` | 0x2a7990 | matt_func_envshot_matt_func_envshot_002b7990.c | env-shots | pending |
-| `idStr::FormatTime` | `_ZN5idStr10FormatTimeEPKci` | 0x344230 | idStr_FormatTime_00354230.c | end-level-stats | pending |
+| `idStr::FormatTime` | `_ZN5idStr10FormatTimeEPKci` | 0x344230 | idStr_FormatTime_00354230.c | end-level-stats | covered |

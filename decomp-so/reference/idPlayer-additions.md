@@ -10,6 +10,7 @@ Offsets are from the start of `idPlayer` in this build (`this + offset`). Names 
 
 | Offset | Type | Name | Group | Evidence (binary) |
 |---|---|---|---|---|
+| `+0x1ea4` | `playerStats_s[ 4 ]` (0x50 bytes, to `+0x1ef3`) | `levelStats` | end-level-stats | `getLevelStats` returns `this + 0x1ea4`. Both constructors `memset` 0x50 bytes there. `idPlayer::Spawn` fills it (`GetLevelStats`, start time at `+0x1ee0`, GUI variable names at `+0x1eac`...`+0x1ee8`). `incSecretsFound` increments `+0x1ed0` (`[2].found`), `AddAIKill` `+0x1ea8` (`[0].found`), `GiveItem` `+0x1ebc` (`[1].found`). Element type and layout: `reference/end-level-stats.md`. |
 | `+0x1f0c` | `idCustomUI *` | `customUIEntity` | custom-ui | `useCustomUI` stores its 2nd argument (`idCustomUI *`), `clearCustomUI` zeroes it. `HandleSingleGuiCommand` calls `HandleCustomGUICommand` (vtable slot 59, `[vptr+0xe4]`) on it. |
 | `+0x1f10` | `idUserInterface *` | `customUI` | custom-ui | `useCustomUI` stores its 1st argument (`idUserInterface *`), `clearCustomUI` zeroes it. `ActiveGui` returns it first when non-NULL. |
 
@@ -17,9 +18,15 @@ Offsets are from the start of `idPlayer` in this build (`this + offset`). Names 
 
 | Method | Group | Address (ELF) |
 |---|---|---|
+| `void incSecretsFound( void )` | end-level-stats | 0x14d2e0 |
+| `playerStats_s *getLevelStats( void )` | end-level-stats | 0x14d2f0 |
 | `void useCustomUI( idUserInterface *ui, idCustomUI *uiEntity )` | custom-ui | 0x14d300 |
 | `void clearCustomUI( void )` | custom-ui | 0x14d320 |
 
+## Types
+
+`struct playerStats_s` (0x14 bytes: `int total`, `int found`, `const char *totalVar`, `foundVar`, `percentVar`) is new, and must be declared before `idPlayer`, which holds four by value. Declaration: `reference/end-level-stats.md`.
+
 ## Conflicts reconciled
 
-None yet.
+None yet. Checked for end-level-stats: `levelStats` (`+0x1ea4`..`+0x1ef3`) does not overlap the custom-ui members (`+0x1f0c`, `+0x1f10`).

@@ -13,7 +13,10 @@ For each job (one group's header block and implementation block):
   3. The rest of the header block, then the implementation block, form one translation
      unit in game/ after the stock game prologue (precompiled.h, Game_local.h). Top-level
      forward declarations (`class idCustomUI;`) in the header block are placed before
-     Game_local.h, so spliced members can name the new classes.
+     Game_local.h, so spliced members can name the new classes; so is a new class without
+     a base class that a spliced member holds by value (`struct playerStats_s`).
+     The header blocks of the groups the job depends on ("deps") are prepared the same way
+     and come first; their implementation blocks are not compiled here.
   4. It is compiled 32-bit (FLAGS). `#line` directives map every diagnostic in the
      reference code, spliced members included, to the reference Markdown's line numbers.
 """
@@ -166,41 +169,76 @@ def splice_members(stock_text: str, stock_close: int, stock_path: str, members: 
     return stock_text[:line_start] + insert.lstrip("\n") + stock_text[line_start:]
 
 
-def prepare(neo: str, job: dict) -> tuple[str, list[dict]]:
-    """Splice stock-class additions into the tree at `neo`; return the TU text and the splices."""
-    source = job["source"]
-    header = job["header"]
+def _has_base(header: str, cls: dict) -> bool:
+    """Does the class head (`class X : public Y {`) name a base class?"""
+    return ":" in header[cls["start"] : cls["open"]]
+
+
+def prepare_header(neo: str, source: str, header: str, header_line: int) -> tuple[str, str, list[dict]]:
+    """Splice one header block's stock-class additions into the tree at `neo`. Returns the
+    text that must precede the stock game headers, the rest of the header block (lines kept),
+    and the splices."""
     splices = []
     classes = top_level_classes(header)
-    # Forward declarations go before the stock game headers, so that spliced members can
-    # name a new class (in the mod's source they would sit in the stock header itself).
-    forwards = "".join(f'#line {job["header_line"] + line_of(header, c["start"]) - 1} "{source}"\n'
-                       f'{header[c["start"]:c["end"]]}\n' for c in classes if c["forward"])
-    for cls in reversed(classes):
+    stock: dict[int, tuple[str, int, int]] = {}  # index in classes -> the stock definition it extends
+    for i, cls in enumerate(classes):
         if cls["forward"]:
-            header = blank_out(header, cls["start"], cls["end"])
             continue
         hits = find_stock_class(neo, cls["name"])
-        if not hits:
-            continue  # a new class: stays in the translation unit
         if len(hits) > 1:
             raise ValueError(f"class {cls['name']} is defined in more than one stock header: "
                              + ", ".join(h[0] for h in hits))
-        rel, _, close = hits[0]
+        if hits:
+            stock[i] = hits[0]
+    spliced = "\n".join(header[classes[i]["open"] + 1 : classes[i]["close"]] for i in stock)
+    # Before the stock game headers go forward declarations, so that spliced members can name a
+    # new class, and a new class without a base class that a spliced member holds by value (not
+    # through `*` or `&`), which needs it complete (in the mod's source these would sit in the
+    # stock header itself).
+    early = [i for i, c in enumerate(classes) if c["forward"] or (
+        i not in stock and not _has_base(header, c)
+        and re.search(r"\b" + re.escape(c["name"]) + r"\b(?!\s*[*&])", spliced))]
+    before = "".join(f'#line {header_line + line_of(header, classes[i]["start"]) - 1} "{source}"\n'
+                     f'{header[classes[i]["start"]:classes[i]["end"]]}\n' for i in early)
+    for i in reversed(range(len(classes))):
+        cls = classes[i]
+        if i in early:
+            header = blank_out(header, cls["start"], cls["end"])
+            continue
+        if i not in stock:
+            continue  # a new class: stays in the translation unit
+        # Looked up again: a splice made just before may have moved this class in its file.
+        rel, _, close = find_stock_class(neo, cls["name"])[0]
         path = os.path.join(neo, rel)
         with open(path, encoding="latin-1") as fh:
-            stock = fh.read()
+            stock_text = fh.read()
         members = header[cls["open"] + 1 : cls["close"]]
-        members_line = job["header_line"] + line_of(header, cls["open"]) - 1
+        members_line = header_line + line_of(header, cls["open"]) - 1
         with open(path, "w", encoding="latin-1") as fh:
-            fh.write(splice_members(stock, close, "../" + rel if not rel.startswith("game/") else rel[5:],
+            fh.write(splice_members(stock_text, close, "../" + rel if not rel.startswith("game/") else rel[5:],
                                     members, members_line, source))
         splices.append({"class": cls["name"], "file": rel, "line": members_line})
         header = blank_out(header, cls["start"], cls["end"])
-    tu = (PROLOGUE.format(forwards=forwards)
-          + f'#line {job["header_line"]} "{source}"\n{header}\n'
-          + f'#line {job["impl_line"]} "{source}"\n{job["impl"]}\n')
-    return tu, list(reversed(splices))
+    return before, header, list(reversed(splices))
+
+
+def prepare(neo: str, job: dict) -> tuple[str, list[dict]]:
+    """Splice stock-class additions into the tree at `neo`; return the TU text and the splices.
+    The header blocks of the groups the job depends on ("deps") come first, in order; a splice
+    made for one of them carries its source as "from"."""
+    before, headers, splices = [], [], []
+    for dep in job.get("deps", []):
+        b, rest, s = prepare_header(neo, dep["source"], dep["header"], dep["header_line"])
+        before.append(b)
+        headers.append(f'#line {dep["header_line"]} "{dep["source"]}"\n{rest}\n')
+        splices += [dict(x, **{"from": dep["source"]}) for x in s]
+    b, rest, s = prepare_header(neo, job["source"], job["header"], job["header_line"])
+    before.append(b)
+    headers.append(f'#line {job["header_line"]} "{job["source"]}"\n{rest}\n')
+    splices += s
+    tu = (PROLOGUE.format(forwards="".join(before)) + "".join(headers)
+          + f'#line {job["impl_line"]} "{job["source"]}"\n{job["impl"]}\n')
+    return tu, splices
 
 
 # ---------------------------------------------------------------- running
