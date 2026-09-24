@@ -107,7 +107,7 @@ def top_level_classes(text: str) -> list[dict]:
                 close = match_brace(text, open_)
                 # `};`, or a declarator first: `} g_a;`, `} *p, q;`
                 d = re.compile(r"[\s\w*&,]*;").match(text, close + 1)
-                if not d:
+                if not d or re.search(r"\b(?:class|struct|union|enum|typedef|template)\b", d.group(0)):
                     raise ValueError(f"class {m.group(1)}: no ';' after the closing brace")
                 semi = d.end() - 1
                 out.append({"name": m.group(1), "start": i, "open": open_, "close": close, "end": semi + 1,

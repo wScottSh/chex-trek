@@ -514,6 +514,8 @@ class CompileSplicing(unittest.TestCase):
         self.assertEqual(text[found[1]["start"]:found[1]["end"]], "class idB {\n} g_b, *g_pb;")
         with self.assertRaisesRegex(ValueError, "no ';'"):
             worker.top_level_classes("class idD {\n}\nvoid f() {}")
+        with self.assertRaisesRegex(ValueError, "no ';'"):  # a missing ';' must not swallow the next declaration
+            worker.top_level_classes("class idA {\n}\nclass idB;\n")
 
     def fake_neo(self, files: dict[str, str]) -> str:
         root = tempfile.mkdtemp()
