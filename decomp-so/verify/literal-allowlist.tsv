@@ -10,3 +10,6 @@
 #                 name the stock function and file in the reason
 idPlayer::updateHudMapAlpha	float [01].5	stock-inline	the Newton step ( 1.5f - r * r * ( x * 0.5f ) ) of idMath::RSqrt (in idVec3::LengthFast) and idMath::InvSqrt (in idMath::Sqrt, idVec2::Length); ID_INLINE in idlib/math/Math.h
 idPlayer::Cmd_ShowMap_f	string ""	stock-inline	args.Argv( 1 ) in the "bad level" message: idCmdArgs::Argv returns "" for an out-of-range index; inline in idlib/CmdArgs.h
+mkTrail::Think	float [01].5	stock-inline	the Newton step ( 1.5f - r * r * ( x * 0.5f ) ) of idMath::RSqrt in idVec3::LengthFast; ID_INLINE in idlib/math/Math.h and idlib/math/Vector.h
+mkTrail::UpdateRenderEntity	float 1.5	stock-inline	the Newton step ( 1.5f - r * r * ( x * 0.5f ) ) of idMath::RSqrt in idVec3::LengthFast; ID_INLINE in idlib/math/Math.h and idlib/math/Vector.h
+mkTrail::addNewAnchor	float 1.5	stock-inline	the Newton steps ( 1.5f - r * r * ( x * 0.5f ) ) of idMath::RSqrt in idVec3::LengthFast and of idMath::InvSqrt in idVec3::Normalize; ID_INLINE in idlib/math/Math.h and idlib/math/Vector.h

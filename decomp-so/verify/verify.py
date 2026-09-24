@@ -10,6 +10,8 @@ cannot be named from the binary alone and are not checked. Missing callees are r
 A stock CLASS_DECLARATION( base, cls ) / ABSTRACT_DECLARATION stands for the GetType and
 CreateInstance bodies it expands to; there `new cls` accounts for a call to base's constructor
 (cls's own constructor, when it declares none, is inline and starts with base's).
+The same macro accounts for the file's GCC static-initialization entry `_GLOBAL__I_<cls::Type>`
+(find_static_init_body), which only calls __static_initialization_and_destruction_0.
 
 Check 2 -- constants and strings. Every float/double constant and string literal the
 function reads from .rodata, and every float stored as an instruction immediate
@@ -72,6 +74,7 @@ from binary import (  # noqa: E402
     Binary,
     Callee,
     Function,
+    demangle,
     Literal,
     c_string,
     source_name,
@@ -431,6 +434,30 @@ def find_macro_body(impl: str, name: str) -> str | None:
     return None
 
 
+# GCC 3 names a translation unit's static-initialization entry `_GLOBAL__I_<mangled name of the
+# file's first global>`. Its whole body is a call to the file-local
+# __static_initialization_and_destruction_0( 1, 0xffff ), which runs the file's static
+# constructors. No source statement writes it: the file's globals do. When that first global is a
+# class's `Type` (`_GLOBAL__I__ZN7mkTrail4TypeE`), the reference accounts for the entry with the
+# CLASS_DECLARATION / ABSTRACT_DECLARATION that defines `cls::Type`.
+_STATIC_INIT = re.compile(r"_GLOBAL__I_(_Z\w+)")
+
+
+def find_static_init_body(impl: str, name: str) -> str | None:
+    m = _STATIC_INIT.fullmatch(name)
+    if not m:
+        return None
+    first_global = strip_params(demangle(m.group(1)))  # `mkTrail::Type`
+    cls, member = split_qualified(first_global)
+    if member != "Type" or not cls:
+        return None
+    decl = re.search(r"\b(?:CLASS|ABSTRACT)_DECLARATION\s*\(\s*\w+\s*,\s*" + re.escape(cls) + r"\s*\)", impl)
+    if not decl:
+        return None
+    return (f"void {name}( void ) {{ /* {decl.group(0)} defines {first_global}; the file's static "
+            "constructors run from here */ __static_initialization_and_destruction_0( 1, 0xffff ); }}")
+
+
 # ---------------------------------------------------------------- check 1
 
 
@@ -509,7 +536,7 @@ def check_group(
             res.error = f"coverage record says {row.vaddr:#x}, symbol table says {func.vaddr:#x}"
             continue
         name = source_name(func.name)
-        body = find_definition(impl, name) or find_macro_body(impl, name)
+        body = find_definition(impl, name) or find_macro_body(impl, name) or find_static_init_body(impl, name)
         if body is None:
             res.error = f"no definition of {name} in the implementation block"
             continue

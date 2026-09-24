@@ -53,3 +53,32 @@ idPlayer::initHudMap	idStr::ReAllocate	stock-inline	EnsureAlloc in idStr::idStr(
 idPlayer::initHudMap	idStr::Mid	stock-inline	mapName.Right( len ) returns Mid( Length() - len, len ); idStr::Right is ID_INLINE in idlib/Str.h
 idPlayer::initHudMap	idStr::FreeData	stock-inline	~idStr() of the local mapName and of the idStr( "guis/hud_maps/" ) and Right() temporaries: ID_INLINE in idlib/Str.h, calls FreeData
 idPlayer::Cmd_ShowMap_f	__strtol_internal	libc-inline	atoi( args.Argv( 1 ) ): glibc's <stdlib.h> defines atoi inline as strtol( s, NULL, 10 ), which its headers turn into __strtol_internal( s, NULL, 10, 0 )
+mkTrail::{*ctor}	idClass::{base dtor}	exception-only	only in the constructors' exception landing pad (C1 0x2a53d6, before _Unwind_Resume): if a member constructor throws, the idClass base is destroyed again; no source statement calls ~idClass
+mkTrail::{ctor}	idHashIndex::Init	stock-inline	spawnArgs' constructor: idDict::idDict() constructs argHash with idHashIndex::idHashIndex(), which calls Init( DEFAULT_HASH_SIZE, DEFAULT_HASH_SIZE ); ID_INLINE in idlib/Dict.h and idlib/containers/HashIndex.h
+mkTrail::{ctor}	idHashIndex::Free	stock-inline	spawnArgs' constructor: idDict::idDict() calls argHash.Clear( 128, 16 ), which calls Free(); ID_INLINE in idlib/Dict.h and idlib/containers/HashIndex.h
+mkTrail::{ctor}	operator new[]	stock-inline	spawnArgs' constructor: idDict::idDict() calls args.SetGranularity( 16 ), whose idList::Resize allocates with new[]; ID_INLINE in idlib/Dict.h and idlib/containers/List.h
+mkTrail::{ctor}	operator delete[]	stock-inline	spawnArgs' constructor: idDict::idDict() calls args.SetGranularity( 16 ), whose idList::Resize frees the old array with delete[]; ID_INLINE in idlib/Dict.h and idlib/containers/List.h
+mkTrail::{base ctor}	idHashIndex::Init	stock-inline	spawnArgs' constructor: idDict::idDict() constructs argHash with idHashIndex::idHashIndex(), which calls Init( DEFAULT_HASH_SIZE, DEFAULT_HASH_SIZE ); ID_INLINE in idlib/Dict.h and idlib/containers/HashIndex.h
+mkTrail::{base ctor}	idHashIndex::Free	stock-inline	spawnArgs' constructor: idDict::idDict() calls argHash.Clear( 128, 16 ), which calls Free(); ID_INLINE in idlib/Dict.h and idlib/containers/HashIndex.h
+mkTrail::{base ctor}	operator new[]	stock-inline	spawnArgs' constructor: idDict::idDict() calls args.SetGranularity( 16 ), whose idList::Resize allocates with new[]; ID_INLINE in idlib/Dict.h and idlib/containers/List.h
+mkTrail::{base ctor}	operator delete[]	stock-inline	spawnArgs' constructor: idDict::idDict() calls args.SetGranularity( 16 ), whose idList::Resize frees the old array with delete[]; ID_INLINE in idlib/Dict.h and idlib/containers/List.h
+mkTrail::{dtor}	idDict::Clear	stock-inline	~idDict() of the member spawnArgs, which the destructor runs: ID_INLINE in idlib/Dict.h, calls Clear
+mkTrail::{dtor}	idHashIndex::Free	stock-inline	~idHashIndex() of spawnArgs.argHash (inside ~idDict): ID_INLINE in idlib/containers/HashIndex.h, calls Free
+mkTrail::{dtor}	operator delete[]	stock-inline	~idList() of the members anchors and spawnArgs.args: idList::Clear frees the array with delete[]; ID_INLINE in idlib/containers/List.h
+mkTrail::{base dtor}	idDict::Clear	stock-inline	~idDict() of the member spawnArgs, which the destructor runs: ID_INLINE in idlib/Dict.h, calls Clear
+mkTrail::{base dtor}	idHashIndex::Free	stock-inline	~idHashIndex() of spawnArgs.argHash (inside ~idDict): ID_INLINE in idlib/containers/HashIndex.h, calls Free
+mkTrail::{base dtor}	operator delete[]	stock-inline	~idList() of the members anchors and spawnArgs.args: idList::Clear frees the array with delete[]; ID_INLINE in idlib/containers/List.h
+mkTrail::{deleting dtor}	idDict::Clear	stock-inline	~idDict() of the member spawnArgs, which the destructor runs: ID_INLINE in idlib/Dict.h, calls Clear
+mkTrail::{deleting dtor}	idHashIndex::Free	stock-inline	~idHashIndex() of spawnArgs.argHash (inside ~idDict): ID_INLINE in idlib/containers/HashIndex.h, calls Free
+mkTrail::{deleting dtor}	operator delete[]	stock-inline	~idList() of the members anchors and spawnArgs.args: idList::Clear frees the array with delete[]; ID_INLINE in idlib/containers/List.h
+mkTrail::Spawn	idDict::FindKey	stock-inline	spawnArgs.GetString / GetFloat / GetInt( key, default ): each reaches idDict::GetString( key, default ) -> FindKey, all ID_INLINE in idlib/Dict.h
+mkTrail::Spawn	__strtod_internal	stock-inline	atof() inside idDict::GetFloat (idlib/Dict.h): glibc's inline atof is strtod( s, NULL ), which its headers turn into __strtod_internal( s, NULL, 0 )
+mkTrail::Spawn	__strtol_internal	stock-inline	atoi() inside idDict::GetInt (idlib/Dict.h): glibc's inline atoi is strtol( s, NULL, 10 ), which its headers turn into __strtol_internal( s, NULL, 10, 0 )
+mkTrail::FadeTrail	idDict::FindKey	stock-inline	spawnArgs.GetFloat( key, default ): idDict::GetFloat -> idDict::GetString( key, default ) -> FindKey, all ID_INLINE in idlib/Dict.h
+mkTrail::FadeTrail	__strtod_internal	stock-inline	atof() inside idDict::GetFloat (idlib/Dict.h): glibc's inline atof is strtod( s, NULL ), which its headers turn into __strtod_internal( s, NULL, 0 )
+mkTrail::addNewAnchor	operator new[]	stock-inline	anchors.Append( anchor ): idList::Append calls Resize, which allocates the array with new[]; ID_INLINE in idlib/containers/List.h
+mkTrail::addNewAnchor	operator delete[]	stock-inline	anchors.Append( anchor ): the Resize in idList::Append frees the old array with delete[]; ID_INLINE in idlib/containers/List.h
+mkTrail::Restore	operator new[]	stock-inline	anchors.Clear() and anchors.Append( anchor ): idList::Append calls Resize, which allocates the array with new[]; ID_INLINE in idlib/containers/List.h
+mkTrail::Restore	operator delete[]	stock-inline	anchors.Clear() and anchors.Append( anchor ): idList::Clear and the Resize in idList::Append free the array with delete[]; ID_INLINE in idlib/containers/List.h
+idGameLocal::BabySitTrail	operator new[]	stock-inline	trails.Append( trail ): idList::Append calls Resize, which allocates the array with new[]; ID_INLINE in idlib/containers/List.h
+idGameLocal::BabySitTrail	operator delete[]	stock-inline	trails.Append( trail ): the Resize in idList::Append frees the old array with delete[]; ID_INLINE in idlib/containers/List.h

@@ -15,7 +15,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 import verify  # noqa: E402
-from binary import GHIDRA_IMAGE_BASE, Binary, source_name  # noqa: E402
+from binary import GHIDRA_IMAGE_BASE, Binary, demangle, source_name  # noqa: E402
 
 BINARY = Binary(verify.BINARY_PATH)
 ROWS = verify.load_coverage()
@@ -76,6 +76,32 @@ class CalleeCoverage(unittest.TestCase):
                                         "updateMapUI", "updateHudMapAlpha", "Cmd_ShowMap_f")},
         )
         self.assertEqual(len([r for r in ROWS if r.group == "hud-map"]), 7)
+
+    def test_trails_covers_its_scope(self):
+        names = {r.function for r in ROWS if r.group == "trails" and r.status == "covered"}
+        self.assertEqual(
+            names,
+            {"idGameLocal::BabySitTrail", "idGameLocal::RemoveTrail"}
+            | {r.function for r in ROWS if r.function.startswith("mkTrail::")},
+        )
+        self.assertEqual(len([r for r in ROWS if r.group == "trails"]), 19)
+
+    def test_static_init_entry_needs_the_class_declaration(self):
+        """_GLOBAL__I__ZN7mkTrail4TypeE only calls the file's __static_initialization_and_destruction_0;
+        the CLASS_DECLARATION that defines mkTrail::Type accounts for it."""
+        name = "_GLOBAL__I__ZN7mkTrail4TypeE"
+        body = verify.find_static_init_body("CLASS_DECLARATION( idClass, mkTrail )\nEND_CLASS\n", name)
+        self.assertIn("__static_initialization_and_destruction_0( 1, 0xffff )", body)
+        self.assertIsNone(verify.find_static_init_body("CLASS_DECLARATION( idClass, mkTrailX )", name))
+        self.assertIsNone(verify.find_static_init_body("CLASS_DECLARATION( idClass, mkTrail )", "mkTrail::Think"))
+        self.assertIsNone(verify.find_static_init_body("CLASS_DECLARATION( idClass, mkTrail )",
+                                                       "_GLOBAL__I__ZN7mkTrail12SnapshotNameE"))
+        text = reference("trails")
+        macro = "CLASS_DECLARATION( idClass, mkTrail )"
+        self.assertEqual(text.count(macro), 1)
+        results = verify.check_group("trails", BINARY, ROWS, ALLOW, text.replace(macro, "// no declaration"))
+        errors = {r.row.function for r in results if r.error}
+        self.assertEqual(errors, {"mkTrail::_GLOBAL__I_Type", "mkTrail::GetType", "mkTrail::CreateInstance"})
 
     def test_class_declaration_names_the_base_constructor(self):
         """CreateInstance calls the superclass's constructor; CLASS_DECLARATION must name it."""
@@ -183,6 +209,21 @@ def synthetic(function: str, group: str = "synthetic") -> list[verify.CoverageRo
     return [verify.CoverageRow(function, f.raw, f.vaddr, "", group, "covered")]
 
 
+def call_sites(func) -> list[str]:
+    """Demangled names of the functions `func` calls directly, one per call instruction, in order."""
+    code = BINARY._bytes(func.vaddr, func.size)
+    out = []
+    for ins in BINARY._md.disasm(code, func.vaddr):
+        if ins.mnemonic == "call":
+            try:
+                target = int(ins.op_str, 16)
+            except ValueError:
+                continue  # indirect
+            if target != ins.address + ins.size:  # not the `call next; pop` PIC idiom
+                out.append(demangle(BINARY._name_for(target)))
+    return out
+
+
 def synthetic_reference(body: str) -> str:
     return f"```cpp\n// header\n```\n\n```cpp\n{body}\n```\n"
 
@@ -208,12 +249,13 @@ class ConstantsAndStrings(unittest.TestCase):
         self.assertIn("2 missing/mismatched literal(s)", report)
 
     def test_changing_a_float_fails_and_names_it(self):
-        # mkTrail::addNewAnchor reads 0.5, 1.5 and -0.5 (and the group is not reconstructed yet).
+        # mkTrail::addNewAnchor reads 0.5, 1.5 and -0.5. No literal allow-list: its 1.5 entry
+        # (LengthFast / Normalize) would excuse the change.
         rows = synthetic("mkTrail::addNewAnchor")
         body = "void mkTrail::addNewAnchor( void ) {{ a = b * 0.5f; c = {} - d; e = f * -0.5f; }}"
-        ok = verify.check_group("synthetic", BINARY, rows, [], synthetic_reference(body.format("1.5f")))
+        ok = verify.check_group("synthetic", BINARY, rows, [], synthetic_reference(body.format("1.5f")), literal_allow=[])
         self.assertEqual(literal_problems(ok), set())
-        bad = verify.check_group("synthetic", BINARY, rows, [], synthetic_reference(body.format("1.25f")))
+        bad = verify.check_group("synthetic", BINARY, rows, [], synthetic_reference(body.format("1.25f")), literal_allow=[])
         self.assertEqual(literal_problems(bad), {("mkTrail::addNewAnchor", "float 1.5")})
         report = "\n".join(verify.format_results(bad))
         self.assertIn("LITERAL  mkTrail::addNewAnchor @ 0x2a59d0: missing float 1.5", report)
@@ -221,22 +263,22 @@ class ConstantsAndStrings(unittest.TestCase):
     def test_sign_of_a_float_matters(self):
         rows = synthetic("mkTrail::addNewAnchor")
         body = "void mkTrail::addNewAnchor( void ) { a = b * 0.5f; c = 1.5f * d; e = f * 0.5f; }"
-        results = verify.check_group("synthetic", BINARY, rows, [], synthetic_reference(body))
+        results = verify.check_group("synthetic", BINARY, rows, [], synthetic_reference(body), literal_allow=[])
         self.assertEqual(literal_problems(results), {("mkTrail::addNewAnchor", "float -0.5")})
         # a unary -0.5f is not the constant 0.5; a binary `x-0.5f` is
         body = "void mkTrail::addNewAnchor( void ) { a = b * -0.5f; c = 1.5f * d; }"
-        results = verify.check_group("synthetic", BINARY, rows, [], synthetic_reference(body))
+        results = verify.check_group("synthetic", BINARY, rows, [], synthetic_reference(body), literal_allow=[])
         self.assertEqual(literal_problems(results), {("mkTrail::addNewAnchor", "float 0.5")})
         body = "void mkTrail::addNewAnchor( void ) { a = b-0.5f; c = 1.5f * d * -0.5f; }"
-        results = verify.check_group("synthetic", BINARY, rows, [], synthetic_reference(body))
+        results = verify.check_group("synthetic", BINARY, rows, [], synthetic_reference(body), literal_allow=[])
         self.assertEqual(literal_problems(results), set())
 
     def test_a_double_constant_must_not_be_written_as_float(self):
         rows = synthetic("mkTrail::UpdateRenderEntity")
         body = "bool mkTrail::UpdateRenderEntity( void ) {{ y = 1.5f * 0.5f * -0.5f; w = 1.0f; z < {}; }}"
-        good = verify.check_group("synthetic", BINARY, rows, [], synthetic_reference(body.format("0.001")))
+        good = verify.check_group("synthetic", BINARY, rows, [], synthetic_reference(body.format("0.001")), literal_allow=[])
         self.assertEqual(literal_problems(good), set())
-        bad = verify.check_group("synthetic", BINARY, rows, [], synthetic_reference(body.format("0.001f")))
+        bad = verify.check_group("synthetic", BINARY, rows, [], synthetic_reference(body.format("0.001f")), literal_allow=[])
         self.assertEqual(literal_problems(bad), {("mkTrail::UpdateRenderEntity", "double 0.001")})
 
     def test_a_literal_in_a_comment_does_not_count(self):
@@ -560,6 +602,43 @@ class Records(unittest.TestCase):
                 self.assertEqual(len(verify.cpp_blocks(text)), 2)
                 for heading in ("## Header", "## Implementation", "## Notes"):
                     self.assertIn(heading, text)
+
+    def test_trail_save_and_restore_match_the_binary_call_for_call(self):
+        """mkTrail::Save makes all 23 of the binary's write calls (the truncated first export had 4),
+        and Restore no read call the binary lacks: same calls, same order."""
+        impl = verify.implementation_block(reference("trails"))
+        for symbol, cls in (("_ZNK7mkTrail4SaveEP10idSaveGame", "idSaveGame"),
+                            ("_ZN7mkTrail7RestoreEP13idRestoreGame", "idRestoreGame")):
+            func = BINARY.by_raw[symbol]
+            with self.subTest(function=func.name):
+                binary_calls = [verify.split_qualified(name)[1] for name in call_sites(func)
+                                if name.startswith(cls + "::")]
+                body = verify.code_only(verify.find_definition(impl, source_name(func.name)))
+                source_calls = re.findall(r"\bsavefile\s*->\s*(\w+)", body)
+                self.assertEqual(source_calls, binary_calls)
+        self.assertEqual(len(binary_calls), 23)
+
+    def test_trail_base_class_is_stated_with_evidence(self):
+        text = reference("trails")
+        self.assertIn("class mkTrail : public idClass {", text)
+        self.assertIn("CLASS_DECLARATION( idClass, mkTrail )", text)
+        self.assertIn("Base class: idClass. Evidence (binary):", text)
+        # every member declaration of the header carries its offset
+        header = verify.reference_blocks(text)[0]
+        cls = header[header.index("class mkTrail : public idClass {"):]
+        members = [l for l in cls.splitlines() if re.match(r"\t(mutable )?[\w<>* ]+\s+\w+;", l)]
+        self.assertEqual(len(members), 24)
+        for line in members:
+            self.assertRegex(line, r"// \+0x[0-9a-f]{3}\b")
+
+    def test_trail_constructors_allow_idclass_destructor_as_exception_only(self):
+        for symbol in ("_ZN7mkTrailC1Ev", "_ZN7mkTrailC2Ev"):
+            func = BINARY.by_raw[symbol]
+            dtor = next(c for c in BINARY.callees(func) if c.name == "idClass::{base dtor}()")
+            entry = verify.allowed(func, dtor, ALLOW)
+            self.assertIsNotNone(entry, symbol)
+            self.assertEqual(entry.kind, "exception-only")
+            self.assertIn("landing pad", entry.reason)
 
     def test_idplayer_additions_have_unique_offsets(self):
         text = (verify.REFERENCE_DIR / "idPlayer-additions.md").read_text(encoding="utf-8")
