@@ -5,8 +5,10 @@
 from __future__ import annotations
 
 import re
+import shutil
 import struct
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -505,11 +507,17 @@ class CompileSplicing(unittest.TestCase):
         self.assertEqual(found, [("idCustomUI", False), ("idCustomUI", True), ("idPlayer", False),
                                  ("idCmdSystem", False)])
 
-    def fake_neo(self, files: dict[str, str]) -> str:
-        import tempfile
+    def test_declarators_after_a_class_body(self):
+        text = "typedef struct a_s {\n\tint x;\n} a_t;\nclass idB {\n} g_b, *g_pb;\nclass idC { int y; };\n"
+        found = worker.top_level_classes(text)
+        self.assertEqual([c["name"] for c in found], ["a_s", "idB", "idC"])
+        self.assertEqual(text[found[1]["start"]:found[1]["end"]], "class idB {\n} g_b, *g_pb;")
+        with self.assertRaisesRegex(ValueError, "no ';'"):
+            worker.top_level_classes("class idD {\n}\nvoid f() {}")
 
+    def fake_neo(self, files: dict[str, str]) -> str:
         root = tempfile.mkdtemp()
-        self.addCleanup(__import__("shutil").rmtree, root, True)
+        self.addCleanup(shutil.rmtree, root, True)
         for rel, text in files.items():
             path = Path(root, rel)
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -557,13 +565,6 @@ class CompileSplicing(unittest.TestCase):
             worker.prepare(neo, job)
 
 
-def _docker_reachable() -> bool:
-    try:
-        return verify._docker("version").returncode == 0
-    except verify.CompileUnavailable:
-        return False
-
-
 class Compile(unittest.TestCase):
     """Check 3 against the real toolchain (compile/Dockerfile). Needs a docker daemon:
     local, or DOCKER_HOST=ssh://qwen. One container run covers every case below."""
@@ -579,7 +580,7 @@ class Compile(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        if not _docker_reachable():
+        if not verify.docker_reachable():
             raise unittest.SkipTest("check 3 needs docker (set DOCKER_HOST, e.g. ssh://qwen)")
         text = reference("custom-ui")
         jobs = [verify.compile_job("custom-ui", text)]
@@ -604,7 +605,7 @@ class Compile(unittest.TestCase):
         self.assertTrue(res.ok)
         self.assertEqual({(s["class"], s["file"]) for s in res.splices},
                          {("idPlayer", "game/Player.h"), ("idCmdSystem", "framework/CmdSystem.h")})
-        self.assertEqual(verify.format_compile(res)[0][:27], "  ok       compiles (check ")
+        self.assertTrue(verify.format_compile(res)[0].startswith("  ok       compiles (check 3)"))
 
     def test_a_syntax_error_fails_and_is_reported_at_its_markdown_line(self):
         for name in self.MUTATIONS:

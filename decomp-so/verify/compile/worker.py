@@ -41,6 +41,8 @@ TU_NAME = "game/_reference.cpp"
 
 
 # ---------------------------------------------------------------- scanning
+# Deliberately a copy of verify.py's brace/comment matching: this file runs alone in the
+# container, with only the standard library.
 
 
 def _skip_comment_or_literal(text: str, i: int) -> int:
@@ -103,11 +105,11 @@ def top_level_classes(text: str) -> list[dict]:
             if m:
                 open_ = m.end() - 1
                 close = match_brace(text, open_)
-                semi = close + 1
-                while semi < len(text) and text[semi].isspace():
-                    semi += 1
-                if semi >= len(text) or text[semi] != ";":
+                # `};`, or a declarator first: `} g_a;`, `} *p, q;`
+                d = re.compile(r"[\s\w*&,]*;").match(text, close + 1)
+                if not d:
                     raise ValueError(f"class {m.group(1)}: no ';' after the closing brace")
+                semi = d.end() - 1
                 out.append({"name": m.group(1), "start": i, "open": open_, "close": close, "end": semi + 1,
                             "forward": False})
                 i = semi + 1

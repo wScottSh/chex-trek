@@ -26,6 +26,8 @@ and SDK revision). The only change made to stock files: a header-block class tha
 stock class (`class idPlayer : public idActor { // ... stock members ... };`) has its members
 spliced into a scratch copy of that stock declaration; each such splice is reported. Compile
 errors are reported per group, at the reference Markdown's line numbers (compile/worker.py).
+Top-level forward declarations in the header block are compiled before the stock game headers,
+so the check does not show where in the stock headers such a declaration has to go.
 This proves the code is well-formed SDK code, not that it behaves like the binary.
 The container runs wherever `docker` points: locally, or on the Ghidra box with
 DOCKER_HOST=ssh://qwen. The image is built on first use (tag = hash of the Dockerfile).
@@ -207,11 +209,16 @@ def cpp_block_lines(markdown: str) -> list[int]:
     return [markdown.count("\n", 0, m.start(1)) + 1 for m in _CPP_BLOCK.finditer(markdown)]
 
 
-def implementation_block(markdown: str) -> str:
+def reference_blocks(markdown: str) -> tuple[str, str]:
+    """(header block, implementation block) of a group reference."""
     blocks = cpp_blocks(markdown)
     if len(blocks) != 2:
         raise ValueError(f"reference must have exactly 2 ```cpp blocks (header, implementation); found {len(blocks)}")
-    return blocks[1]
+    return blocks[0], blocks[1]
+
+
+def implementation_block(markdown: str) -> str:
+    return reference_blocks(markdown)[1]
 
 
 def _comment_end(text: str, i: int) -> int:
@@ -523,11 +530,10 @@ class CompileResult:
 
 def compile_job(group: str, reference_text: str) -> dict:
     """What worker.py needs to compile one group: its two blocks and where they start."""
-    blocks, lines = cpp_blocks(reference_text), cpp_block_lines(reference_text)
-    if len(blocks) != 2:
-        raise ValueError(f"reference must have exactly 2 ```cpp blocks (header, implementation); found {len(blocks)}")
+    header, impl = reference_blocks(reference_text)
+    lines = cpp_block_lines(reference_text)
     return {"group": group, "source": f"decomp-so/reference/{group}.md",
-            "header": blocks[0], "header_line": lines[0], "impl": blocks[1], "impl_line": lines[1]}
+            "header": header, "header_line": lines[0], "impl": impl, "impl_line": lines[1]}
 
 
 def dockerfile() -> bytes:
@@ -539,18 +545,30 @@ def image_tag() -> str:
     return "chex-decomp-compile:" + hashlib.sha256(dockerfile()).hexdigest()[:12]
 
 
-def _docker(*args: str, stdin: bytes | None = None) -> subprocess.CompletedProcess:
+DOCKER_TIMEOUT = 1800  # seconds; a first image build downloads the base image and the SDK
+
+
+def docker(*args: str, stdin: bytes | None = None, timeout: float = DOCKER_TIMEOUT) -> subprocess.CompletedProcess:
     try:
-        return subprocess.run(["docker", *args], input=stdin, capture_output=True)
+        return subprocess.run(["docker", *args], input=stdin, capture_output=True, timeout=timeout)
     except FileNotFoundError as exc:
         raise CompileUnavailable("docker CLI not found") from exc
+    except subprocess.TimeoutExpired as exc:
+        raise CompileUnavailable(f"`docker {args[0]}` timed out after {timeout:.0f} s") from exc
+
+
+def docker_reachable() -> bool:
+    try:
+        return docker("version", timeout=60).returncode == 0
+    except CompileUnavailable:
+        return False
 
 
 def ensure_image() -> str:
     tag = image_tag()
-    if _docker("image", "inspect", tag).returncode == 0:
+    if docker("image", "inspect", tag).returncode == 0:
         return tag
-    proc = _docker("build", "-t", tag, "-", stdin=dockerfile())
+    proc = docker("build", "-t", tag, "-", stdin=dockerfile())
     if proc.returncode:
         where = os.environ.get("DOCKER_HOST", "the local docker daemon")
         raise CompileUnavailable(f"building {tag} on {where} failed: "
@@ -562,15 +580,18 @@ def run_compile(jobs: list[dict]) -> tuple[dict, list[CompileResult]]:
     """Check 3 for `jobs` (from compile_job) in one container run: (toolchain, results)."""
     tag = ensure_image()
     payload = json.dumps({"worker": WORKER.read_text(encoding="utf-8"), "jobs": jobs}).encode()
-    proc = _docker("run", "--rm", "-i", "--network", "none", tag, "python3", "-c", _BOOTSTRAP, stdin=payload)
+    proc = docker("run", "--rm", "-i", "--network", "none", tag, "python3", "-c", _BOOTSTRAP, stdin=payload)
     if proc.returncode:
         raise CompileUnavailable("compile worker failed: " + proc.stderr.decode(errors="replace").strip()[-800:])
-    out = json.loads(proc.stdout)
-    return out["toolchain"], [CompileResult(**r) for r in out["results"]]
+    try:
+        out = json.loads(proc.stdout)
+        return out["toolchain"], [CompileResult(**r) for r in out["results"]]
+    except (ValueError, KeyError, TypeError) as exc:
+        raise CompileUnavailable(f"unreadable compile worker output: {exc}") from exc
 
 
 def format_toolchain(tc: dict) -> str:
-    return f"check 3 toolchain: {tc['compiler']}, {' '.join(tc['flags'][:4])}; DOOM-3 GPL {tc['doom3']}"
+    return f"check 3 toolchain: {tc['compiler']}, {' '.join(tc['flags'])}; DOOM-3 GPL {tc['doom3']}"
 
 
 def format_compile(res: CompileResult) -> list[str]:
