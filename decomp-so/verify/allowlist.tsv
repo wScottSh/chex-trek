@@ -26,3 +26,21 @@ idTarget_EndLevelGUI::Event_UpdateStats	idStr::FreeData	stock-inline	~idStr() of
 idTarget_EndLevelGUI::HandleCustomGUICommand	idStr::FreeData	stock-inline	~idStr() of idStr::FormatTime's returned temporary: ID_INLINE in idlib/Str.h, calls FreeData
 idStr::FormatTime	idStr::ReAllocate	stock-inline	idStr::operator+=( const char * ) / operator+=( char ) -> Append -> EnsureAlloc, ID_INLINE in idlib/Str.h
 idStr::FormatTime	strlen	stock-inline	idStr::operator+=( const char * ) -> Append( const char * ) calls strlen; ID_INLINE in idlib/Str.h
+mkObjective::Spawn	idDict::FindKey	stock-inline	spawnArgs.GetString( key, default, idStr & ): ID_INLINE in idlib/Dict.h, calls FindKey
+mkObjective::Spawn	idStr::ReAllocate	stock-inline	out = kv->GetValue() in idDict::GetString( key, default, idStr & ): idStr::operator=( const idStr & ) -> EnsureAlloc, ID_INLINE in idlib/Str.h
+mkObjective::Spawn	memcpy	stock-inline	idStr::operator=( const idStr & ) (ID_INLINE, idlib/Str.h) copies the text with memcpy, reached from idDict::GetString( key, default, idStr & )
+mkObjective::AttachToLocalPlayer	idDict::FindKey	stock-inline	spawnArgs.GetString( key, default, idStr & ): ID_INLINE in idlib/Dict.h, calls FindKey
+mkObjective::AttachToLocalPlayer	idStr::ReAllocate	stock-inline	out = kv->GetValue() in idDict::GetString( key, default, idStr & ): idStr::operator=( const idStr & ) -> EnsureAlloc, ID_INLINE in idlib/Str.h
+mkObjective::AttachToLocalPlayer	memcpy	stock-inline	idStr::operator=( const idStr & ) (ID_INLINE, idlib/Str.h) copies the text with memcpy, reached from idDict::GetString( key, default, idStr & )
+mkObjective::AttachToLocalPlayer	idStr::FreeData	stock-inline	implicit ~idItemInfo() of the local info (stock struct in game/Player.h): ~idStr() of name and icon, ID_INLINE in idlib/Str.h, calls FreeData
+mkObjective::RemoveFromLocalPlayer	idDict::FindKey	stock-inline	spawnArgs.GetString( key, default, idStr & ): ID_INLINE in idlib/Dict.h, calls FindKey
+mkObjective::RemoveFromLocalPlayer	idStr::ReAllocate	stock-inline	out = kv->GetValue() in idDict::GetString( key, default, idStr & ): idStr::operator=( const idStr & ) -> EnsureAlloc, ID_INLINE in idlib/Str.h
+mkObjective::RemoveFromLocalPlayer	memcpy	stock-inline	idStr::operator=( const idStr & ) (ID_INLINE, idlib/Str.h) copies the text with memcpy, reached from idDict::GetString( key, default, idStr & )
+mkObjective::RemoveFromLocalPlayer	idStr::FreeData	stock-inline	implicit ~idItemInfo() of the local info (stock struct in game/Player.h): ~idStr() of name and icon, ID_INLINE in idlib/Str.h, calls FreeData
+mkObjective::Event_Activate	idDict::FindKey	stock-inline	spawnArgs.GetBool( key, "0" ): idDict::GetBool -> idDict::GetString( key, default ) -> FindKey, all ID_INLINE in idlib/Dict.h
+mkObjective::Event_Activate	__strtol_internal	stock-inline	atoi() inside idDict::GetBool (idlib/Dict.h): glibc's inline atoi is strtol( s, NULL, 10 ), which its headers turn into __strtol_internal( s, NULL, 10, 0 )
+mkObjective::{dtor}	idStr::FreeData	stock-inline	~idStr() of the members description, title and image, which the (implicit) destructor runs: ID_INLINE in idlib/Str.h, calls FreeData
+mkObjective::{deleting dtor}	idStr::FreeData	stock-inline	~idStr() of the members description, title and image, which the (implicit) destructor runs: ID_INLINE in idlib/Str.h, calls FreeData
+idPlayer::addItemText	idList<idItemInfo>::Resize	stock-inline	inventory.pickupItemNames.Append( info ): idList<type>::Append (ID_INLINE template, idlib/containers/List.h) calls Resize when the list is unallocated or full
+idPlayer::addItemText	idStr::ReAllocate	stock-inline	list[ num ] = obj in idList::Append: idItemInfo's implicit operator= -> idStr::operator=( const idStr & ) for name and icon -> EnsureAlloc, ID_INLINE in idlib/Str.h
+idPlayer::addItemText	memcpy	stock-inline	idStr::operator=( const idStr & ) (ID_INLINE, idlib/Str.h) copies the text with memcpy, reached from idItemInfo's implicit operator= in idList::Append

@@ -58,6 +58,24 @@ class CalleeCoverage(unittest.TestCase):
         )
         self.assertEqual(len([r for r in ROWS if r.group == "end-level-stats"]), 15)
 
+    def test_objectives_covers_its_scope(self):
+        names = {r.function for r in ROWS if r.group == "objectives" and r.status == "covered"}
+        self.assertEqual(
+            names,
+            {"idPlayer::addObjective", "idPlayer::freeObjective", "idPlayer::addItemText"}
+            | {r.function for r in ROWS if r.function.startswith("mkObjective::")},
+        )
+        self.assertEqual(len([r for r in ROWS if r.group == "objectives"]), 13)
+
+    def test_objectives_base_class_is_idEntity(self):
+        text = reference("objectives")
+        macro = "CLASS_DECLARATION( idEntity, mkObjective )"
+        self.assertEqual(text.count(macro), 1)
+        self.assertIn("class mkObjective : public idEntity {", text)
+        results = verify.check_group("objectives", BINARY, ROWS, ALLOW,
+                                     text.replace(macro, "CLASS_DECLARATION( idCustomUI, mkObjective )"))
+        self.assertEqual(missing_pairs(results), {("mkObjective::CreateInstance", "idEntity::{base ctor}")})
+
     def test_class_declaration_names_the_base_constructor(self):
         """CreateInstance calls the superclass's constructor; CLASS_DECLARATION must name it."""
         text = reference("end-level-stats")
@@ -461,7 +479,7 @@ class HarnessRules(unittest.TestCase):
             self.assertGreater(len(entry.reason), 20)
             if entry.kind == "stock-inline":  # one exact function, and the stock code named
                 self.assertNotIn("*", entry.function)
-                self.assertRegex(entry.reason, r"idlib/\w+\.h|game/\w+\.h")
+                self.assertRegex(entry.reason, r"(idlib|game)/(\w+/)*\w+\.h")  # e.g. idlib/containers/List.h
 
     def test_every_allowlist_entry_is_used(self):
         """No stale entries: each one excuses at least one callee of a covered function."""
@@ -508,6 +526,8 @@ class Records(unittest.TestCase):
         self.assertIn("0x1f0c", offsets)
         self.assertIn("0x1f10", offsets)
         self.assertIn("0x1ea4", offsets)
+        self.assertIn("0x1ef4", offsets)
+        self.assertIn("0x1f08", offsets)
         self.assertEqual(len(offsets), len(set(offsets)))
 
 
