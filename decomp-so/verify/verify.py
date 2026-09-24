@@ -553,26 +553,33 @@ def _dep_headers(markdown: str, chain: tuple[str, ...], out: list[dict]) -> None
     for dep in header_deps(markdown):
         if dep in chain:
             raise ValueError(f"circular **Depends on:** {' -> '.join(chain + (dep,))}")
-        source = f"decomp-so/reference/{dep}.md"
-        if any(d["source"] == source for d in out):
+        if any(d["source"] == reference_source(dep) for d in out):
             continue
         path = REFERENCE_DIR / f"{dep}.md"
         if not path.exists():
             raise ValueError(f"**Depends on:** names group {dep!r}, which has no reference file")
         text = path.read_text(encoding="utf-8")
         _dep_headers(text, chain + (dep,), out)  # its own dependencies first
-        out.append({"source": source, "header": reference_blocks(text)[0], "header_line": cpp_block_lines(text)[0]})
+        out.append(_header_part(dep, text))
+
+
+def reference_source(group: str) -> str:
+    return f"decomp-so/reference/{group}.md"
+
+
+def _header_part(group: str, reference_text: str) -> dict:
+    header = reference_blocks(reference_text)[0]
+    return {"source": reference_source(group), "header": header, "header_line": cpp_block_lines(reference_text)[0]}
 
 
 def compile_job(group: str, reference_text: str) -> dict:
     """What worker.py needs to compile one group: its two blocks and where they start, and
     the header blocks of the groups it depends on (compiled first, in dependency order)."""
-    header, impl = reference_blocks(reference_text)
-    lines = cpp_block_lines(reference_text)
+    impl = reference_blocks(reference_text)[1]
     deps: list[dict] = []
     _dep_headers(reference_text, (group,), deps)
-    return {"group": group, "source": f"decomp-so/reference/{group}.md",
-            "header": header, "header_line": lines[0], "impl": impl, "impl_line": lines[1], "deps": deps}
+    return {"group": group, **_header_part(group, reference_text), "impl": impl,
+            "impl_line": cpp_block_lines(reference_text)[1], "deps": deps}
 
 
 def dockerfile() -> bytes:

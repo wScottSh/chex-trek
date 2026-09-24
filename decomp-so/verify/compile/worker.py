@@ -180,7 +180,7 @@ def prepare_header(neo: str, source: str, header: str, header_line: int) -> tupl
     and the splices."""
     splices = []
     classes = top_level_classes(header)
-    stock: dict[int, tuple[str, int, int]] = {}  # index in classes -> the stock definition it extends
+    stock: set[int] = set()  # indexes (in classes) of additions to a stock class
     for i, cls in enumerate(classes):
         if cls["forward"]:
             continue
@@ -189,20 +189,21 @@ def prepare_header(neo: str, source: str, header: str, header_line: int) -> tupl
             raise ValueError(f"class {cls['name']} is defined in more than one stock header: "
                              + ", ".join(h[0] for h in hits))
         if hits:
-            stock[i] = hits[0]
+            stock.add(i)
     spliced = "\n".join(header[classes[i]["open"] + 1 : classes[i]["close"]] for i in stock)
     # Before the stock game headers go forward declarations, so that spliced members can name a
     # new class, and a new class without a base class that a spliced member holds by value (not
     # through `*` or `&`), which needs it complete (in the mod's source these would sit in the
-    # stock header itself).
-    early = [i for i, c in enumerate(classes) if c["forward"] or (
+    # stock header itself). Only this header block's own splices are searched, so a struct that
+    # another group's splice holds by value is not hoisted (no group needs that yet).
+    hoisted = [i for i, c in enumerate(classes) if c["forward"] or (
         i not in stock and not _has_base(header, c)
         and re.search(r"\b" + re.escape(c["name"]) + r"\b(?!\s*[*&])", spliced))]
-    before = "".join(f'#line {header_line + line_of(header, classes[i]["start"]) - 1} "{source}"\n'
-                     f'{header[classes[i]["start"]:classes[i]["end"]]}\n' for i in early)
+    pre_game = "".join(f'#line {header_line + line_of(header, classes[i]["start"]) - 1} "{source}"\n'
+                       f'{header[classes[i]["start"]:classes[i]["end"]]}\n' for i in hoisted)
     for i in reversed(range(len(classes))):
         cls = classes[i]
-        if i in early:
+        if i in hoisted:
             header = blank_out(header, cls["start"], cls["end"])
             continue
         if i not in stock:
@@ -219,24 +220,20 @@ def prepare_header(neo: str, source: str, header: str, header_line: int) -> tupl
                                     members, members_line, source))
         splices.append({"class": cls["name"], "file": rel, "line": members_line})
         header = blank_out(header, cls["start"], cls["end"])
-    return before, header, list(reversed(splices))
+    return pre_game, header, list(reversed(splices))
 
 
 def prepare(neo: str, job: dict) -> tuple[str, list[dict]]:
     """Splice stock-class additions into the tree at `neo`; return the TU text and the splices.
     The header blocks of the groups the job depends on ("deps") come first, in order; a splice
     made for one of them carries its source as "from"."""
-    before, headers, splices = [], [], []
-    for dep in job.get("deps", []):
-        b, rest, s = prepare_header(neo, dep["source"], dep["header"], dep["header_line"])
-        before.append(b)
-        headers.append(f'#line {dep["header_line"]} "{dep["source"]}"\n{rest}\n')
-        splices += [dict(x, **{"from": dep["source"]}) for x in s]
-    b, rest, s = prepare_header(neo, job["source"], job["header"], job["header_line"])
-    before.append(b)
-    headers.append(f'#line {job["header_line"]} "{job["source"]}"\n{rest}\n')
-    splices += s
-    tu = (PROLOGUE.format(forwards="".join(before)) + "".join(headers)
+    pre_game, headers, splices = [], [], []
+    for block in job.get("deps", []) + [job]:
+        text, rest, made = prepare_header(neo, block["source"], block["header"], block["header_line"])
+        pre_game.append(text)
+        headers.append(f'#line {block["header_line"]} "{block["source"]}"\n{rest}\n')
+        splices += made if block is job else [dict(x, **{"from": block["source"]}) for x in made]
+    tu = (PROLOGUE.format(forwards="".join(pre_game)) + "".join(headers)
           + f'#line {job["impl_line"]} "{job["source"]}"\n{job["impl"]}\n')
     return tu, splices
 

@@ -570,7 +570,8 @@ idStr idStr::FormatTime( const char *format, int ms ) {
 - **GUI commands** (resolved from the binary's `Icmp` strings): `"nextmap"`, `"skip"`, `"unregister"`. Cross-check with the mod's GUIs: `guis/chex/stats.gui` sends `"skip"` (line 223) and `"nextmap"` (line 238). No GUI in `guis/` sends `"unregister"` (as in `custom-ui.md`). `guis/end_trek.gui`, which the second end-level entity in `maps/sf_923.map` shows, sends only `runScript` commands. This class returns `false` for them, and the stock GUI command code handles them (not checked).
 - **GUI state variables** (set by name through `playerStats_s`): `ai_total`, `ai_killed`, `ai_percent`, `items_total`, `items_found`, `items_percent`, `secrets_total`, `secrets_found`, `secrets_percent`, `level_time`, and `mapname`. All 11 appear as `gui::` variables in `guis/chex/stats.gui`.
 - **spawnArgs, cross-checked with `def/` and `maps/`.**
-  - `gui`: `guis/chex/stats.gui` in `e1m1.map`, `e1m1_2.map` and `sf_923.map`. `guis/end_trek.gui` on `sf_923.map`'s `target_endlevelgui_2`.
+  - Entities: `target_endlevelgui` appears in `maps/e1m1.map`, `e1m1_2.map`, `sf_923.map` (two) and the test map `test_end.map` (and in the backup `sf_923.bak`).
+  - `gui`: `guis/chex/stats.gui` in `e1m1.map`, `e1m1_2.map` and `sf_923.map`. `guis/end_trek.gui` on `sf_923.map`'s `target_endlevelgui_2`. `guis/chex_credits.gui` on `test_end.map`'s `target_endlevelgui_2` (no other keys; that GUI sends no `cmd`).
   - `s_shader`: default `sound/chex/level_stats` in `def/endlevelgui.def`. `sf_923.map`'s `target_endlevelgui_2` sets it to `""`, which still takes the `FindSound` branch (`FindSound( "" )`, what that returns is not checked).
   - `mapname`: "Landing Zone" (`e1m1`), "Storage Facility" (`sf_923`).
   - `extHndNextMap`: `"1"` only on `sf_923.map`'s `target_endlevelgui_2`, whose screen a script closes.
