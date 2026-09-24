@@ -94,8 +94,7 @@ public:
 
 ```cpp
 // ===========================================================================
-// mkObjective (Target.cpp: its code and static initializer are shared with idCustomUI,
-// idTarget_EndLevelGUI and the stock idTarget_* classes. UNCERTAIN: file name.)
+// mkObjective (Target.cpp; see the header's base-class evidence, item 1)
 // ===========================================================================
 
 // Event table (binary: mkObjective::eventCallbacks @ 0x3d5aa4 =
@@ -321,6 +320,7 @@ void idPlayer::addItemText( const idItemInfo &info ) {
   - Entity: `trigger_objective` (`def/func_envshot.def`, `"spawnclass" "mkObjective"`). Its `editor_var`s are exactly the six keys the binary reads: `description`, `title`, `image` (`Spawn`), `remove` (`Event_Activate`), `addmsg` (`AttachToLocalPlayer`), `rmmsg` (`RemoveFromLocalPlayer`).
   - Maps: only `maps/sf_923.map` (and its backup `sf_923.bak`) has `trigger_objective` entities: `trigger_objective_1` ("Acquire a weapon") and `trigger_objective_2` ("Investigate"). Both set `title`, `description`, `image` (`textures/chex/guis/map_investigate`), `addmsg` ("New Objective") and `remove` "1". Only `trigger_objective_1` sets `rmmsg` ("Objective Complete"), so `trigger_objective_2` goes away without a message.
   - Triggers: `trigger_once_6` targets both (they are added). `moveable_item_pistol_1` (picking up the weapon) targets `trigger_objective_1`, and `trigger_once_9` (at the hangar) `trigger_objective_2`: the second trigger removes each.
+  - Scripts: no file in `script/` names `trigger_objective`, `mkObjective`, `addmsg` or `rmmsg`. Objectives are driven only by map targets.
   - Defaults: missing `title` / `description` give the literal texts "title" / "description". Missing `image`, `addmsg`, `rmmsg` give "" (no message for the last two). Missing `remove` gives "0".
 - **Messages.** `addItemText` appends to `inventory.pickupItemNames`, the stock pickup-message queue, with an empty icon. It then sets the HUD's `itemicon` to that empty icon and fires `invPickup`. In the mod's current `guis/hud.gui`, both `onNamedEvent invPickup` and the `gui::itemicon` window are commented out (lines 9 and 729). They are live in `guis/hud_old.gui`. How the queued text itself is shown (stock `idPlayer::UpdateHud`) was not checked.
 - **Stock-inline callees (check 1 allow-list, `stock-inline`).** `idDict::FindKey`, `idStr::ReAllocate` and `memcpy` inside `spawnArgs.GetString( key, default, idStr & )` (`Spawn`, `AttachToLocalPlayer`, `RemoveFromLocalPlayer`); `idDict::FindKey` and `__strtol_internal` inside `spawnArgs.GetBool` (`Event_Activate`); `idStr::FreeData` inside the implicit `~idItemInfo()` of the local `info` and inside the members' `~idStr()` in the destructor clones; `idList<idItemInfo>::Resize`, `idStr::ReAllocate` and `memcpy` inside `idList::Append` and `idItemInfo`'s implicit `operator=` (`addItemText`). Each is on `verify/allowlist.tsv` for the exact function, with the stock function named.

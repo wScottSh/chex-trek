@@ -67,25 +67,23 @@ class CalleeCoverage(unittest.TestCase):
         )
         self.assertEqual(len([r for r in ROWS if r.group == "objectives"]), 13)
 
-    def test_objectives_base_class_is_idEntity(self):
-        text = reference("objectives")
-        macro = "CLASS_DECLARATION( idEntity, mkObjective )"
-        self.assertEqual(text.count(macro), 1)
-        self.assertIn("class mkObjective : public idEntity {", text)
-        results = verify.check_group("objectives", BINARY, ROWS, ALLOW,
-                                     text.replace(macro, "CLASS_DECLARATION( idCustomUI, mkObjective )"))
-        self.assertEqual(missing_pairs(results), {("mkObjective::CreateInstance", "idEntity::{base ctor}")})
-
     def test_class_declaration_names_the_base_constructor(self):
         """CreateInstance calls the superclass's constructor; CLASS_DECLARATION must name it."""
-        text = reference("end-level-stats")
-        macro = "CLASS_DECLARATION( idCustomUI, idTarget_EndLevelGUI )"
-        self.assertEqual(text.count(macro), 1)
-        body = verify.find_macro_body(verify.implementation_block(text), "idTarget_EndLevelGUI::CreateInstance")
-        self.assertIn("idCustomUI::idCustomUI()", body)
-        results = verify.check_group("end-level-stats", BINARY, ROWS, ALLOW,
-                                     text.replace(macro, "CLASS_DECLARATION( idEntity, idTarget_EndLevelGUI )"))
-        self.assertEqual(missing_pairs(results), {("idTarget_EndLevelGUI::CreateInstance", "idCustomUI::{base ctor}")})
+        cases = [  # group, class, its base, a wrong base
+            ("end-level-stats", "idTarget_EndLevelGUI", "idCustomUI", "idEntity"),
+            ("objectives", "mkObjective", "idEntity", "idCustomUI"),
+        ]
+        for group, cls, base, wrong in cases:
+            with self.subTest(group=group):
+                text = reference(group)
+                macro = f"CLASS_DECLARATION( {base}, {cls} )"
+                self.assertEqual(text.count(macro), 1)
+                self.assertIn(f"class {cls} : public {base} {{", text)
+                body = verify.find_macro_body(verify.implementation_block(text), f"{cls}::CreateInstance")
+                self.assertIn(f"{base}::{base}()", body)
+                results = verify.check_group(group, BINARY, ROWS, ALLOW,
+                                             text.replace(macro, f"CLASS_DECLARATION( {wrong}, {cls} )"))
+                self.assertEqual(missing_pairs(results), {(f"{cls}::CreateInstance", f"{base}::{{base ctor}}")})
 
     def test_deleting_a_call_fails_and_names_function_and_callee(self):
         text = reference("custom-ui")

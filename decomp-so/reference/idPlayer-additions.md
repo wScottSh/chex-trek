@@ -38,7 +38,3 @@ Offsets are from the start of `idPlayer` in this build (`this + offset`). Names 
 ## Conflicts reconciled
 
 None yet. Checked for end-level-stats: `levelStats` (`+0x1ea4`..`+0x1ef3`) does not overlap the custom-ui members (`+0x1f0c`, `+0x1f10`). Checked for objectives: `objectives` (`+0x1ef4`..`+0x1f07`) and `nextObjective` (`+0x1f08`) fill the gap between them exactly, and overlap neither.
-
-## Stock members at non-stock offsets
-
-Not additions, but worth knowing when mapping offsets: in this build the stock `inventory.pickupItemNames` (`+0x1404`), `hud` (`+0x1428`) and `objectiveSystem` (`+0x142c`) are 0x14 bytes further on than a GCC 12 `-m32` build of the stock a9c49da headers puts them. Found for objectives. Evidence in `reference/objectives.md`'s Notes.
