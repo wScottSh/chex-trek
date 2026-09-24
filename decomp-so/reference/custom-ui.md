@@ -1,6 +1,6 @@
 # Custom UI (`idCustomUI`): reconstructed reference
 
-**Provenance:** reconstructed by **Claude Opus 5.5** on 2026-09-24 from the complete Ghidra export `decomp-so/ghidra-full/` of `gamex86.so` (Ghidra 12.1.4, "Non-Returning Functions - Discovered" disabled), re-cleaned against the enriched export (issue #18: float constants and string literals resolved from `.rodata`; checks 1 and 2 pass). Export files: `idCustomUI_*.c` (13 files), `idPlayer_useCustomUI_0015d300.c`, `idPlayer_clearCustomUI_0015d320.c` and `idCmdSystem_ArgCompletion_GuiName_00183a40.c`. Facts marked *binary* were read straight from `gamex86.so` (symbol table, vtables, RTTI, relocations, disassembly). Reference material only, not original source. The original source does not exist.
+**Provenance:** reconstructed by **Claude Opus 5.5** on 2026-09-24 from the complete Ghidra export `decomp-so/ghidra-full/` of `gamex86.so` (Ghidra 12.1.4, "Non-Returning Functions - Discovered" disabled), re-cleaned against the enriched export (issue #18: float constants and string literals resolved from `.rodata`; checks 1 and 2 pass). Check 3 (issue #19) compiles it, 32-bit, against stock DOOM-3 GPL a9c49da. Export files: `idCustomUI_*.c` (13 files), `idPlayer_useCustomUI_0015d300.c`, `idPlayer_clearCustomUI_0015d320.c` and `idCmdSystem_ArgCompletion_GuiName_00183a40.c`. Facts marked *binary* were read straight from `gamex86.so` (symbol table, vtables, RTTI, relocations, disassembly). Reference material only, not original source. The original source does not exist.
 
 Scope (spec #16, issue #17): the `idCustomUI` class, `idPlayer::useCustomUI` / `clearCustomUI`, `idCmdSystem::ArgCompletion_GuiName` and the `g_PDA` cvar that registers it. Addresses below are ELF virtual addresses. Ghidra's are `+0x10000`. Stock DOOM-3 GPL source (a9c49da) is referenced, not repeated.
 
@@ -62,7 +62,11 @@ private:
 // ---------------------------------------------------------------------------
 // idPlayer additions used by this feature (full list: reference/idPlayer-additions.md)
 // UNCERTAIN: where in the idPlayer declaration these sit. Only the offsets are known.
+// Player.h is included before this class is declared, so it needs a forward declaration.
+// UNCERTAIN: where the source put it (or whether it included a header instead).
 // ---------------------------------------------------------------------------
+class idCustomUI;
+
 class idPlayer : public idActor {
 	// ... stock members ...
 public:
@@ -284,6 +288,7 @@ idCVar g_PDA( "g_PDA", "guis/pda_chex.gui", CVAR_GAME | CVAR_ARCHIVE, "gui file 
   - No spawnArg keys: nothing in this group reads `spawnArgs`. The GUI name reaches `setGUI` from the subclass (end-level group).
   - GUI command `"unregister"`: no GUI in `guis/` sends it. The only in-data route to `UnregisterGUI` is `Event_Hide`: `script/map_storage_facility.script:101` calls `$target_endlevelgui_2.hide()` with the comment "CustomUI does UnregisterGUI() on hide". `guis/chex/stats.gui` sends `"nextmap"` and `"skip"`, which `idTarget_EndLevelGUI::HandleCustomGUICommand` reads (end-level group), not this class. UNCERTAIN: whether `"unregister"` was used by a GUI that is not in this repo.
   - `ArgCompletion_GuiName` completes `guis/*.gui`. The `g_PDA` default `guis/pda_chex.gui` exists in `guis/`.
+- **Compile (check 3).** The header and implementation compile with g++ 12 `-m32` against stock DOOM-3 GPL a9c49da. The `idPlayer` and `idCmdSystem` partial declarations are spliced into scratch copies of stock `game/Player.h` and `framework/CmdSystem.h`. No other stock file is changed. The check added one line to this reference: the forward declaration `class idCustomUI;`, which `Player.h` needs because it is included before `idCustomUI` is declared. The check proves the code is well-formed only. The vtable offsets below are not checked by compiling, because calls are written by name.
 - **Vtable offsets** (`FindGui` +0x38, `Activate` +0x5c, `Warning` +0x50, `ArgCompletion_FolderExtension` +0x2c) were matched by counting virtual declarations in the stock headers, with GCC 3 two-slot virtual destructors.
 - **Ghidra artifacts.**
   - Ghidra labels the D0 clone `~idCustomUI` and passes a stray `unaff_EBX` to `operator_delete`. The call is really `idClass::operator delete( this )`.

@@ -53,6 +53,11 @@ RULES = """\
 - Every direct callee listed below must appear in that function's definition (a comment
   counts, e.g. for implicit base-destructor calls). Exception-only and ABI-implicit callees
   are on decomp-so/verify/allowlist.tsv.
+- The header and implementation blocks must compile, 32-bit, against the stock DOOM-3 GPL
+  game source (check 3). Additions to a stock class are written as a partial declaration
+  (`class idPlayer : public idActor { // ... stock members ... public: ... };`) with
+  explicit access labels; they are spliced into the stock class. A new class named by such
+  additions needs a top-level forward declaration (`class idCustomUI;`) in the header block.
 - New `idPlayer` members go in decomp-so/reference/idPlayer-additions.md with offsets.
 - The 2026 entries in Stnynotes.txt are not a trusted source.
 

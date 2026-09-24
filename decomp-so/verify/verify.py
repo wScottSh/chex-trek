@@ -18,12 +18,26 @@ suffix; `x - 0.5f` is the constant 0.5, `x * -0.5f` is -0.5), strings as the exa
 never reads is reported as mismatched. Integer-load x87 operands (`fild`) are integers, not
 float constants, and are not checked.
 
+Check 3 -- compile. The group's header block and implementation block are compiled, 32-bit,
+against an unmodified checkout of the stock DOOM-3 GPL source (id-Software/DOOM-3 at
+a9c49da5afb18201d31e3f0a429a037e56ce2b9a) inside a container: Debian bookworm g++ 12 with
+-m32 (the toolchain is pinned in compile/Dockerfile; each run prints the exact g++ version
+and SDK revision). The only change made to stock files: a header-block class that extends a
+stock class (`class idPlayer : public idActor { // ... stock members ... };`) has its members
+spliced into a scratch copy of that stock declaration; each such splice is reported. Compile
+errors are reported per group, at the reference Markdown's line numbers (compile/worker.py).
+This proves the code is well-formed SDK code, not that it behaves like the binary.
+The container runs wherever `docker` points: locally, or on the Ghidra box with
+DOCKER_HOST=ssh://qwen. The image is built on first use (tag = hash of the Dockerfile).
+
     python decomp-so/verify/verify.py              # every group with covered functions
     python decomp-so/verify/verify.py custom-ui    # one (or more) groups
+    python decomp-so/verify/verify.py --no-compile # checks 1 and 2 only
     python decomp-so/verify/verify.py --callees custom-ui    # just list binary callees
     python decomp-so/verify/verify.py --literals custom-ui   # just list binary literals
 
-Exit status is 0 only when nothing is missing or mismatched. Callees that are never checked
+Exit status is 0 only when nothing is missing or mismatched and every group compiles (a
+check 3 that cannot run fails, unless --no-compile). Callees that are never checked
 (_Unwind_Resume, __cxa_*, the PIC thunk) are listed in binary.py; exception-only and
 ABI-implicit callees are on allowlist.tsv, literals that come from stock inline code on
 literal-allowlist.tsv. Dependencies: requirements.txt.
@@ -32,7 +46,11 @@ from __future__ import annotations
 
 import argparse
 import fnmatch
+import hashlib
+import json
+import os
 import re
+import subprocess
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -177,8 +195,16 @@ def load_coverage(path: Path = COVERAGE_PATH) -> list[CoverageRow]:
 # ---------------------------------------------------------------- reference parsing
 
 
+_CPP_BLOCK = re.compile(r"^```(?:cpp|c\+\+)[ \t]*\n(.*?)^```", re.M | re.S)
+
+
 def cpp_blocks(markdown: str) -> list[str]:
-    return re.findall(r"^```(?:cpp|c\+\+)\s*\n(.*?)^```", markdown, re.M | re.S)
+    return [m.group(1) for m in _CPP_BLOCK.finditer(markdown)]
+
+
+def cpp_block_lines(markdown: str) -> list[int]:
+    """1-based Markdown line number of each ```cpp block's first code line."""
+    return [markdown.count("\n", 0, m.start(1)) + 1 for m in _CPP_BLOCK.finditer(markdown)]
 
 
 def implementation_block(markdown: str) -> str:
@@ -471,6 +497,84 @@ def check_group(
     return results
 
 
+# ---------------------------------------------------------------- check 3
+
+COMPILE_DIR = VERIFY_DIR / "compile"
+DOCKERFILE = COMPILE_DIR / "Dockerfile"
+WORKER = COMPILE_DIR / "worker.py"
+# Runs in the container: loads worker.py's source from the JSON on stdin and runs the jobs.
+_BOOTSTRAP = (
+    "import json,sys;d=json.load(sys.stdin);g={'__name__':'worker'};"
+    "exec(compile(d['worker'],'worker.py','exec'),g);g['run'](d['jobs'])"
+)
+
+
+class CompileUnavailable(RuntimeError):
+    """Check 3 could not run (no docker, image build failed, worker crashed)."""
+
+
+@dataclass
+class CompileResult:
+    group: str
+    ok: bool
+    errors: list[str]
+    splices: list[dict]  # {"class", "file", "line"}: stock declarations the header extends
+
+
+def compile_job(group: str, reference_text: str) -> dict:
+    """What worker.py needs to compile one group: its two blocks and where they start."""
+    blocks, lines = cpp_blocks(reference_text), cpp_block_lines(reference_text)
+    if len(blocks) != 2:
+        raise ValueError(f"reference must have exactly 2 ```cpp blocks (header, implementation); found {len(blocks)}")
+    return {"group": group, "source": f"decomp-so/reference/{group}.md",
+            "header": blocks[0], "header_line": lines[0], "impl": blocks[1], "impl_line": lines[1]}
+
+
+def image_tag() -> str:
+    return "chex-decomp-compile:" + hashlib.sha256(DOCKERFILE.read_bytes()).hexdigest()[:12]
+
+
+def _docker(*args: str, stdin: bytes | None = None) -> subprocess.CompletedProcess:
+    try:
+        return subprocess.run(["docker", *args], input=stdin, capture_output=True)
+    except FileNotFoundError as exc:
+        raise CompileUnavailable("docker CLI not found") from exc
+
+
+def ensure_image() -> str:
+    tag = image_tag()
+    if _docker("image", "inspect", tag).returncode == 0:
+        return tag
+    proc = _docker("build", "-t", tag, "-", stdin=DOCKERFILE.read_bytes())
+    if proc.returncode:
+        where = os.environ.get("DOCKER_HOST", "the local docker daemon")
+        raise CompileUnavailable(f"building {tag} on {where} failed: "
+                                 + proc.stderr.decode(errors="replace").strip()[-800:])
+    return tag
+
+
+def run_compile(jobs: list[dict]) -> tuple[dict, list[CompileResult]]:
+    """Check 3 for `jobs` (from compile_job) in one container run: (toolchain, results)."""
+    tag = ensure_image()
+    payload = json.dumps({"worker": WORKER.read_text(encoding="utf-8"), "jobs": jobs}).encode()
+    proc = _docker("run", "--rm", "-i", "--network", "none", tag, "python3", "-c", _BOOTSTRAP, stdin=payload)
+    if proc.returncode:
+        raise CompileUnavailable("compile worker failed: " + proc.stderr.decode(errors="replace").strip()[-800:])
+    out = json.loads(proc.stdout)
+    return out["toolchain"], [CompileResult(**r) for r in out["results"]]
+
+
+def format_toolchain(tc: dict) -> str:
+    return f"check 3 toolchain: {tc['compiler']}, {' '.join(tc['flags'][:4])}; DOOM-3 GPL {tc['doom3']}"
+
+
+def format_compile(res: CompileResult) -> list[str]:
+    splices = "".join(f"; {s['class']} members spliced into stock {s['file']}" for s in res.splices)
+    if res.ok:
+        return [f"  ok       compiles (check 3){splices}"]
+    return [f"  COMPILE  {e}" for e in res.errors] + [f"  => does not compile: {len(res.errors)} error(s){splices}"]
+
+
 def format_results(results: list[FunctionResult]) -> list[str]:
     """Per-function report lines, then a one-line summary."""
     lines = []
@@ -504,6 +608,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("groups", nargs="*", help="group names (default: every group with covered functions)")
     ap.add_argument("--callees", action="store_true", help="list each function's binary callees and exit")
     ap.add_argument("--literals", action="store_true", help="list each function's binary literals and exit")
+    ap.add_argument("--no-compile", action="store_true", help="skip check 3 (compile)")
     args = ap.parse_args(argv)
 
     binary = Binary(BINARY_PATH)
@@ -535,6 +640,24 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     failed = False
+    compiled: dict[str, CompileResult] = {}
+    compile_error: str | None = None
+    if not args.no_compile:
+        jobs = []
+        for g in groups:
+            ref = REFERENCE_DIR / f"{g}.md"
+            try:
+                jobs.append(compile_job(g, ref.read_text(encoding="utf-8")))
+            except (OSError, ValueError):
+                pass  # reported below by checks 1 and 2
+        try:
+            toolchain, results3 = run_compile(jobs) if jobs else ({}, [])
+            compiled = {r.group: r for r in results3}
+            if toolchain:
+                print(format_toolchain(toolchain))
+        except CompileUnavailable as exc:
+            compile_error = (f"check 3 not run: {exc} (point DOCKER_HOST at a docker host, "
+                             "e.g. ssh://qwen, or pass --no-compile)")
     for g in groups:
         ref = REFERENCE_DIR / f"{g}.md"
         print(f"[{g}] {ref.relative_to(REPO_ROOT).as_posix()}")
@@ -555,6 +678,15 @@ def main(argv: list[str] | None = None) -> int:
         for line in format_results(results):
             print(line)
         failed |= any(not r.ok for r in results)
+        if args.no_compile:
+            continue
+        if g in compiled:
+            for line in format_compile(compiled[g]):
+                print(line)
+            failed |= not compiled[g].ok
+        else:
+            print(f"  FAIL     {compile_error or 'check 3 produced no result'}")
+            failed = True
     return 1 if failed else 0
 
 

@@ -477,6 +477,146 @@ class Records(unittest.TestCase):
         self.assertEqual(len(offsets), len(set(offsets)))
 
 
+sys.path.insert(0, str(verify.COMPILE_DIR))
+import worker  # noqa: E402
+
+
+def md_line(text: str, needle: str) -> int:
+    """1-based line of the (unique) line containing `needle`."""
+    lines = [i for i, l in enumerate(text.splitlines(), 1) if needle in l]
+    assert len(lines) == 1, (needle, lines)
+    return lines[0]
+
+
+class CompileSplicing(unittest.TestCase):
+    """Check 3's preparation (compile/worker.py), without a compiler."""
+
+    def test_job_line_numbers_point_at_the_blocks(self):
+        text = reference("custom-ui")
+        job = verify.compile_job("custom-ui", text)
+        lines = text.splitlines()
+        self.assertEqual(lines[job["header_line"] - 1], job["header"].splitlines()[0])
+        self.assertEqual(lines[job["impl_line"] - 1], job["impl"].splitlines()[0])
+        self.assertEqual(job["source"], "decomp-so/reference/custom-ui.md")
+
+    def test_top_level_classes_of_the_custom_ui_header(self):
+        header = verify.cpp_blocks(reference("custom-ui"))[0]
+        found = [(c["name"], c["forward"]) for c in worker.top_level_classes(header)]
+        self.assertEqual(found, [("idCustomUI", False), ("idCustomUI", True), ("idPlayer", False),
+                                 ("idCmdSystem", False)])
+
+    def fake_neo(self, files: dict[str, str]) -> str:
+        import tempfile
+
+        root = tempfile.mkdtemp()
+        self.addCleanup(__import__("shutil").rmtree, root, True)
+        for rel, text in files.items():
+            path = Path(root, rel)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(text, encoding="latin-1")
+        return root
+
+    def test_additions_are_spliced_into_the_stock_class_with_line_mapping(self):
+        neo = self.fake_neo({
+            "game/Player.h": "class idActor;\nclass idPlayer : public idActor {\npublic:\n\tint stock;\n};\n",
+            "d3xp/Player.h": "class idPlayer : public idActor {\n};\n",  # expansion: not searched
+        })
+        header = ("// h\nclass idNew;\n\nclass idPlayer : public idActor {\n\t// ... stock members ...\n"
+                  "public:\n\tidNew *added;\n};\n\nclass idNew {\n\tint x;\n};\n")
+        job = {"group": "g", "source": "ref.md", "header": header, "header_line": 10, "impl": "int f;", "impl_line": 40}
+        tu, splices = worker.prepare(neo, job)
+        self.assertEqual(splices, [{"class": "idPlayer", "file": "game/Player.h", "line": 13}])
+        stock = Path(neo, "game/Player.h").read_text(encoding="latin-1")
+        self.assertEqual(
+            stock,
+            "class idActor;\nclass idPlayer : public idActor {\npublic:\n\tint stock;\n"
+            '#line 13 "ref.md"\n\n\t// ... stock members ...\npublic:\n\tidNew *added;\n\n#line 5 "Player.h"\n};\n',
+        )
+        # forward declaration before the stock headers; the stock class's lines blanked, new class kept
+        self.assertLess(tu.index('#line 11 "ref.md"\nclass idNew;'), tu.index('#include "Game_local.h"'))
+        header_part = tu[tu.index('#line 10 "ref.md"\n') + len('#line 10 "ref.md"\n'): tu.index('#line 40')]
+        self.assertEqual(header_part.count("\n"), header.count("\n") + 1)
+        self.assertNotIn("idPlayer", header_part)
+        self.assertIn("class idNew {\n\tint x;\n};", header_part)
+        self.assertIn('#line 40 "ref.md"\nint f;', tu)
+
+    def test_non_game_stock_header_path_and_one_line_close(self):
+        neo = self.fake_neo({"framework/CmdSystem.h": "class idCmdSystem {\npublic:\n\tint a; };\n"})
+        job = {"group": "g", "source": "r.md", "header": "class idCmdSystem {\n\tint b;\n};\n",
+               "header_line": 1, "impl": "", "impl_line": 5}
+        _, splices = worker.prepare(neo, job)
+        self.assertEqual(splices, [{"class": "idCmdSystem", "file": "framework/CmdSystem.h", "line": 1}])
+        stock = Path(neo, "framework/CmdSystem.h").read_text(encoding="latin-1")
+        self.assertIn('\tint a; \n#line 1 "r.md"\n\n\tint b;\n\n#line 3 "../framework/CmdSystem.h"\n};', stock)
+
+    def test_ambiguous_stock_class_is_an_error(self):
+        neo = self.fake_neo({"game/A.h": "class idX {\n};\n", "game/B.h": "class idX {\n};\n"})
+        job = {"group": "g", "source": "r.md", "header": "class idX {\n};\n", "header_line": 1, "impl": "",
+               "impl_line": 3}
+        with self.assertRaisesRegex(ValueError, "more than one stock header"):
+            worker.prepare(neo, job)
+
+
+def _docker_reachable() -> bool:
+    try:
+        return verify._docker("version").returncode == 0
+    except verify.CompileUnavailable:
+        return False
+
+
+class Compile(unittest.TestCase):
+    """Check 3 against the real toolchain (compile/Dockerfile). Needs a docker daemon:
+    local, or DOCKER_HOST=ssh://qwen. One container run covers every case below."""
+
+    MUTATIONS = {
+        # name: (old, new, line of the error in custom-ui.md)
+        "impl_syntax": ("\tregistered\t= false;\n", "\tregistered\t= false\n", "registered\t= false"),
+        "header_syntax": ("\tvoid\t\t\t\t\tRegisterGUI( void );\n", "\tvoid\t\t\t\t\tRegisterGUI( void )\n",
+                          "	void					RegisterGUI( void )"),
+        "spliced_member": ("\tidCustomUI *\t\t\tcustomUIEntity;", "\tidCustomUI\t\t\tcustomUIEntity;",
+                           "customUIEntity;\t\t// +0x1f0c"),
+    }
+
+    @classmethod
+    def setUpClass(cls):
+        if not _docker_reachable():
+            raise unittest.SkipTest("check 3 needs docker (set DOCKER_HOST, e.g. ssh://qwen)")
+        text = reference("custom-ui")
+        jobs = [verify.compile_job("custom-ui", text)]
+        cls.lines = {}
+        for name, (old, new, needle) in cls.MUTATIONS.items():
+            assert text.count(old) == 1, name
+            mutated = text.replace(old, new)
+            jobs.append(dict(verify.compile_job("custom-ui", mutated), group=name))
+            cls.lines[name] = md_line(mutated, needle)
+        cls.toolchain, results = verify.run_compile(jobs)
+        cls.results = {r.group: r for r in results}
+
+    def test_toolchain_is_recorded(self):
+        self.assertTrue(self.toolchain["compiler"].startswith("g++ (Debian 12."), self.toolchain)
+        self.assertEqual(self.toolchain["doom3"], "a9c49da5afb18201d31e3f0a429a037e56ce2b9a")
+        self.assertIn("-m32", self.toolchain["flags"])
+        self.assertIn("a9c49da5afb18201d31e3f0a429a037e56ce2b9a", verify.DOCKERFILE.read_text())
+
+    def test_custom_ui_compiles(self):
+        res = self.results["custom-ui"]
+        self.assertEqual(res.errors, [])
+        self.assertTrue(res.ok)
+        self.assertEqual({(s["class"], s["file"]) for s in res.splices},
+                         {("idPlayer", "game/Player.h"), ("idCmdSystem", "framework/CmdSystem.h")})
+        self.assertEqual(verify.format_compile(res)[0][:27], "  ok       compiles (check ")
+
+    def test_a_syntax_error_fails_and_is_reported_at_its_markdown_line(self):
+        for name in self.MUTATIONS:
+            with self.subTest(mutation=name):
+                res = self.results[name]
+                self.assertFalse(res.ok)
+                self.assertTrue(res.errors)
+                where = [re.match(r"decomp-so/reference/custom-ui\.md:(\d+):", e) for e in res.errors]
+                self.assertIn(self.lines[name], [int(m.group(1)) for m in where if m], res.errors)
+                self.assertIn("COMPILE  decomp-so/reference/custom-ui.md:", "\n".join(verify.format_compile(res)))
+
+
 class CleanupDriver(unittest.TestCase):
     def test_packet_has_each_function_its_callees_and_export(self):
         import cleanup_driver
