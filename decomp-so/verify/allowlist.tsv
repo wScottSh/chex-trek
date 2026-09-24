@@ -1,0 +1,11 @@
+# Callees check 1 accepts without a mention in the reconstruction.
+# One entry per line, 4 TAB-separated fields:
+#   function-pattern  callee-pattern  kind  reason
+# Patterns are fnmatch globs on demangled names with parameters stripped
+# (e.g. `idCustomUI::CreateInstance`, `idClass::operator delete`).
+# Kinds:
+#   exception-only  reached only from an exception landing pad; no source statement makes the call
+#   abi-implicit    emitted by the GCC C++ ABI itself; no source statement makes the call
+# Always ignored (never listed here): _Unwind_Resume, __cxa_*, __i686.get_pc_thunk.*
+*::CreateInstance	*::operator delete	exception-only	CLASS_DECLARATION's `new nameofclass` frees the storage only if the constructor throws (seen in stock idTarget::CreateInstance @ 0x18de90: operator delete sits in the landing pad before _Unwind_Resume)
+*::{deleting dtor}	*::operator delete	abi-implicit	D0 "deleting destructor" clone runs the D1 body then frees `this`; the source destructor has no delete statement
