@@ -131,7 +131,7 @@ LAB_002b4560:
         *(undefined1 *)((int)puVar13 + 0x3a) = 0;
         *(undefined1 *)((int)puVar13 + 0x39) = 0;
         *(undefined1 *)(puVar13 + 0xe) = 0;
-        puVar13[4] = 0x3f800000 /* 1.0f */ /* 1.0f */;
+        puVar13[4] = 0x3f800000 /* 1.0f */;
         *puVar13 = 0;
         puVar13[5] = 0;
         puVar13[8] = 0;
@@ -230,7 +230,7 @@ LAB_002b4560:
     *(undefined1 *)((int)puVar13 + 0x39) = 0;
     *(undefined1 *)(puVar13 + 0xe) = 0;
     *(float *)(*(int *)(iVar12 + 0x24) * 0x3c + 0xc + *(int *)(iVar12 + 0x28)) = fVar5;
-    *(undefined4 *)(*(int *)(iVar12 + 0x24) * 0x3c + 0x10 + *(int *)(iVar12 + 0x28)) = 0x3f800000 /* 1.0f */ /* 1.0f */;
+    *(undefined4 *)(*(int *)(iVar12 + 0x24) * 0x3c + 0x10 + *(int *)(iVar12 + 0x28)) = 0x3f800000 /* 1.0f */;
     iVar15 = *(int *)(iVar12 + 0x24);
     fVar5 = *(float *)(this + 0x4c);
     fVar3 = fVar3 * fVar5 * 0.5;

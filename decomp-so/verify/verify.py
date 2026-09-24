@@ -324,16 +324,25 @@ _FLOAT_TOKEN = re.compile(r"(?<![\w.])((?:\d+\.\d*|\.\d+)(?:[eE][+-]?\d+)?|\d+[e
 
 def _unary_minus_before(code: str, start: int) -> bool:
     """Is the token at `start` preceded by a unary minus? `-0.5f`, `( -0.5f`, `* -0.5f` are
-    unary; in `x - 0.5f`, `f() - 0.5f`, `a[i]-0.5f` the minus is binary subtraction."""
+    unary, and so is one after `return`, `case` or a cast like `(float)`; in `x - 0.5f`,
+    `f() - 0.5f`, `a[i]-0.5f` the minus is binary subtraction."""
     i = start - 1
     while i >= 0 and code[i].isspace():
         i -= 1
     if i < 0 or code[i] != "-":
         return False
-    i -= 1
-    while i >= 0 and code[i].isspace():
-        i -= 1
-    return i < 0 or not (code[i].isalnum() or code[i] in "_)]")
+    before = code[:i].rstrip()
+    if not before:
+        return True
+    if _KEYWORD_OR_CAST_END.search(before):
+        return True  # `return -0.5f`, `case -1.0:`, `(float)-3.0`
+    return not (before[-1].isalnum() or before[-1] in "_)]")
+
+
+_KEYWORD_OR_CAST_END = re.compile(
+    r"(?<![\w.])(?:return|case|throw|else|do)$"
+    r"|\(\s*(?:const\s+)?(?:unsigned\s+|signed\s+)?(?:float|double|int|long|short|char|bool)\s*\)$"
+)
 
 
 def float_literals(code: str) -> list[tuple[float, bool]]:

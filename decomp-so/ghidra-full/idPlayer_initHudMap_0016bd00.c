@@ -4,7 +4,7 @@
 //   00372152  string "0 0 0 0"
 //   0037215a  string "map_coords"
 //   003859f8  string "%f"
-//   0016bf0a  float  -8.0  (immediate 0xc1000000)
+//   0016bf0a  double -131072.0  (immediate 0xc1000000, high word; low word 0)
 //   00372165  string "map_level_%d"
 //   00372c30  float  131072.0
 //   00372172  string "640"
@@ -137,7 +137,7 @@ LAB_0016bec4:
   *(int *)this_00 = iVar8;
   *(undefined1 *)(*(int *)(this + 0x1e64) + iVar8) = 0;
   idStr::FreeData(piStack_7c);
-  pcVar4 = (char *)va("%f",0,0xc1000000 /* -8.0f */,piVar10);
+  pcVar4 = (char *)va("%f",0,0xc1000000 /* high word of double -131072.0 */,piVar10);
   pcVar6 = (char *)va("map_level_%d",0);
   idDict::GetFloat((idDict *)(*(int *)(PTR_gameLocal_003e0cac + 0x8f68) + 100),pcVar6,pcVar4,
                    (float *)(this + 0x1e80));

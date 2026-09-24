@@ -140,7 +140,7 @@ void __thiscall idActor::Event_FootPrint(idActor *this,char *param_1,char *param
   lVar14 = (longdouble)__strtod_internal(pcVar10,0,0);
   local_58 = (float)lVar14 + fVar1;
   cVar6 = (**(code **)(**(int **)PTR_gameRenderWorld_003e10a0 + 0x7c))
-                    (*(int **)PTR_gameRenderWorld_003e10a0,auStack_d0,&local_54,&local_60,0x41000000 /* 8.0f */ /* 8.0f */ /* 8.0f */
+                    (*(int **)PTR_gameRenderWorld_003e10a0,auStack_d0,&local_54,&local_60,0x41000000 /* 8.0f */
                      ,0,1);
   if ((cVar6 != '\0') && (iStack_b4 != 0)) {
     pcVar10 = (char *)va("footprint_time_%s",
@@ -258,7 +258,7 @@ LAB_000c64b6:
       pcVar10 = (char *)va("%s_%s",pcStack_128,param_1);
       uStack_30 = 0;
       uStack_2c = 0;
-      uStack_28 = 0xbf800000 /* -1.0f */ /* -1.0f */;
+      uStack_28 = 0xbf800000 /* -1.0f */;
       fStack_1c = fStack_70 + fStack_7c;
       fStack_20 = fStack_74 + fStack_80;
       fStack_24 = fStack_78 + fStack_84;
@@ -284,7 +284,7 @@ LAB_000c64b6:
     pcVar10 = (char *)va("%s%s",pcStack_128,pcVar10);
     uStack_48 = 0;
     uStack_44 = 0;
-    uStack_40 = 0xbf800000 /* -1.0f */ /* -1.0f */;
+    uStack_40 = 0xbf800000 /* -1.0f */;
     piVar7 = (int *)idEntity::GetPhysics((idEntity *)this);
     pfVar13 = (float *)(**(code **)(*piVar7 + 0x84))(piVar7,0);
     fStack_34 = fStack_114 + pfVar13[2];

@@ -241,6 +241,10 @@ class LiteralParsing(unittest.TestCase):
         )
         values = sorted({v for v, _ in verify.float_literals(code)})
         self.assertEqual(values, sorted({32.0, 0.05, 1e-3, 1.5, -0.5, 4.0, -2.0}))
+        for unary in ("return -0.5f;", "case -1.0:", "x = (float)-3.0;", "x = ( const double ) - 3.0;"):
+            self.assertLess(verify.float_literals(unary)[0][0], 0, unary)
+        for binary in ("x = (a)-3.0;", "x = b[2] - 3.0;", "x = returned - 3.0;"):
+            self.assertGreater(verify.float_literals(binary)[0][0], 0, binary)
         self.assertEqual(dict(verify.float_literals("a = 2.5f;")), {2.5: True})
 
     def test_rendering(self):
@@ -263,6 +267,16 @@ class BinaryLiterals(unittest.TestCase):
         self.assertAlmostEqual(float_immediate(0x42937AE1), 73.74, places=4)
         for integer in (0x14, 0x21080, 0x2B5549, 0x5F3759DF, 0x4A90BE59, 0x45E7B273, 0xFFFFFFFF):
             self.assertIsNone(float_immediate(integer), hex(integer))
+
+    def test_double_argument_high_word_is_a_double(self):
+        # initHudMap: `xor eax,eax; mov [esp+4],eax; mov eax,0xc1000000; mov [esp+8],eax` -> va( "%f", -131072.0 )
+        lits = {l.render() for l in BINARY.literals(BINARY.find("idPlayer::initHudMap")[0])}
+        self.assertIn("double -131072.0", lits)
+        self.assertNotIn("float -8.0", lits)
+        # a stack-local idVec3 ( 0, 1.0f, ... ) next to a zero stays a float
+        foot = {l.render() for l in BINARY.literals(BINARY.find("idActor::Event_FootPrint")[0])}
+        self.assertTrue({"float 1.0", "float -1.0", "float 8.0"} <= foot, foot)
+        self.assertFalse([l for l in foot if l.startswith("double")], foot)
 
     def test_every_rodata_read_in_the_export_is_classified(self):
         for r in ROWS:
@@ -288,7 +302,7 @@ def export_literals(text: str) -> set[tuple[str, float | str]]:
     """(kind, value) from an export file's `// literals` block."""
     out = set()
     for line in text.splitlines():
-        m = re.match(r"//\s+[0-9a-f]{8}\s+(float|double|string)\s+(.*?)(?:\s+\(immediate 0x[0-9a-f]{8}\))?$", line)
+        m = re.match(r"//\s+[0-9a-f]{8}\s+(float|double|string)\s+(.*?)(?:\s+\(immediate 0x[0-9a-f]{8}[^)]*\))?$", line)
         if not m:
             continue
         kind, raw = m.groups()
@@ -326,6 +340,13 @@ class EnrichedExport(unittest.TestCase):
         self.assertNotIn("_LAB_0036b0e4", anchor)  # 0.5 used to be shown as this label
         render = by_fn["mkTrail::UpdateRenderEntity"]
         self.assertRegex(render[render.index("{"):], r"(?<![\w.])0\.001(?![\d])")  # the epsilon
+
+    def test_immediates_are_annotated_once(self):
+        for r in ROWS:
+            with self.subTest(export=r.export):
+                self.assertNotRegex(self.read(r), r"/\* [^*]* \*/ /\* ")
+        hud = next(self.read(r) for r in ROWS if r.function == "idPlayer::initHudMap")
+        self.assertIn("0xc1000000 /* high word of double -131072.0 */", hud)
 
     def test_callee_coverage_did_not_regress(self):
         """Each export still names at least as many direct callees as the first full export."""

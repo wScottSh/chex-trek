@@ -19,6 +19,8 @@
 //   - float immediate: `mov <4-byte dest>, imm32` whose bits read as a float with
 //     1/65536 <= |x| <= 2^24 and at most 6 significant digits (0x42000000 = 32.0). It is not
 //     in .rodata, so it is listed as `(immediate ...)` and annotated where the hex appears.
+//     If it is the high word of a double call argument whose low word is 0 (see
+//     doubleHighWord), it is listed as that double instead (`va("%f", -131072.0)`).
 // The C-escape rules (cString) and the x87 mnemonic set are duplicated in binary.py.
 //
 // Args: <outDir> <comma-separated classes> <file of extra qualified method names>
@@ -43,7 +45,8 @@ import java.util.regex.Pattern;
 public class ExportCustom extends GhidraScript {
     static final Set<String> X87_READS = Set.of("FLD", "FADD", "FSUB", "FSUBR", "FMUL", "FDIV", "FDIVR", "FCOM", "FCOMP");
 
-    /** kind: float, double, string, pointer (placeholder), immediate (float imm32 `bits`). */
+    /** kind: float, double, string, pointer (placeholder), immediate (float imm32 `bits`),
+     *  immediate-double (`bits` is the high word of a double argument). */
     record Lit(Address addr, String kind, String text, int length, long bits) {
         Lit(Address addr, String kind, String text, int length) { this(addr, kind, text, length, 0); }
     }
@@ -76,7 +79,7 @@ public class ExportCustom extends GhidraScript {
             List<Lit> list = literals(f);
             lits.put(f, list);
             for (Lit l : list) {
-                if (l.kind().equals("immediate") || typed.stream().anyMatch(t -> overlaps(t, l))) continue; // keep the first of overlapping strings
+                if (l.kind().startsWith("immediate") || typed.stream().anyMatch(t -> overlaps(t, l))) continue; // keep the first of overlapping strings
                 typeLiteral(l);
                 typed.add(l);
             }
@@ -131,7 +134,9 @@ public class ExportCustom extends GhidraScript {
         Set<Register> pic = new HashSet<>();
         Register pendingReg = null;
         long pendingValue = -1; // return address a thunk / `call next` left in pendingReg
-        for (Instruction ins : instructions(f)) {
+        List<Instruction> insns = instructions(f);
+        for (int k = 0; k < insns.size(); k++) {
+            Instruction ins = insns.get(k);
             String mn = ins.getMnemonicString().toUpperCase();
             if (mn.equals("CALL")) {
                 leaRegs.keySet().removeIf(r -> clobbered.contains(r.getName()));
@@ -167,7 +172,12 @@ public class ExportCustom extends GhidraScript {
                     && ins.getOpObjects(1)[0] instanceof Scalar imm && fourBytes(ins)) {
                 long bits = imm.getUnsignedValue() & 0xffffffffL;
                 Float v = floatImmediate(bits);
-                if (v != null) found.add(new Lit(ins.getAddress(), "immediate", Float.toString(v), 4, bits));
+                if (v != null) {
+                    Double d = doubleHighWord(insns, k, bits);
+                    found.add(d != null
+                        ? new Lit(ins.getAddress(), "immediate-double", Double.toString(d), 4, bits)
+                        : new Lit(ins.getAddress(), "immediate", Float.toString(v), 4, bits));
+                }
             }
             boolean x87 = X87_READS.contains(mn);
             boolean lea = mn.equals("LEA");
@@ -239,9 +249,84 @@ public class ExportCustom extends GhidraScript {
         float v = Float.intBitsToFloat((int) bits);
         if (!Float.isFinite(v) || Math.abs(v) < FLOAT_IMM_MIN || Math.abs(v) > FLOAT_IMM_MAX) return null;
         // Float.toString is the shortest round-trip text (JDK 19+), like binary.py's shortest_float
-        String digits = Float.toString(Math.abs(v)).split("E")[0].replace(".", "")
-            .replaceAll("^0+", "").replaceAll("0+$", "");
-        return digits.length() <= 6 ? v : null;
+        return shortDigits(Float.toString(Math.abs(v))) ? v : null;
+    }
+
+    static final int DOUBLE_WINDOW = 6, ARG_SLOT_MAX = 0x20;
+
+    /** d for a dword operand [ESP + d] (no index) of ins, else null. */
+    static Long espSlot(Instruction ins, int op) {
+        if (!ins.getDefaultOperandRepresentation(op).toLowerCase().startsWith("dword ptr")) return null;
+        Register base = null;
+        long disp = 0;
+        int regs = 0;
+        for (Object o : ins.getOpObjects(op)) {
+            if (o instanceof Register r) { base = r; regs++; }
+            else if (o instanceof Scalar sc) disp = sc.getSignedValue();
+        }
+        return regs == 1 && base.getName().equals("ESP") ? disp : null;
+    }
+
+    static boolean writes(Instruction ins, Register r) {
+        for (Object o : ins.getResultObjects()) {
+            if (o instanceof Register w && w.getBaseRegister().equals(r.getBaseRegister())) return true;
+        }
+        return false;
+    }
+
+    /** Operand 1 of insns[j] is zero: imm 0, or a register last set by XOR r,r shortly before. */
+    static boolean isZero(List<Instruction> insns, int j) {
+        Object[] src = insns.get(j).getOpObjects(1);
+        if (src.length != 1) return false;
+        if (src[0] instanceof Scalar sc) return sc.getValue() == 0;
+        if (!(src[0] instanceof Register r)) return false;
+        for (int i = j - 1; i >= Math.max(0, j - DOUBLE_WINDOW); i--) {
+            Instruction prev = insns.get(i);
+            if (!writes(prev, r)) continue;
+            Object[] a = prev.getOpObjects(0), b = prev.getOpObjects(1);
+            return prev.getMnemonicString().equalsIgnoreCase("XOR") && a.length == 1 && b.length == 1
+                && r.equals(a[0]) && r.equals(b[0]);
+        }
+        return false;
+    }
+
+    /** Mirrors binary.py _double_high_word: the MOV imm32 at insns[k] is the high word of a
+     *  double call argument whose low word (stored at [esp+d-4]) is zero -> that double. */
+    static Double doubleHighWord(List<Instruction> insns, int k, long bits) {
+        Instruction ins = insns.get(k);
+        Long slot = espSlot(ins, 0);
+        Object[] dest = ins.getOpObjects(0);
+        if (slot == null && dest.length == 1 && dest[0] instanceof Register reg) {
+            for (int i = k + 1; i < Math.min(insns.size(), k + 1 + DOUBLE_WINDOW); i++) {
+                Instruction later = insns.get(i);
+                Object[] src = later.getNumOperands() == 2 ? later.getOpObjects(1) : new Object[0];
+                if (later.getMnemonicString().equalsIgnoreCase("MOV") && src.length == 1 && reg.equals(src[0])) {
+                    slot = espSlot(later, 0);
+                    break;
+                }
+                if (writes(later, reg)) break;
+            }
+        }
+        if (slot == null || slot > ARG_SLOT_MAX) return null;
+        boolean call = false;
+        for (int i = k + 1; i < Math.min(insns.size(), k + 1 + 2 * DOUBLE_WINDOW); i++) {
+            call |= insns.get(i).getMnemonicString().equalsIgnoreCase("CALL");
+        }
+        if (!call) return null;
+        for (int j = Math.max(0, k - DOUBLE_WINDOW); j < Math.min(insns.size(), k + DOUBLE_WINDOW + 1); j++) {
+            Instruction st = insns.get(j);
+            if (!st.getMnemonicString().equalsIgnoreCase("MOV") || st.getNumOperands() != 2) continue;
+            Long lo = espSlot(st, 0);
+            if (lo == null || lo != slot - 4 || !isZero(insns, j)) continue;
+            double v = Double.longBitsToDouble(bits << 32);
+            return shortDigits(Double.toString(Math.abs(v))) ? v : null;
+        }
+        return null;
+    }
+
+    static boolean shortDigits(String text) {
+        String digits = text.split("E")[0].replace(".", "").replaceAll("^0+", "").replaceAll("0+$", "");
+        return digits.length() <= 6;
     }
 
     /** NUL-terminated printable ASCII at a, C-escaped with quotes; null if not a string. */
@@ -293,11 +378,13 @@ public class ExportCustom extends GhidraScript {
     static String resolveLabels(String c, List<Lit> lits) {
         Map<Long, Lit> byAddr = new HashMap<>();
         for (Lit l : lits) byAddr.put(l.addr().getOffset(), l);
+        Set<Long> annotated = new HashSet<>();
         for (Lit l : lits) {
-            if (!l.kind().equals("immediate")) continue;
+            if (!l.kind().startsWith("immediate") || !annotated.add(l.bits())) continue;
             String hex = String.format("0x%x", l.bits());
+            String note = l.kind().equals("immediate") ? l.text() + "f" : "high word of double " + l.text();
             c = c.replaceAll("(?<![0-9A-Za-z_])" + hex + "(?![0-9A-Za-z_])",
-                Matcher.quoteReplacement(hex + " /* " + l.text() + "f */"));
+                Matcher.quoteReplacement(hex + " /* " + note + " */"));
         }
         Matcher m = LABEL.matcher(c);
         StringBuilder sb = new StringBuilder();
@@ -319,10 +406,13 @@ public class ExportCustom extends GhidraScript {
         StringBuilder sb = new StringBuilder(
             "// literals (Ghidra address of the data, or of the instruction for an immediate; type; value):\n");
         for (Lit l : lits) {
-            boolean imm = l.kind().equals("immediate");
-            sb.append("//   ").append(l.addr()).append("  ").append(String.format("%-6s", imm ? "float" : l.kind()))
+            boolean imm = l.kind().startsWith("immediate");
+            String type = l.kind().equals("immediate") ? "float" : l.kind().equals("immediate-double") ? "double" : l.kind();
+            sb.append("//   ").append(l.addr()).append("  ").append(String.format("%-6s", type))
               .append(" ").append(l.text())
-              .append(imm ? String.format("  (immediate 0x%08x)", l.bits()) : "").append("\n");
+              .append(!imm ? "" : l.kind().equals("immediate") ? String.format("  (immediate 0x%08x)", l.bits())
+                  : String.format("  (immediate 0x%08x, high word; low word 0)", l.bits()))
+              .append("\n");
         }
         return sb.toString();
     }

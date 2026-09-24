@@ -101,6 +101,37 @@ def shortest_float(value: float, kind: str) -> str:
 FLOAT_IMM_MIN, FLOAT_IMM_MAX, FLOAT_IMM_DIGITS = 2.0**-16, 2.0**24, 6
 
 
+ARG_SLOT_MAX = 0x20  # [esp+d] with d <= this is taken as an outgoing argument slot
+
+
+def _esp_slot(op) -> int | None:
+    """d for a dword memory operand [esp + d] (no index), else None."""
+    from capstone import x86
+
+    if op.type == x86.X86_OP_MEM and op.size == 4 and op.mem.base == x86.X86_REG_ESP and not op.mem.index:
+        return op.mem.disp
+    return None
+
+
+def _is_zero(insns: list, j: int, src) -> bool:
+    """Is operand `src` of insns[j] zero: imm 0, or a register last set by `xor r, r`
+    within the preceding DOUBLE_WINDOW instructions?"""
+    from capstone import x86
+
+    if src.type == x86.X86_OP_IMM:
+        return src.imm == 0
+    if src.type != x86.X86_OP_REG:
+        return False
+    for prev in reversed(insns[max(0, j - Binary.DOUBLE_WINDOW) : j]):
+        if src.reg in prev.regs_access()[1]:
+            ops = prev.operands
+            return (
+                prev.mnemonic == "xor" and len(ops) == 2
+                and ops[0].type == ops[1].type == x86.X86_OP_REG and ops[0].reg == ops[1].reg == src.reg
+            )
+    return False
+
+
 def float_immediate(imm: int) -> float | None:
     """The float an instruction immediate encodes, or None if it does not look like one."""
     bits = imm & 0xFFFFFFFF
@@ -320,21 +351,67 @@ class Binary:
         return list(seen)
 
     def immediate_floats(self, func: Function) -> list[tuple[int, Literal]]:
-        """(instruction address, float) for each `mov <4-byte dest>, imm32` whose immediate
-        looks like a float constant (see float_immediate)."""
+        """(instruction address, literal) for each `mov <4-byte dest>, imm32` whose immediate
+        looks like a float constant (see float_immediate).
+
+        A double argument built on the stack is two dword stores: low word 0 at [esp+d-4],
+        high word at [esp+d] (`va( "%f", -131072.0 )` stores 0 and 0xc1000000). When the
+        immediate reaches an argument slot [esp+d] (d <= ARG_SLOT_MAX, a call follows) and a
+        zero is stored at [esp+d-4] within DOUBLE_WINDOW instructions, the pair is taken as
+        that double, if it too is short (<= 6 digits)."""
         from capstone import x86
 
+        insns = list(self._md_detail.disasm(self._bytes(func.vaddr, func.size), func.vaddr))
         out = []
-        for ins in self._md_detail.disasm(self._bytes(func.vaddr, func.size), func.vaddr):
+        for k, ins in enumerate(insns):
             if ins.mnemonic != "mov" or len(ins.operands) != 2:
                 continue
             dest, src = ins.operands
             if src.type != x86.X86_OP_IMM or dest.size != 4:
                 continue
             value = float_immediate(src.imm)
-            if value is not None:
+            if value is None:
+                continue
+            double = self._double_high_word(insns, k)
+            if double is not None:
+                out.append((ins.address, Literal("double", double)))
+            else:
                 out.append((ins.address, Literal("float", value)))
         return out
+
+    DOUBLE_WINDOW = 6
+
+    def _double_high_word(self, insns: list, k: int) -> float | None:
+        """If insns[k] (`mov <dest>, imm32`) is the high word of a stack double whose low word
+        is zero, the double's value (see immediate_floats); else None."""
+        from capstone import x86
+
+        imm = insns[k].operands[1].imm & 0xFFFFFFFF
+        slot = _esp_slot(insns[k].operands[0])  # stored straight to [esp+d]?
+        if slot is None and insns[k].operands[0].type == x86.X86_OP_REG:
+            reg = insns[k].operands[0].reg
+            for later in insns[k + 1 : k + 1 + self.DOUBLE_WINDOW]:
+                ops = later.operands
+                if later.mnemonic == "mov" and len(ops) == 2 and ops[1].type == x86.X86_OP_REG and ops[1].reg == reg:
+                    slot = _esp_slot(ops[0])
+                    break
+                if reg in later.regs_access()[1]:
+                    break
+        # Only outgoing call arguments: a small [esp+d] and a call soon after. Stack locals
+        # such as an idVec3( 0, 1.0f, 0 ) also put a 0 next to a float and must stay floats.
+        if slot is None or slot > ARG_SLOT_MAX:
+            return None
+        if not any(i.mnemonic == "call" for i in insns[k + 1 : k + 1 + 2 * self.DOUBLE_WINDOW]):
+            return None
+        lo, hi = max(0, k - self.DOUBLE_WINDOW), k + self.DOUBLE_WINDOW + 1
+        for j in range(lo, min(hi, len(insns))):
+            ops = insns[j].operands
+            if insns[j].mnemonic != "mov" or len(ops) != 2 or _esp_slot(ops[0]) != slot - 4:
+                continue
+            if _is_zero(insns, j, ops[1]):
+                (value,) = struct.unpack("<d", struct.pack("<Q", imm << 32))
+                return value if _shortest_digits(value, "double") <= FLOAT_IMM_DIGITS else None
+        return None
 
     def _name_for(self, target: int) -> str:
         if target in self.plt:
