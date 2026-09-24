@@ -10,7 +10,7 @@ Offsets are from the start of `idPlayer` in this build (`this + offset`). Names 
 
 | Offset | Type | Name | Group | Evidence (binary) |
 |---|---|---|---|---|
-| `+0x1f0c` | `idCustomUI *` | `customUIEntity` | custom-ui | `useCustomUI` stores its 2nd argument (`idCustomUI *`), `clearCustomUI` zeroes it. `HandleSingleGuiCommand` calls `HandleCustomGUICommand` (vtable slot 59) on it. |
+| `+0x1f0c` | `idCustomUI *` | `customUIEntity` | custom-ui | `useCustomUI` stores its 2nd argument (`idCustomUI *`), `clearCustomUI` zeroes it. `HandleSingleGuiCommand` calls `HandleCustomGUICommand` (vtable slot 59, `[vptr+0xe4]`) on it. |
 | `+0x1f10` | `idUserInterface *` | `customUI` | custom-ui | `useCustomUI` stores its 1st argument (`idUserInterface *`), `clearCustomUI` zeroes it. `ActiveGui` returns it first when non-NULL. |
 
 ## Methods

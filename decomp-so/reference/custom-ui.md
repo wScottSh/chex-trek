@@ -18,8 +18,10 @@ Scope (spec #16, issue #17): the `idCustomUI` class, `idPlayer::useCustomUI` / `
 //   2. RTTI: _ZTI10idCustomUI is a __si_class_type_info whose base is _ZTI8idEntity.
 //   3. Both constructor clones (C1 0x18dd60, C2 0x18ddb0) call idEntity's base constructor first.
 //      Both destructor clones (D0 0x199100, D1 0x199150) end in idEntity's base destructor.
-//   4. Vtable _ZTV10idCustomUI (60 slots) matches _ZTV8idEntity (59 slots) slot for slot,
-//      except for the idCustomUI overrides (type, destructors) and one new slot at the end.
+//   4. Vtable _ZTV10idCustomUI (60 words) matches _ZTV8idEntity (59 words) word for word,
+//      except for the idCustomUI overrides (type, destructors) and one new entry at the end.
+//      "Slot N" below counts words of the _ZTV symbol (offset-to-top and typeinfo are slots
+//      0 and 1). The object's vptr points at slot 2, so slot N is called as [vptr + (N-2)*4].
 //   5. Its first member is at this+0x27c, and sizeof(idEntity) in this build is 0x27c
 //      (stock idTarget::CreateInstance @ 0x18de90 allocates 0x27c for an idTarget, which adds
 //      no members to idEntity).
@@ -31,8 +33,10 @@ public:
 	ABSTRACT_PROTOTYPE( idCustomUI );
 
 							idCustomUI( void );
+							~idCustomUI( void );
 	// UNCERTAIN: whether ~idCustomUI() was declared in the source. The binary has D0/D1 clones
-	// (vtable slots 3/4) with an empty body, which a compiler-generated destructor also produces.
+	// (vtable slots 3/4) with an empty body, which a compiler-generated destructor also
+	// produces. Declaring an empty one here behaves the same. It is virtual through idEntity.
 
 	void					Save( idSaveGame *savefile ) const;
 	void					Restore( idRestoreGame *savefile );
@@ -41,7 +45,7 @@ public:
 	void					RegisterGUI( void );
 	void					UnregisterGUI( void );
 
-	// New virtual: vtable slot 59, the one slot idEntity does not have. The stock
+	// New virtual: vtable slot 59 ([vptr+0xe4]), the one slot idEntity does not have. The stock
 	// idPlayer::HandleSingleGuiCommand calls it through the vtable (call [vptr+0xe4] @ 0x16db8c).
 	virtual bool			HandleCustomGUICommand( idEntity *entityGui, idToken *token );
 
@@ -113,7 +117,7 @@ idCustomUI::idCustomUI( void ) {
 ================
 idCustomUI::~idCustomUI
 
-Not written in the source, or empty (see header).
+Possibly not written in the source (see header).
 ================
 */
 idCustomUI::~idCustomUI( void ) {
@@ -272,8 +276,9 @@ idCVar g_PDA( "g_PDA", "guis/pda_chex.gui", CVAR_GAME | CVAR_ARCHIVE, "gui file 
 
 - **Placement of `ArgCompletion_GuiName`.** Issue #17 placed this function here provisionally. Its only registration site is the `g_PDA` cvar (PDA GUI file), not the HUD map's `showMap` command. It stays in this group: it is a GUI-name helper, and the HUD map group (#22) does not use it.
 - **Who uses `idCustomUI` (binary, outside this group).** `idTarget_EndLevelGUI` is its only subclass: its `CreateInstance` calls `idCustomUI`'s base constructor. It calls `setGUI` and `RegisterGUI` from `Event_Activate`, and `UnregisterGUI` from `Event_UpdateStats` and its own `HandleCustomGUICommand`. Nothing else calls `idPlayer::useCustomUI` / `clearCustomUI` except `idCustomUI::RegisterGUI` / `UnregisterGUI`. Among the entity defs in `def/`, only `def/endlevelgui.def` (`spawnclass idTarget_EndLevelGUI`) names either class.
-- **Edits inside stock `idPlayer` functions (out of scope for spec #16, recorded as leads).** A displacement of `+0x1f10` (presumably `customUI`) also appears in `ActiveGui` (returned first when non-NULL, 0x14ce64), `UpdateViewAngles`, `SelectWeapon`, `Weapon_GUI`, `ClientPredictionThink`, `Think`, `HandleSingleGuiCommand` and `idPlayerView::SingleView`. When both `+0x1f10` and `+0x1f0c` are non-NULL, `HandleSingleGuiCommand` calls vtable slot 59 (`HandleCustomGUICommand`) on the `+0x1f0c` object (0x16db60-0x16db8c). Both constructor clones write both members. None of these are checked here.
+- **Edits inside stock `idPlayer` functions (out of scope for spec #16, recorded as leads).** A displacement of `+0x1f10` (presumably `customUI`) also appears in `ActiveGui` (returned first when non-NULL, 0x14ce64), `UpdateViewAngles`, `SelectWeapon`, `Weapon_GUI`, `ClientPredictionThink`, `Think`, `HandleSingleGuiCommand` and `idPlayerView::SingleView`. When both `+0x1f10` and `+0x1f0c` are non-NULL, `HandleSingleGuiCommand` calls vtable slot 59 (`HandleCustomGUICommand`, `[vptr+0xe4]`) on the `+0x1f0c` object (0x16db60-0x16db8c). Both constructor clones write both members. None of these are checked here.
 - **`gameLocal.time` offset.** `+0x251884` is taken as `gameLocal.time` because stock `idEvent::Schedule` (`this->time = gameLocal.time + time`) reads the same offset (0x1df4fb). Not proven by compiling.
+- **Limit of check 1 for this group.** The harness checks only direct calls. Calls through a vtable or function pointer cannot be named from the binary alone and are not checked. That covers every engine-interface call here: `uiManager->FindGui`, `gui->Activate`, `common->Warning`, `cmdSystem->ArgCompletion_FolderExtension`. So `setGUI` and `ArgCompletion_GuiName` pass with 0 checked callees. Their vtable calls rest on the offset matching in the next point.
 - **Vtable offsets** (`FindGui` +0x38, `Activate` +0x5c, `Warning` +0x50, `ArgCompletion_FolderExtension` +0x2c) were matched by counting virtual declarations in the stock headers, with GCC 3 two-slot virtual destructors.
 - **Ghidra artifacts.**
   - Ghidra labels the D0 clone `~idCustomUI` and passes a stray `unaff_EBX` to `operator_delete`. The call is really `idClass::operator delete( this )`.

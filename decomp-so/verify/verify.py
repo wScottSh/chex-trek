@@ -3,8 +3,10 @@
 
 Check 1 -- callee coverage. For every function the coverage record marks `covered`,
 disassemble its real byte range (symbol-table start + st_size), list its distinct direct
-callees, and assert each one appears in that function's definition in the group's
-reference Markdown. Missing callees are reported per function.
+callees, and assert each one appears in the code of that function's definition in the
+group's reference Markdown. Comments do not count, except for constructor/destructor
+callees, whose calls are usually implicit. Indirect (virtual / function-pointer) calls
+cannot be named from the binary alone and are not checked. Missing callees are reported per function.
 
     python decomp-so/verify/verify.py              # every group with covered functions
     python decomp-so/verify/verify.py custom-ui    # one (or more) groups
@@ -33,7 +35,8 @@ BINARY_PATH = REPO_ROOT / "gamex86.so"
 REFERENCE_DIR = DECOMP_DIR / "reference"
 COVERAGE_PATH = REFERENCE_DIR / "coverage.md"
 ALLOWLIST_PATH = VERIFY_DIR / "allowlist.tsv"
-GHIDRA_INDEX = DECOMP_DIR / "ghidra-full" / "_index.tsv"
+GHIDRA_DIR = DECOMP_DIR / "ghidra-full"
+GHIDRA_INDEX = GHIDRA_DIR / "_index.tsv"
 
 # Stock class-declaration macros (neo/game/gamesys/Class.h, DOOM-3 GPL a9c49da). When a
 # reference writes one of these instead of a body, the macro's stock expansion is the body.
@@ -53,7 +56,7 @@ MACRO_BODIES = {
 # Operator callees: how each may appear in source. Ghidra spells `operator new[]` as
 # `operator_new__`, so both spellings are accepted (spec #16: `operator new[]` == `operator_new__`).
 _OPERATOR_PATTERNS = {
-    "new": r"\bnew\b(?!\s*\[)|\boperator\s*new\b(?!\s*\[)|\boperator_new\b",
+    "new": r"\bnew\b(?![^;]*\[)|\boperator\s*new\b(?!\s*\[)|\boperator_new\b",
     "new[]": r"\bnew\b[^;]*\[|\boperator\s*new\s*\[\s*\]|\boperator_new__",
     "delete": r"\bdelete\b(?!\s*\[)|\boperator\s*delete\b(?!\s*\[)|\boperator_delete\b",
     "delete[]": r"\bdelete\s*\[\s*\]|\boperator\s*delete\s*\[\s*\]|\boperator_delete__",
@@ -72,8 +75,12 @@ def normalize_operator(member: str) -> str | None:
 
 
 def callee_pattern(callee_name: str) -> re.Pattern:
-    """Regex that finds a mention of this callee in reconstruction source text."""
-    cls, member = split_qualified(callee_name)
+    """Regex that finds a mention of this callee in reconstruction source text.
+
+    Deliberately loose: the member name only (source writes `gameLocal.Printf`, not
+    `idGameLocal::Printf`); a constructor is its class name; other operators match their
+    symbol. The check asks "is the call there?", not "is it spelled a certain way?"."""
+    _, member = split_qualified(callee_name)
     op = normalize_operator(member)
     if op is not None:
         pat = _OPERATOR_PATTERNS.get(op, r"\boperator\s*" + re.escape(op) + r"|" + re.escape(op))
@@ -94,7 +101,7 @@ class AllowEntry:
 
 def load_allowlist(path: Path = ALLOWLIST_PATH) -> list[AllowEntry]:
     out = []
-    for line in path.read_text().splitlines():
+    for line in path.read_text(encoding="utf-8").splitlines():
         if not line.strip() or line.startswith("#"):
             continue
         parts = line.split("\t")
@@ -150,6 +157,13 @@ def implementation_block(markdown: str) -> str:
     return blocks[1]
 
 
+def _comment_end(text: str, i: int) -> int:
+    end = text.find("*/", i + 2)
+    if end < 0:
+        raise ValueError("unterminated /* comment")
+    return end + 2
+
+
 def _skip_ws_comments(text: str, i: int) -> int:
     while i < len(text):
         if text[i].isspace():
@@ -158,7 +172,7 @@ def _skip_ws_comments(text: str, i: int) -> int:
             i = text.find("\n", i)
             i = len(text) if i < 0 else i
         elif text.startswith("/*", i):
-            i = text.find("*/", i) + 2
+            i = _comment_end(text, i)
         else:
             break
     return i
@@ -174,7 +188,7 @@ def _match_close(text: str, i: int, open_ch: str, close_ch: str) -> int:
                 break
             continue
         if text.startswith("/*", i):
-            i = text.find("*/", i) + 2
+            i = _comment_end(text, i)
             continue
         ch = text[i]
         if ch in "\"'":
@@ -207,6 +221,21 @@ def find_definition(impl: str, name: str) -> str | None:
         line_start = impl.rfind("\n", 0, m.start()) + 1
         return impl[line_start : _match_close(impl, j, "{", "}")]
     return None
+
+
+_COMMENT_OR_LITERAL = re.compile(r'//[^\n]*|/\*.*?\*/|"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\'', re.S)
+
+
+def code_only(text: str) -> str:
+    """`text` with comments and string/char literals blanked out."""
+    return _COMMENT_OR_LITERAL.sub(" ", text)
+
+
+def is_structor(callee_name: str) -> bool:
+    """Constructors/destructors: their calls are often implicit (base/member), so the
+    reconstruction may only be able to name them in a comment."""
+    cls, member = split_qualified(callee_name)
+    return member in (cls, "~" + cls)
 
 
 def find_macro_body(impl: str, name: str) -> str | None:
@@ -261,11 +290,13 @@ def check_group(
         if body is None:
             res.error = f"no definition of {name} in the implementation block"
             continue
+        code = code_only(body)
         for callee in binary.callees(func):
             if callee.ignored:
                 continue
             res.callees.append(callee)
-            if callee_pattern(callee.name).search(body):
+            # A mention in a comment only counts for constructors/destructors (implicit calls).
+            if callee_pattern(callee.name).search(body if is_structor(callee.name) else code):
                 continue
             entry = allowed(func, callee, allow)
             if entry:

@@ -75,7 +75,13 @@ class Binary:
 
     @cached_property
     def by_raw(self) -> dict[str, Function]:
-        return {f.raw: f for f in self.functions.values()}
+        """Every .symtab function symbol, including aliases that share an address."""
+        out: dict[str, Function] = {}
+        for sym in self.elf.get_section_by_name(".symtab").iter_symbols():
+            if sym["st_info"]["type"] == "STT_FUNC" and sym["st_value"]:
+                canon = self.functions[sym["st_value"]]
+                out[sym.name] = Function(sym.name, demangle(sym.name), canon.vaddr, canon.size)
+        return out
 
     @cached_property
     def plt(self) -> dict[int, str]:
@@ -102,9 +108,6 @@ class Binary:
             if f.raw == name or strip_params(f.name) == name
         ]
 
-    def function_at(self, vaddr: int) -> Function:
-        return self.functions[vaddr]
-
     def callees(self, func: Function) -> list[Callee]:
         """Distinct direct callees (calls, and tail-jumps leaving the function), in first-seen order."""
         code = self._bytes(func.vaddr, func.size)
@@ -122,12 +125,10 @@ class Binary:
             if ins.mnemonic == "call" and target == ins.address + ins.size:
                 continue  # `call next; pop %ebx` PIC idiom
             raw = self._name_for(target)
-            if raw is None:
-                continue
             seen.setdefault(raw, Callee(raw, demangle(raw)))
         return list(seen.values())
 
-    def _name_for(self, target: int) -> str | None:
+    def _name_for(self, target: int) -> str:
         if target in self.plt:
             return self.plt[target]
         f = self.functions.get(target)
@@ -141,15 +142,22 @@ class Binary:
         raise ValueError(f"address {vaddr:#x} not in a loaded segment")
 
 
+_OPERATOR_SYMBOL = re.compile(r"\boperator\s*(\(\)|[^\w\s(]+)")
+
+
 def strip_params(demangled: str) -> str:
     """`idStr::operator=(char const*)` -> `idStr::operator=`; keeps template args."""
+    op = _OPERATOR_SYMBOL.search(demangled)
+    skip = range(op.start(1), op.end(1)) if op else range(0)
     depth = 0
     for i, ch in enumerate(demangled):
+        if i in skip:
+            continue  # `<`, `>`, `()` of operator<, operator->, operator() are not brackets
         if ch == "<":
             depth += 1
         elif ch == ">":
             depth -= 1
-        elif ch == "(" and depth == 0 and not demangled[:i].endswith("operator"):
+        elif ch == "(" and depth == 0:
             return demangled[:i].removesuffix(" const")
     return demangled.removesuffix(" const")
 

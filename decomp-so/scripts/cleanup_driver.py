@@ -24,7 +24,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "verify"))
 import verify  # noqa: E402
-from binary import Binary  # noqa: E402
+from binary import GHIDRA_IMAGE_BASE, Binary  # noqa: E402
 
 RULES = """\
 ## Rules (spec #16)
@@ -80,11 +80,11 @@ def build_packet(group: str) -> str:
     for r in rows:
         f = binary.by_raw[r.symbol]
         callees = [c for c in binary.callees(f) if not c.ignored]
-        export = (verify.DECOMP_DIR / "ghidra-full" / r.export).read_text(encoding="utf-8")
+        export = (verify.GHIDRA_DIR / r.export).read_text(encoding="utf-8")
         out.append(
             f"### {r.function} ({f.name})\n\n"
             f"- symbol `{r.symbol}`, ELF {f.vaddr:#x}, {f.size} bytes (Ghidra address "
-            f"{f.vaddr + 0x10000:#x}), export `{r.export}`, status `{r.status}`\n"
+            f"{f.vaddr + GHIDRA_IMAGE_BASE:#x}), export `{r.export}`, status `{r.status}`\n"
             f"- direct callees (binary): "
             + (", ".join(f"`{c.name}`" for c in callees) or "none")
             + f"\n\n```c\n{export.rstrip()}\n```\n"

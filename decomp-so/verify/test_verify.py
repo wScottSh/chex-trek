@@ -76,6 +76,20 @@ class CalleeCoverage(unittest.TestCase):
                         hit = [r for r in results if r.row.vaddr == row.vaddr][0]
                         self.assertIn(callee, hit.missing)
 
+    def test_a_mention_in_a_comment_does_not_count(self):
+        text = reference("custom-ui")
+        call = "\tidEntity::Hide();\n"
+        self.assertEqual(text.count(call), 1)
+        results = verify.check_group(
+            "custom-ui", BINARY, ROWS, ALLOW, text.replace(call, "\t// idEntity::Hide(); \"Hide\"\n")
+        )
+        self.assertEqual(missing_pairs(results), {("idCustomUI::Event_Hide", "idEntity::Hide")})
+
+    def test_implicit_base_destructor_may_be_named_in_a_comment(self):
+        self.assertTrue(verify.is_structor("idEntity::{base dtor}()"))
+        self.assertTrue(verify.is_structor("idEntity::{base ctor}()"))
+        self.assertFalse(verify.is_structor("idEntity::Hide()"))
+
     def test_wrong_declaration_macro_fails(self):
         text = reference("custom-ui").replace("ABSTRACT_DECLARATION( idEntity, idCustomUI )",
                                               "CLASS_DECLARATION( idEntity, idCustomUI )")
@@ -102,6 +116,7 @@ class HarnessRules(unittest.TestCase):
         for text in ("p = new idFoo;", "idClass::operator new( n )", "operator_new( n )"):
             self.assertTrue(new_obj.search(text), text)
         self.assertFalse(new_obj.search("operator_new__( n )"))
+        self.assertFalse(new_obj.search("p = new int[ 4 ];"))
         self.assertTrue(delete.search("delete p;"))
         self.assertFalse(delete.search("delete[] p;"))
         self.assertTrue(delete_arr.search("delete[] p;"))
@@ -115,6 +130,24 @@ class HarnessRules(unittest.TestCase):
         self.assertFalse(base_dtor.search("idEntity *ent;"))
         self.assertTrue(verify.callee_pattern("idEntity::{base ctor}()").search("idEntity::idEntity() first"))
         self.assertFalse(verify.callee_pattern("idEntity::Hide()").search("Event_Hide();"))
+
+    def test_operator_names_keep_their_brackets(self):
+        from binary import strip_params
+
+        self.assertEqual(strip_params("idVec3::operator<(idVec3 const&)"), "idVec3::operator<")
+        self.assertEqual(strip_params("idFoo::operator->()"), "idFoo::operator->")
+        self.assertEqual(strip_params("idFoo::operator()(int)"), "idFoo::operator()")
+        self.assertEqual(strip_params("idList<idStr>::Append(idStr const&)"), "idList<idStr>::Append")
+        self.assertEqual(strip_params("operator new[](unsigned int)"), "operator new[]")
+        self.assertEqual(strip_params("idStr::operator<<=(int)"), "idStr::operator<<=")
+
+    def test_unterminated_comment_is_an_error_not_a_hang(self):
+        with self.assertRaises(ValueError):
+            verify.find_definition("void f( int a /* oops ", "f")
+
+    def test_aliased_symbols_resolve(self):
+        f = BINARY.by_raw["_ZN10idCustomUIC2Ev"]
+        self.assertEqual((f.vaddr, f.size), (0x18DDB0, 72))
 
     def test_abi_clones_collapse_to_one_source_name(self):
         by_addr = {r.vaddr: BINARY.by_raw[r.symbol] for r in ROWS}
@@ -146,12 +179,12 @@ class HarnessRules(unittest.TestCase):
 
 class Records(unittest.TestCase):
     def test_coverage_record_lists_all_84_exported_functions(self):
-        index = [l.split("\t") for l in verify.GHIDRA_INDEX.read_text().splitlines()]
+        index = [l.split("\t") for l in verify.GHIDRA_INDEX.read_text(encoding="utf-8").splitlines()]
         self.assertEqual(len(ROWS), 84)
         self.assertEqual(sorted(r.export for r in ROWS), sorted(f"{safe}.c" for safe, _, _ in index))
         for r in ROWS:
             with self.subTest(export=r.export):
-                self.assertTrue((verify.DECOMP_DIR / "ghidra-full" / r.export).exists())
+                self.assertTrue((verify.GHIDRA_DIR / r.export).exists())
                 self.assertEqual(BINARY.by_raw[r.symbol].vaddr, r.vaddr)
                 self.assertEqual(int(r.export.rsplit("_", 1)[1][:-2], 16), r.vaddr + GHIDRA_IMAGE_BASE)
                 self.assertIn(r.status, {"covered", "pending"})
