@@ -1,0 +1,64 @@
+// idGameLocal::GetLevelStats @ 00100800
+// undefined GetLevelStats(idGameLocal * this, playerStats_s * param_1)
+
+/* WARNING: Function: __i686.get_pc_thunk.bx replaced with injection: get_pc_thunk_bx */
+/* idGameLocal::GetLevelStats(playerStats_s*) */
+
+void __thiscall idGameLocal::GetLevelStats(idGameLocal *this,playerStats_s *param_1)
+
+{
+  int iVar1;
+  undefined1 *puVar2;
+  int iVar3;
+  
+  *(undefined4 *)param_1 = 0;
+  *(undefined4 *)(param_1 + 0x14) = 0;
+  *(undefined4 *)(param_1 + 0x28) = 0;
+  if (*(int *)(this + 0x8f48) < 1) {
+    return;
+  }
+  iVar3 = 0;
+  do {
+    while (*(int *)(this + iVar3 * 4 + 0xf44) == 0) {
+LAB_00100856:
+      iVar3 = iVar3 + 1;
+      if (*(int *)(this + 0x8f48) <= iVar3) {
+        return;
+      }
+    }
+    iVar1 = idDict::FindKey((idDict *)(*(int *)(this + iVar3 * 4 + 0xf44) + 100),"secret");
+    puVar2 = &LAB_00372157_1;
+    if (iVar1 != 0) {
+      puVar2 = *(undefined1 **)(*(int *)(iVar1 + 4) + 4);
+    }
+    iVar1 = __strtol_internal(puVar2,0,10,0);
+    if (iVar1 != 0) {
+      *(int *)(param_1 + 0x28) = *(int *)(param_1 + 0x28) + 1;
+      goto LAB_00100856;
+    }
+    iVar1 = idDict::FindKey((idDict *)(*(int *)(this + iVar3 * 4 + 0xf44) + 100),"level_item");
+    puVar2 = &LAB_00372157_1;
+    if (iVar1 != 0) {
+      puVar2 = *(undefined1 **)(*(int *)(iVar1 + 4) + 4);
+    }
+    iVar1 = __strtol_internal(puVar2,0,10,0);
+    if (iVar1 == 0) {
+      iVar1 = idDict::FindKey((idDict *)(*(int *)(this + iVar3 * 4 + 0xf44) + 100),"level_monster");
+      puVar2 = &LAB_00372157_1;
+      if (iVar1 != 0) {
+        puVar2 = *(undefined1 **)(*(int *)(iVar1 + 4) + 4);
+      }
+      iVar1 = __strtol_internal(puVar2,0,10,0);
+      if (iVar1 != 0) {
+        *(int *)param_1 = *(int *)param_1 + 1;
+      }
+      goto LAB_00100856;
+    }
+    iVar3 = iVar3 + 1;
+    *(int *)(param_1 + 0x14) = *(int *)(param_1 + 0x14) + 1;
+    if (*(int *)(this + 0x8f48) <= iVar3) {
+      return;
+    }
+  } while( true );
+}
+
