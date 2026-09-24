@@ -1,5 +1,6 @@
 // mkObjective::GetType @ 0019d640
 // undefined GetType(void)
+// literals: none
 
 /* WARNING: Function: __i686.get_pc_thunk.cx replaced with injection: get_pc_thunk_cx */
 /* mkObjective::GetType() const */

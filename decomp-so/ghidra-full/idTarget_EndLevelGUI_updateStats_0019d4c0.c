@@ -1,5 +1,6 @@
 // idTarget_EndLevelGUI::updateStats @ 0019d4c0
 // undefined updateStats(idTarget_EndLevelGUI * this, playerStats_s * param_1, playerStats_s * param_2)
+// literals: none
 
 /* WARNING: Function: __i686.get_pc_thunk.bx replaced with injection: get_pc_thunk_bx */
 /* idTarget_EndLevelGUI::updateStats(playerStats_s*, playerStats_s*) */

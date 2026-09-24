@@ -1,5 +1,12 @@
 // idPlayer::tryOpen @ 0017c420
 // undefined tryOpen(void)
+// literals (read from .rodata; Ghidra address, type, value):
+//   0037048b  string "requires"
+//   00372945  string "lockedtext"
+//   00372979  string "Door Locked"
+//   00372965  string " to open this door."
+//   00372950  string "This door is locked."
+//   0037f468  string ""
 
 /* WARNING: Function: __i686.get_pc_thunk.bx replaced with injection: get_pc_thunk_bx */
 /* idPlayer::tryOpen() */
@@ -136,7 +143,7 @@ LAB_0017c904:
         }
         iVar5 = 0;
         cVar4 = ' ';
-        puVar7 = &LAB_00372961_4;
+        puVar7 = " to open this door.";
         do {
           local_6c[iVar5 + local_70] = cVar4;
           iVar5 = iVar5 + 1;

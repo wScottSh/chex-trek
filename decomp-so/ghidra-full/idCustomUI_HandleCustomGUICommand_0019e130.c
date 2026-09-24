@@ -1,5 +1,7 @@
 // idCustomUI::HandleCustomGUICommand @ 0019e130
 // undefined HandleCustomGUICommand(idCustomUI * this, idEntity * param_1, idToken * param_2)
+// literals (read from .rodata; Ghidra address, type, value):
+//   00373d09  string "unregister"
 
 /* WARNING: Function: __i686.get_pc_thunk.bx replaced with injection: get_pc_thunk_bx */
 /* idCustomUI::HandleCustomGUICommand(idEntity*, idToken*) */

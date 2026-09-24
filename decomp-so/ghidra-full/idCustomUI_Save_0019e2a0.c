@@ -1,5 +1,6 @@
 // idCustomUI::Save @ 0019e2a0
 // undefined Save(idCustomUI * this, idSaveGame * param_1)
+// literals: none
 
 /* WARNING: Function: __i686.get_pc_thunk.bx replaced with injection: get_pc_thunk_bx */
 /* idCustomUI::Save(idSaveGame*) const */

@@ -1,5 +1,6 @@
 // mkTrail::CreateInstance @ 002b53f0
 // undefined CreateInstance(void)
+// literals: none
 
 /* WARNING: Function: __i686.get_pc_thunk.bx replaced with injection: get_pc_thunk_bx */
 /* mkTrail::CreateInstance() */

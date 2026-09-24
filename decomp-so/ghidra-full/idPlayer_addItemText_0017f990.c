@@ -1,5 +1,8 @@
 // idPlayer::addItemText @ 0017f990
 // undefined addItemText(idPlayer * this, idItemInfo * param_1)
+// literals (read from .rodata; Ghidra address, type, value):
+//   00372b4d  string "itemicon"
+//   00372b56  string "invPickup"
 
 /* WARNING: Function: __i686.get_pc_thunk.bx replaced with injection: get_pc_thunk_bx */
 /* idPlayer::addItemText(idItemInfo const&) */
@@ -42,8 +45,8 @@ void __thiscall idPlayer::addItemText(idPlayer *this,idItemInfo *param_1)
   *(int *)this_00 = *(int *)this_00 + 1;
   piVar2 = *(int **)(this + 0x1428);
   if (piVar2 != (int *)0x0) {
-    (**(code **)(*piVar2 + 0x38))(piVar2,&LAB_00372b4b_2,*(undefined4 *)(param_1 + 0x24));
-    (**(code **)(**(int **)(this + 0x1428) + 0x24))(*(int **)(this + 0x1428),&LAB_00372b51_5);
+    (**(code **)(*piVar2 + 0x38))(piVar2,"itemicon",*(undefined4 *)(param_1 + 0x24));
+    (**(code **)(**(int **)(this + 0x1428) + 0x24))(*(int **)(this + 0x1428),"invPickup");
   }
   return;
 }

@@ -1,5 +1,8 @@
 // idStr::FormatTime @ 00354230
 // undefined FormatTime(idStr * this, char * param_1, int param_2)
+// literals (read from .rodata; Ghidra address, type, value):
+//   00371002  string "%i"
+//   00385bfa  string "%0"
 
 /* WARNING: Function: __i686.get_pc_thunk.bx replaced with injection: get_pc_thunk_bx */
 /* idStr::FormatTime(char const*, int) */

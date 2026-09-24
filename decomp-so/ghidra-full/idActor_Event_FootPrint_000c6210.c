@@ -1,8 +1,30 @@
 // idActor::Event_FootPrint @ 000c6210
 // undefined Event_FootPrint(idActor * this, char * param_1, char * param_2)
+// literals (read from .rodata; Ghidra address, type, value):
+//   0036beab  string "footprint_s_z"
+//   00372158  string "0"
+//   0036beb9  string "footprint_e_z"
+//   0036bec7  string "-8"
+//   0036beca  string "footprint_time_%s"
+//   0036beed  string "mtr_footprint"
+//   0037f468  string ""
+//   0036befb  string "footprint_scale_x"
+//   0037470c  string "1"
+//   0036bf0d  string "footprint_scale_y"
+//   0036bf1f  string "footprint_size"
+//   00371dbd  string "16"
+//   0036bf34  string "footprint_offset_%s"
+//   0036b0e4  float  0.5
+//   0036b0e8  float  1.5
+//   0036bbbe  string "%s_%s"
+//   0036bedc  string "mtr_footprint_%s"
+//   0036c140  float  -12.0
+//   0036bf2e  string "_r"
+//   0037d0f7  string "%s%s"
+//   0036c144  float  12.0
+//   0036bf31  string "_l"
 
 /* WARNING: Function: __i686.get_pc_thunk.bx replaced with injection: get_pc_thunk_bx */
-/* WARNING: Globals starting with '_' overlap smaller symbols at the same address */
 /* idActor::Event_FootPrint(char const*, char const*) */
 
 void __thiscall idActor::Event_FootPrint(idActor *this,char *param_1,char *param_2)
@@ -13,6 +35,7 @@ void __thiscall idActor::Event_FootPrint(idActor *this,char *param_1,char *param
   float fVar3;
   float fVar4;
   float fVar5;
+  undefined *this_00;
   char cVar6;
   int *piVar7;
   undefined4 *puVar8;
@@ -20,11 +43,9 @@ void __thiscall idActor::Event_FootPrint(idActor *this,char *param_1,char *param
   char *pcVar10;
   undefined4 uVar11;
   float fVar12;
-  undefined1 *puVar13;
-  float *pfVar14;
-  undefined *puVar15;
-  idDict *this_00;
-  longdouble lVar16;
+  float *pfVar13;
+  idDict *this_01;
+  longdouble lVar14;
   float fStack_12c;
   char *pcStack_128;
   float fStack_114;
@@ -89,7 +110,7 @@ void __thiscall idActor::Event_FootPrint(idActor *this,char *param_1,char *param
   }
   piVar7 = (int *)idEntity::GetPhysics((idEntity *)this);
   puVar8 = (undefined4 *)(**(code **)(*piVar7 + 0x84))(piVar7,0);
-  this_00 = (idDict *)(this + 100);
+  this_01 = (idDict *)(this + 100);
   local_5c = puVar8[1];
   local_60 = *puVar8;
   fVar12 = (float)puVar8[2];
@@ -97,21 +118,21 @@ void __thiscall idActor::Event_FootPrint(idActor *this,char *param_1,char *param
   local_54 = local_60;
   local_50 = local_5c;
   local_4c = fVar12;
-  iVar9 = idDict::FindKey(this_00,"footprint_s_z");
-  puVar13 = &LAB_00372157_1;
+  iVar9 = idDict::FindKey(this_01,"footprint_s_z");
+  pcVar10 = "0";
   if (iVar9 != 0) {
-    puVar13 = *(undefined1 **)(*(int *)(iVar9 + 4) + 4);
+    pcVar10 = *(char **)(*(int *)(iVar9 + 4) + 4);
   }
-  lVar16 = (longdouble)__strtod_internal(puVar13,0,0);
+  lVar14 = (longdouble)__strtod_internal(pcVar10,0,0);
   fVar1 = local_58;
-  local_4c = fVar12 + (float)lVar16;
-  iVar9 = idDict::FindKey(this_00,"footprint_e_z");
-  puVar13 = &LAB_0036bec7;
+  local_4c = fVar12 + (float)lVar14;
+  iVar9 = idDict::FindKey(this_01,"footprint_e_z");
+  pcVar10 = "-8";
   if (iVar9 != 0) {
-    puVar13 = *(undefined1 **)(*(int *)(iVar9 + 4) + 4);
+    pcVar10 = *(char **)(*(int *)(iVar9 + 4) + 4);
   }
-  lVar16 = (longdouble)__strtod_internal(puVar13,0,0);
-  local_58 = (float)lVar16 + fVar1;
+  lVar14 = (longdouble)__strtod_internal(pcVar10,0,0);
+  local_58 = (float)lVar14 + fVar1;
   cVar6 = (**(code **)(**(int **)PTR_gameRenderWorld_003e10a0 + 0x7c))
                     (*(int **)PTR_gameRenderWorld_003e10a0,auStack_d0,&local_54,&local_60,0x41000000
                      ,0,1);
@@ -119,7 +140,7 @@ void __thiscall idActor::Event_FootPrint(idActor *this,char *param_1,char *param
     pcVar10 = (char *)va("footprint_time_%s",
                          *(undefined4 *)
                           (PTR_sufaceTypeNames_003e1118 + (*(uint *)(iStack_b4 + 100) & 0xf) * 4));
-    cVar6 = idDict::GetFloat(this_00,pcVar10,"0",&fStack_14);
+    cVar6 = idDict::GetFloat(this_01,pcVar10,"0",&fStack_14);
     if (cVar6 != '\0') {
       *(uint *)(this + 0xf74) = *(uint *)(iStack_b4 + 100) & 0xf;
       *(int *)(this + 0xf70) =
@@ -135,39 +156,39 @@ void __thiscall idActor::Event_FootPrint(idActor *this,char *param_1,char *param
     pcVar10 = (char *)va("mtr_footprint_%s",
                          *(undefined4 *)(PTR_sufaceTypeNames_003e1118 + *(int *)(this + 0xf74) * 4))
     ;
-    iVar9 = idDict::FindKey(this_00,pcVar10);
+    iVar9 = idDict::FindKey(this_01,pcVar10);
     pcStack_128 = "";
     if ((iVar9 == 0) ||
        (pcStack_128 = *(char **)(*(int *)(iVar9 + 4) + 4), pcStack_128 != (char *)0x0))
     goto LAB_000c64b6;
   }
-  iVar9 = idDict::FindKey(this_00,"mtr_footprint");
+  iVar9 = idDict::FindKey(this_01,"mtr_footprint");
   pcStack_128 = "";
   if (iVar9 != 0) {
     pcStack_128 = *(char **)(*(int *)(iVar9 + 4) + 4);
   }
 LAB_000c64b6:
   if (*pcStack_128 != '\0') {
-    iVar9 = idDict::FindKey(this_00,"footprint_scale_x");
-    puVar15 = &DAT_0037470c;
+    iVar9 = idDict::FindKey(this_01,"footprint_scale_x");
+    pcVar10 = "1";
     if (iVar9 != 0) {
-      puVar15 = *(undefined **)(*(int *)(iVar9 + 4) + 4);
+      pcVar10 = *(char **)(*(int *)(iVar9 + 4) + 4);
     }
-    lVar16 = (longdouble)__strtod_internal(puVar15,0,0);
-    fVar12 = (float)lVar16;
-    iVar9 = idDict::FindKey(this_00,"footprint_scale_y");
-    puVar15 = &DAT_0037470c;
+    lVar14 = (longdouble)__strtod_internal(pcVar10,0,0);
+    fVar12 = (float)lVar14;
+    iVar9 = idDict::FindKey(this_01,"footprint_scale_y");
+    pcVar10 = "1";
     if (iVar9 != 0) {
-      puVar15 = *(undefined **)(*(int *)(iVar9 + 4) + 4);
+      pcVar10 = *(char **)(*(int *)(iVar9 + 4) + 4);
     }
-    lVar16 = (longdouble)__strtod_internal(puVar15,0,0);
-    fVar1 = (float)lVar16;
-    iVar9 = idDict::FindKey(this_00,"footprint_size");
-    puVar13 = &LAB_00371dbc_1;
+    lVar14 = (longdouble)__strtod_internal(pcVar10,0,0);
+    fVar1 = (float)lVar14;
+    iVar9 = idDict::FindKey(this_01,"footprint_size");
+    pcVar10 = "16";
     if (iVar9 != 0) {
-      puVar13 = *(undefined1 **)(*(int *)(iVar9 + 4) + 4);
+      pcVar10 = *(char **)(*(int *)(iVar9 + 4) + 4);
     }
-    lVar16 = (longdouble)__strtod_internal(puVar13,0,0);
+    lVar14 = (longdouble)__strtod_internal(pcVar10,0,0);
     uStack_f8 = 0;
     uStack_ec = 0;
     uStack_e0 = 0;
@@ -183,8 +204,8 @@ LAB_000c64b6:
     idMat3::ToAngles();
     if (param_2 != (char *)0x0) {
       pcVar10 = (char *)va("footprint_offset_%s",param_1);
-      idDict::GetVector(this_00,pcVar10,(char *)0x0,(idVec3 *)&fStack_84);
-      puVar15 = PTR_gameLocal_003e0cac;
+      idDict::GetVector(this_01,pcVar10,(char *)0x0,(idVec3 *)&fStack_84);
+      this_00 = PTR_gameLocal_003e0cac;
       uVar2 = *(undefined4 *)(PTR_gameLocal_003e0cac + 0x251884);
       uVar11 = idAnimator::GetJointHandle((idAnimator *)(this + 0x27c),param_2);
       idAnimatedEntity::GetJointWorldTransform
@@ -207,16 +228,16 @@ LAB_000c64b6:
       fVar1 = fStack_a0 * fStack_a0 + fStack_a4 * fStack_a4 + fStack_a8 * fStack_a8;
       fVar12 = (float)((0x17c - ((uint)fVar1 >> 0x17 & 0xff) >> 1) << 0x17 |
                       *(uint *)(PTR_iSqrt_003e0edc + ((uint)fVar1 >> 0xf & 0x1ff) * 4));
-      fVar12 = (_LAB_0036b0e8 - fVar12 * fVar12 * fVar1 * _LAB_0036b0e4) * fVar12;
-      fVar12 = fVar12 * (_LAB_0036b0e8 - fVar12 * fVar12 * fVar1 * _LAB_0036b0e4);
+      fVar12 = (1.5 - fVar12 * fVar12 * fVar1 * 0.5) * fVar12;
+      fVar12 = fVar12 * (1.5 - fVar12 * fVar12 * fVar1 * 0.5);
       fStack_a8 = fStack_a8 * fVar12;
       fStack_a4 = fStack_a4 * fVar12;
       fStack_a0 = fStack_a0 * fVar12;
       fStack_18 = fVar3 * fVar3 + fStack_98 * fStack_98 + fStack_9c * fStack_9c;
       fStack_94 = (float)((0x17c - ((uint)fStack_18 >> 0x17 & 0xff) >> 1) << 0x17 |
                          *(uint *)(PTR_iSqrt_003e0edc + ((uint)fStack_18 >> 0xf & 0x1ff) * 4));
-      fStack_94 = (_LAB_0036b0e8 - fStack_94 * fStack_94 * fStack_18 * _LAB_0036b0e4) * fStack_94;
-      fStack_94 = (_LAB_0036b0e8 - fStack_94 * fStack_94 * fStack_18 * _LAB_0036b0e4) * fStack_94;
+      fStack_94 = (1.5 - fStack_94 * fStack_94 * fStack_18 * 0.5) * fStack_94;
+      fStack_94 = (1.5 - fStack_94 * fStack_94 * fStack_18 * 0.5) * fStack_94;
       fStack_9c = fStack_9c * fStack_94;
       fStack_98 = fStack_98 * fStack_94;
       fStack_94 = fStack_94 * fVar3;
@@ -236,36 +257,36 @@ LAB_000c64b6:
       fStack_20 = fStack_74 + fStack_80;
       fStack_24 = fStack_78 + fStack_84;
       idGameLocal::ProjectDecal
-                ((idGameLocal *)puVar15,(idVec3 *)&fStack_24,(idVec3 *)&uStack_30,8.0,true,
-                 (float)lVar16,pcVar10,(idVec3 *)&fStack_100,fVar1 - fStack_68 * fVar12);
+                ((idGameLocal *)this_00,(idVec3 *)&fStack_24,(idVec3 *)&uStack_30,8.0,true,
+                 (float)lVar14,pcVar10,(idVec3 *)&fStack_100,fVar1 - fStack_68 * fVar12);
       return;
     }
     if (this[0xf6d] == (idActor)0x0) {
-      fStack_114 = *(float *)(this + 0x8f0) * _LAB_0036c143_1;
-      fStack_110 = *(float *)(this + 0x8ec) * _LAB_0036c143_1;
-      fStack_10c = _LAB_0036c143_1 * *(float *)(this + 0x8e8);
+      fStack_114 = *(float *)(this + 0x8f0) * 12.0;
+      fStack_110 = *(float *)(this + 0x8ec) * 12.0;
+      fStack_10c = 12.0 * *(float *)(this + 0x8e8);
       fStack_12c = *(float *)PTR_HALF_PI_003e05b4 - fStack_68 * *(float *)PTR_M_DEG2RAD_003dfd70;
-      puVar13 = (undefined1 *)0x36bf31;
+      pcVar10 = "_l";
     }
     else {
-      fStack_114 = *(float *)(this + 0x8f0) * fRam0036c140;
-      fStack_110 = *(float *)(this + 0x8ec) * fRam0036c140;
-      fStack_10c = fRam0036c140 * *(float *)(this + 0x8e8);
+      fStack_114 = *(float *)(this + 0x8f0) * -12.0;
+      fStack_110 = *(float *)(this + 0x8ec) * -12.0;
+      fStack_10c = -12.0 * *(float *)(this + 0x8e8);
       fStack_12c = *(float *)PTR_HALF_PI_003e05b4 - fStack_68 * *(float *)PTR_M_DEG2RAD_003dfd70;
-      puVar13 = &LAB_0036bf2d_1;
+      pcVar10 = "_r";
     }
-    pcVar10 = (char *)va("%s%s",pcStack_128,puVar13);
+    pcVar10 = (char *)va("%s%s",pcStack_128,pcVar10);
     uStack_48 = 0;
     uStack_44 = 0;
     uStack_40 = 0xbf800000;
     piVar7 = (int *)idEntity::GetPhysics((idEntity *)this);
-    pfVar14 = (float *)(**(code **)(*piVar7 + 0x84))(piVar7,0);
-    fStack_34 = fStack_114 + pfVar14[2];
-    fStack_38 = fStack_110 + pfVar14[1];
-    fStack_3c = fStack_10c + *pfVar14;
+    pfVar13 = (float *)(**(code **)(*piVar7 + 0x84))(piVar7,0);
+    fStack_34 = fStack_114 + pfVar13[2];
+    fStack_38 = fStack_110 + pfVar13[1];
+    fStack_3c = fStack_10c + *pfVar13;
     idGameLocal::ProjectDecal
               ((idGameLocal *)PTR_gameLocal_003e0cac,(idVec3 *)&fStack_3c,(idVec3 *)&uStack_48,8.0,
-               true,(float)lVar16,pcVar10,(idVec3 *)&fStack_100,fStack_12c);
+               true,(float)lVar14,pcVar10,(idVec3 *)&fStack_100,fStack_12c);
     this[0xf6d] = (idActor)((byte)this[0xf6d] ^ 1);
   }
   return;

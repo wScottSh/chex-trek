@@ -1,5 +1,6 @@
 // idCustomUI::RegisterGUI @ 0019e1c0
 // undefined RegisterGUI(idCustomUI * this)
+// literals: none
 
 /* WARNING: Function: __i686.get_pc_thunk.bx replaced with injection: get_pc_thunk_bx */
 /* idCustomUI::RegisterGUI() */

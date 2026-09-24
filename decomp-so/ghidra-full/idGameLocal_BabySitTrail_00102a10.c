@@ -1,5 +1,6 @@
 // idGameLocal::BabySitTrail @ 00102a10
 // undefined BabySitTrail(idGameLocal * this, mkTrail * param_1)
+// literals: none
 
 /* WARNING: Function: __i686.get_pc_thunk.bx replaced with injection: get_pc_thunk_bx */
 /* idGameLocal::BabySitTrail(mkTrail*) */

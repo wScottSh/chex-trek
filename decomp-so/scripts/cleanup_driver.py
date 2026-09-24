@@ -3,8 +3,8 @@
 
 The packet is the whole brief that Claude Opus 5.5 is given for one group: the spec #16
 rules, the output format, and for each function in the group its real byte range, its
-direct callees (read from gamex86.so by the verification harness) and its complete
-Ghidra export. The model writes `decomp-so/reference/<group>.md`, then the harness is
+direct callees and the float constants / string literals it reads (both read from
+gamex86.so by the verification harness) and its complete enriched Ghidra export. The model writes `decomp-so/reference/<group>.md`, then the harness is
 re-run until it passes.
 
     python decomp-so/scripts/cleanup_driver.py custom-ui            # packet to stdout
@@ -41,6 +41,14 @@ RULES = """\
 - Call out Ghidra artifacts (misnamed `this`, missing exception-cleanup paths, x87 compare
   noise, stray `unaff_*` arguments) instead of turning them into behavior.
 - Show float constants as real values and strings as the literal text read from the binary.
+  Every literal listed below for a function must appear in its definition with the same
+  value (check 2): floats as decimal literals (`32.0f`, `-0.5f`; a `double` without an `f`
+  suffix), strings exactly, including stock defaults the call inlines (write
+  `spawnArgs.GetFloat( "key", "0" )` when the binary reads "0"). Do not add string literals
+  the function does not read. Literals from stock inline code go on
+  decomp-so/verify/literal-allowlist.tsv instead.
+- Cross-check spawnArg keys and GUI command names against the mod's def/, script/, guis/
+  and maps/; record in Notes which keys the data uses and which it never sets.
 - Every direct callee listed below must appear in that function's definition (a comment
   counts, e.g. for implicit base-destructor calls). Exception-only and ABI-implicit callees
   are on decomp-so/verify/allowlist.tsv.
@@ -87,6 +95,8 @@ def build_packet(group: str) -> str:
             f"{f.vaddr + GHIDRA_IMAGE_BASE:#x}), export `{r.export}`, status `{r.status}`\n"
             f"- direct callees (binary): "
             + (", ".join(f"`{c.name}`" for c in callees) or "none")
+            + "\n- literals (binary): "
+            + (", ".join(f"`{lit.render()}`" for lit in binary.literals(f)) or "none")
             + f"\n\n```c\n{export.rstrip()}\n```\n"
         )
     return "\n".join(out)

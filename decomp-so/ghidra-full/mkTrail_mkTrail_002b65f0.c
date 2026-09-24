@@ -1,5 +1,6 @@
 // mkTrail::mkTrail @ 002b65f0
 // undefined mkTrail(mkTrail * this)
+// literals: none
 
 /* WARNING: Function: __i686.get_pc_thunk.bx replaced with injection: get_pc_thunk_bx */
 /* mkTrail::mkTrail() */

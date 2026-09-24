@@ -1,5 +1,6 @@
 // idPlayer::freeObjective @ 0015d390
 // undefined freeObjective(idPlayer * this, int param_1)
+// literals: none
 
 /* idPlayer::freeObjective(int) */
 

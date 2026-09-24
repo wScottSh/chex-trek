@@ -1,8 +1,10 @@
 // idPlayer::HudMapLevel @ 0015e450
 // undefined HudMapLevel(idPlayer * this, idVec3 * param_1)
+// literals (read from .rodata; Ghidra address, type, value):
+//   0036b0e4  float  0.5
+//   00372c4c  string "Location below lowest MapLevel"
 
 /* WARNING: Function: __i686.get_pc_thunk.bx replaced with injection: get_pc_thunk_bx */
-/* WARNING: Globals starting with '_' overlap smaller symbols at the same address */
 /* idPlayer::HudMapLevel(idVec3 const*) */
 
 int __thiscall idPlayer::HudMapLevel(idPlayer *this,idVec3 *param_1)
@@ -15,7 +17,7 @@ int __thiscall idPlayer::HudMapLevel(idPlayer *this,idVec3 *param_1)
   if (param_1 == (idVec3 *)0x0) {
     piVar3 = (int *)idEntity::GetPhysics((idEntity *)this);
     iVar2 = (**(code **)(*piVar3 + 0x84))(piVar3,0);
-    fVar1 = _LAB_0036b0e4 * *(float *)(*(int *)(PTR_pm_normalheight_003e04b0 + 0x2c) + 0x28) +
+    fVar1 = 0.5 * *(float *)(*(int *)(PTR_pm_normalheight_003e04b0 + 0x2c) + 0x28) +
             *(float *)(iVar2 + 8);
   }
   else {

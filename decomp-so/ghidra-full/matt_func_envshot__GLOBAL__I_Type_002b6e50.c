@@ -1,5 +1,6 @@
 // matt_func_envshot::_GLOBAL__I_Type @ 002b6e50
 // undefined _GLOBAL__I_Type(void)
+// literals: none
 
 /* matt_func_envshot::Type */
 

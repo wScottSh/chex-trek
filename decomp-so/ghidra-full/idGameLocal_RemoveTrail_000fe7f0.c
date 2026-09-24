@@ -1,5 +1,6 @@
 // idGameLocal::RemoveTrail @ 000fe7f0
 // undefined RemoveTrail(idGameLocal * this, mkTrail * param_1)
+// literals: none
 
 /* idGameLocal::RemoveTrail(mkTrail*) */
 

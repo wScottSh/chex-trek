@@ -104,6 +104,222 @@ class CalleeCoverage(unittest.TestCase):
         self.assertIn("no definition", errors["idCustomUI::setGUI"])
 
 
+def literal_problems(results) -> set[tuple[str, str]]:
+    out = {(r.row.function, lit.render()) for r in results for lit in r.missing_literals}
+    out |= {(r.row.function, "mismatched " + s) for r in results for s in r.mismatched_strings}
+    return out
+
+
+def synthetic(function: str, group: str = "synthetic") -> list[verify.CoverageRow]:
+    """A coverage record with one `covered` row for `function`, for tests on real binary
+    functions whose group is not reconstructed yet."""
+    f = BINARY.find(function)[0]
+    return [verify.CoverageRow(function, f.raw, f.vaddr, "", group, "covered")]
+
+
+def synthetic_reference(body: str) -> str:
+    return f"```cpp\n// header\n```\n\n```cpp\n{body}\n```\n"
+
+
+class ConstantsAndStrings(unittest.TestCase):
+    """Check 2."""
+
+    def test_changing_a_string_fails_and_names_it(self):
+        text = reference("custom-ui")
+        code = 'token->Icmp( "unregister" )'
+        self.assertEqual(text.count(code), 1)
+        results = verify.check_group(
+            "custom-ui", BINARY, ROWS, ALLOW, text.replace(code, code.replace("unregister", "unregistr"))
+        )
+        self.assertEqual(
+            literal_problems(results),
+            {("idCustomUI::HandleCustomGUICommand", 'string "unregister"'),
+             ("idCustomUI::HandleCustomGUICommand", "mismatched unregistr")},
+        )
+        report = "\n".join(verify.format_results(results))
+        self.assertIn('LITERAL  idCustomUI::HandleCustomGUICommand @ 0x18e130: missing string "unregister"', report)
+        self.assertIn('LITERAL  idCustomUI::HandleCustomGUICommand @ 0x18e130: mismatched "unregistr"', report)
+        self.assertIn("2 missing/mismatched literal(s)", report)
+
+    def test_changing_a_float_fails_and_names_it(self):
+        # mkTrail::addNewAnchor reads 0.5, 1.5 and -0.5 (and the group is not reconstructed yet).
+        rows = synthetic("mkTrail::addNewAnchor")
+        body = "void mkTrail::addNewAnchor( void ) {{ a = b * 0.5f; c = {} - d; e = f * -0.5f; }}"
+        ok = verify.check_group("synthetic", BINARY, rows, [], synthetic_reference(body.format("1.5f")))
+        self.assertEqual(literal_problems(ok), set())
+        bad = verify.check_group("synthetic", BINARY, rows, [], synthetic_reference(body.format("1.25f")))
+        self.assertEqual(literal_problems(bad), {("mkTrail::addNewAnchor", "float 1.5")})
+        report = "\n".join(verify.format_results(bad))
+        self.assertIn("LITERAL  mkTrail::addNewAnchor @ 0x2a59d0: missing float 1.5", report)
+
+    def test_sign_of_a_float_matters(self):
+        rows = synthetic("mkTrail::addNewAnchor")
+        body = "void mkTrail::addNewAnchor( void ) { a = b * 0.5f; c = 1.5f * d; e = f * 0.5f; }"
+        results = verify.check_group("synthetic", BINARY, rows, [], synthetic_reference(body))
+        self.assertEqual(literal_problems(results), {("mkTrail::addNewAnchor", "float -0.5")})
+
+    def test_a_double_constant_must_not_be_written_as_float(self):
+        rows = synthetic("mkTrail::UpdateRenderEntity")
+        body = "bool mkTrail::UpdateRenderEntity( void ) {{ y = 1.5f * 0.5f * -0.5f; z < {}; }}"
+        good = verify.check_group("synthetic", BINARY, rows, [], synthetic_reference(body.format("0.001")))
+        self.assertEqual(literal_problems(good), set())
+        bad = verify.check_group("synthetic", BINARY, rows, [], synthetic_reference(body.format("0.001f")))
+        self.assertEqual(literal_problems(bad), {("mkTrail::UpdateRenderEntity", "double 0.001")})
+
+    def test_a_literal_in_a_comment_does_not_count(self):
+        text = reference("custom-ui").replace(
+            'token->Icmp( "unregister" )', 'token->Icmp( cmd ) /* "unregister" */'
+        )
+        results = verify.check_group("custom-ui", BINARY, ROWS, ALLOW, text)
+        self.assertEqual(literal_problems(results), {("idCustomUI::HandleCustomGUICommand", 'string "unregister"')})
+
+    def test_every_checked_literal_is_load_bearing(self):
+        """Mutation sweep: alter each binary string literal in its function's definition -> reported."""
+        for group in COVERED_GROUPS:
+            text = reference(group)
+            impl = verify.implementation_block(text)
+            for row in (r for r in ROWS if r.group == group and r.status == "covered"):
+                func = BINARY.by_raw[row.symbol]
+                body = verify.find_definition(impl, source_name(func.name))
+                if body is None:
+                    continue  # macro-generated; see test_macro_literals_are_checked
+                for lit in BINARY.literals(func):
+                    with self.subTest(function=row.function, literal=lit.render()):
+                        self.assertEqual(lit.kind, "string")  # no float literals in covered groups yet
+                        quoted = verify.c_string(lit.value)
+                        self.assertIn(quoted, body)
+                        mutated = text.replace(body, body.replace(quoted, quoted[:-1] + '~"'))
+                        results = verify.check_group(group, BINARY, ROWS, ALLOW, mutated)
+                        hit = [r for r in results if r.row.vaddr == row.vaddr][0]
+                        self.assertIn(lit, hit.missing_literals)
+                        self.assertIn(lit.value + "~", hit.mismatched_strings)
+
+    def test_macro_literals_are_checked(self):
+        # ABSTRACT_DECLARATION's CreateInstance passes "idCustomUI" (#nameofclass) to gameLocal.Error.
+        text = reference("custom-ui").replace("ABSTRACT_DECLARATION( idEntity, idCustomUI )",
+                                              "CLASS_DECLARATION( idEntity, idCustomUI )")
+        results = verify.check_group("custom-ui", BINARY, ROWS, ALLOW, text)
+        self.assertEqual(
+            literal_problems(results),
+            {("idCustomUI::CreateInstance", 'string "idCustomUI"'),
+             ("idCustomUI::CreateInstance", 'string "Cannot instanciate abstract class %s."')},
+        )
+
+    def test_literal_allowlist_accepts_a_documented_literal(self):
+        rows = synthetic("mkTrail::Think")
+        body = "void mkTrail::Think( void ) { GetPhysics(); c.Lerp( a, b, t ); x = idMath::InvSqrt( y ); }"
+        allow = [verify.AllowEntry("mkTrail::Think", "float [01].5", "stock-inline", "idMath::InvSqrt Newton step")]
+        results = verify.check_group("synthetic", BINARY, rows, [], synthetic_reference(body), allow)
+        self.assertEqual(literal_problems(results), set())
+        self.assertEqual(sorted(l.render() for l, _ in results[0].allowed_literals), ["float 0.5", "float 1.5"])
+        self.assertIn("allow-listed float 0.5 (stock-inline)", "\n".join(verify.format_results(results)))
+
+    def test_literal_allowlist_is_documented(self):
+        for entry in verify.load_allowlist(verify.LITERAL_ALLOWLIST_PATH):
+            self.assertEqual(entry.kind, "stock-inline")
+            self.assertGreater(len(entry.reason), 20)
+
+
+class LiteralParsing(unittest.TestCase):
+    def test_string_literals_join_unescape_and_skip_comments(self):
+        code = 'f( "a" /* x */ "b", "c\\n\\"q\\"\\x41\\101", \'"\' ); // "not code"\n g( "d" ); /* "no" */'
+        self.assertEqual(verify.string_literals(code), ["ab", 'c\n"q"AA', "d"])
+        self.assertEqual(verify.string_literals('x = "";'), [""])
+
+    def test_float_tokens(self):
+        code = verify.code_only('a = 32.0f + .05 - 1e-3 * 2 + 0x1f + 7 + b.x + 1.5F; c = -0.5f; // 9.0')
+        values = sorted({v for v, _ in verify.float_literals(code)})
+        self.assertEqual(values, sorted({32.0, 0.05, 1e-3, -1e-3, 1.5, 0.5, -0.5}))
+        self.assertEqual(dict(verify.float_literals("a = 2.5f;")), {2.5: True})
+
+    def test_rendering(self):
+        from binary import Literal
+
+        self.assertEqual(Literal("float", 32.0).render(), "float 32.0")
+        self.assertEqual(Literal("float", 0.1).render(), "float 0.1")
+        self.assertEqual(Literal("double", 0.001).render(), "double 0.001")
+        self.assertEqual(Literal("string", 'a"b\n').render(), 'string "a\\"b\\n"')
+        import struct
+
+        f01 = struct.unpack("<f", struct.pack("<f", 0.1))[0]
+        self.assertEqual(Literal("float", f01).render(), "float 0.1")
+
+
+class BinaryLiterals(unittest.TestCase):
+    def test_every_rodata_read_in_the_export_is_classified(self):
+        for r in ROWS:
+            refs = BINARY.rodata_refs(BINARY.by_raw[r.symbol])
+            with self.subTest(function=r.function, at=hex(r.vaddr)):
+                self.assertEqual([hex(x.at) for x in refs if x.kind == "unclassified"], [])
+
+    def test_mktrail_spot_values(self):
+        spawn = [l.render() for l in BINARY.literals(BINARY.find("mkTrail::Spawn")[0])]
+        self.assertEqual(spawn[spawn.index('string "trailWidth"') + 1], 'string "32"')  # width 32.0, not 4.0
+        anchor = {l.render() for l in BINARY.literals(BINARY.find("mkTrail::addNewAnchor")[0])}
+        self.assertEqual(anchor, {"float 0.5", "float 1.5", "float -0.5"})
+        render = {l.render() for l in BINARY.literals(BINARY.find("mkTrail::UpdateRenderEntity")[0])}
+        # 0.5 is read through a register: `lea edx, [ebx-0x7651c]` then an x87 read of [edx].
+        self.assertEqual(render, {"double 0.001", "float 0.5", "float 1.5", "float -0.5"})
+
+
+def export_literals(text: str) -> set[tuple[str, float | str]]:
+    """(kind, value) from an export file's `// literals` block."""
+    out = set()
+    for line in text.splitlines():
+        m = re.match(r"//\s+[0-9a-f]{8}\s+(float|double|string)\s+(.*)$", line)
+        if not m:
+            continue
+        kind, raw = m.groups()
+        if kind == "string":
+            out.add((kind, verify.c_unescape(raw[1:-1])))
+        else:
+            out.add((kind, verify.to_precision(float(raw), kind)))
+    return out
+
+
+class EnrichedExport(unittest.TestCase):
+    def read(self, row) -> str:
+        return (verify.GHIDRA_DIR / row.export).read_text(encoding="utf-8")
+
+    def test_every_export_lists_the_literals_the_binary_reads(self):
+        """ExportCustom.java (Ghidra) and binary.py (capstone) find literals independently."""
+        for r in ROWS:
+            with self.subTest(export=r.export):
+                text = self.read(r)
+                self.assertRegex(text, r"^// .*\n// .*\n// literals")
+                expected = {(l.kind, l.value) for l in BINARY.literals(BINARY.by_raw[r.symbol])}
+                self.assertEqual(export_literals(text), expected)
+
+    def test_mktrail_values_are_readable(self):
+        by_fn = {r.function: self.read(r) for r in ROWS if r.function.startswith("mkTrail::")}
+        spawn = by_fn["mkTrail::Spawn"]
+        self.assertRegex(spawn, r'"trailWidth"\);\s*\n\s*\w+ = "32";')
+        anchor = by_fn["mkTrail::addNewAnchor"]
+        body = anchor[anchor.index("{"):]
+        for value in ("0.5", "1.5", "-0.5"):
+            self.assertRegex(body, r"(?<![\w.])" + re.escape(value) + r"(?![\d])", value)
+        self.assertNotIn("_LAB_0036b0e4", anchor)  # 0.5 used to be shown as this label
+        render = by_fn["mkTrail::UpdateRenderEntity"]
+        self.assertRegex(render[render.index("{"):], r"(?<![\w.])0\.001(?![\d])")  # the epsilon
+
+    def test_callee_coverage_did_not_regress(self):
+        """Each export still names at least as many direct callees as the first full export."""
+        path = verify.VERIFY_DIR / "export-callee-baseline.tsv"
+        baseline = {}
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if line and not line.startswith("#"):
+                export, found, total = line.split("\t")[:3]
+                baseline[export] = (int(found), int(total))
+        self.assertEqual(sorted(baseline), sorted(r.export for r in ROWS))
+        for r in ROWS:
+            text = self.read(r)
+            callees = [c for c in BINARY.callees(BINARY.by_raw[r.symbol]) if not c.ignored]
+            found = sum(1 for c in callees if verify.callee_pattern(c.name).search(text))
+            with self.subTest(export=r.export):
+                self.assertEqual(len(callees), baseline[r.export][1])
+                self.assertGreaterEqual(found, baseline[r.export][0])
+
+
 class HarnessRules(unittest.TestCase):
     def test_operator_names_are_normalized(self):
         new_arr = verify.callee_pattern("operator new[](unsigned int)")
@@ -225,6 +441,7 @@ class CleanupDriver(unittest.TestCase):
             self.assertIn(f"export `{r.export}`", packet)
         self.assertIn("`idRestoreGame::ReadBool(bool&)`", packet)
         self.assertIn('"unregister"', packet)  # Ghidra export body is included
+        self.assertIn('- literals (binary): `string "unregister"`', packet)
 
 
 if __name__ == "__main__":

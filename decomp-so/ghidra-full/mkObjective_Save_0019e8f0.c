@@ -1,5 +1,6 @@
 // mkObjective::Save @ 0019e8f0
 // undefined Save(mkObjective * this, idSaveGame * param_1)
+// literals: none
 
 /* WARNING: Function: __i686.get_pc_thunk.bx replaced with injection: get_pc_thunk_bx */
 /* mkObjective::Save(idSaveGame*) const */

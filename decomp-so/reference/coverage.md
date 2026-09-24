@@ -4,9 +4,11 @@ Which exported custom functions have a verified reference, and which do not yet.
 
 - **Source of the list:** all 84 functions in the complete Ghidra export, `ghidra-full/_index.tsv`
   (Ghidra 12.1.4, "Non-Returning Functions - Discovered" disabled; made with `scripts/ExportCustom.java`,
-  `scripts/NoReturnOff.java` and `scripts/targets.txt`).
+  `scripts/NoReturnOff.java` and `scripts/targets.txt`). Enriched export (#18): each file lists the float
+  constants and string literals the function reads, and the pseudo-C shows their values.
 - **Status:** `covered` = the function is in its group's reference (`reference/<group>.md`) and passes the
-  harness (`python decomp-so/verify/verify.py <group>`). `pending` = not reconstructed yet.
+  harness, checks 1 (callees) and 2 (constants and strings) (`python decomp-so/verify/verify.py <group>`).
+  `pending` = not reconstructed yet.
 - **ELF vaddr** is the symbol-table address. The Ghidra export address is this plus `0x10000` (Ghidra's image base).
 - **Symbol** is the mangled `.symtab` name the harness uses to find the function's real byte range (`st_size`).
 - **Group** is the planned reference file. Groups: `custom-ui` (#17), `end-level-stats` (#20), `objectives` (#21),

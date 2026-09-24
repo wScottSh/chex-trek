@@ -1,5 +1,7 @@
 // idCustomUI::setGUI @ 0019d3d0
 // undefined setGUI(idCustomUI * this, char * param_1)
+// literals (read from .rodata; Ghidra address, type, value):
+//   00373bc0  string "idCustomUI::setGUI, set GUI failed"
 
 /* WARNING: Function: __i686.get_pc_thunk.bx replaced with injection: get_pc_thunk_bx */
 /* idCustomUI::setGUI(char const*) */
@@ -23,7 +25,8 @@ void __thiscall idCustomUI::setGUI(idCustomUI *this,char *param_1)
     (**(code **)(*piVar1 + 0x5c))(piVar1,1,*(undefined4 *)(PTR_gameLocal_003e0cac + 0x251884));
     return;
   }
-  (**(code **)(**(int **)PTR_common_003e01fc + 0x50))(*(int **)PTR_common_003e01fc,&DAT_00373bc0);
+  (**(code **)(**(int **)PTR_common_003e01fc + 0x50))
+            (*(int **)PTR_common_003e01fc,"idCustomUI::setGUI, set GUI failed");
   return;
 }
 

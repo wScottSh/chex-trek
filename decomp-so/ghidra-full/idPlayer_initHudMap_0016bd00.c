@@ -1,8 +1,23 @@
 // idPlayer::initHudMap @ 0016bd00
 // undefined initHudMap(idPlayer * this)
+// literals (read from .rodata; Ghidra address, type, value):
+//   00372152  string "0 0 0 0"
+//   0037215a  string "map_coords"
+//   003859f8  string "%f"
+//   00372165  string "map_level_%d"
+//   00372c30  float  131072.0
+//   00372172  string "640"
+//   00372176  string "map_x"
+//   0037217c  string "480"
+//   00372180  string "map_y"
+//   0036bec8  string "8"
+//   00372186  string "map_radius"
+//   0037470c  string "1"
+//   00372191  string "map_scale"
+//   0036b1a4  float  0.0078125
+//   00372d6c  string "No map_coords set in world spawn, hud map won't work"
 
 /* WARNING: Function: __i686.get_pc_thunk.bx replaced with injection: get_pc_thunk_bx */
-/* WARNING: Globals starting with '_' overlap smaller symbols at the same address */
 /* idPlayer::initHudMap() */
 
 void __thiscall idPlayer::initHudMap(idPlayer *this)
@@ -46,7 +61,9 @@ void __thiscall idPlayer::initHudMap(idPlayer *this)
   cVar3 = idDict::GetVec4((idDict *)(*(int *)(PTR_gameLocal_003e0cac + 0x8f68) + 100),"map_coords",
                           "0 0 0 0",piVar9);
   if (cVar3 == '\0') {
-    (**(code **)(**(int **)PTR_common_003e01fc + 0x50))(*(int **)PTR_common_003e01fc,0x372d6c);
+    (**(code **)(**(int **)PTR_common_003e01fc + 0x50))
+              (*(int **)PTR_common_003e01fc,"No map_coords set in world spawn, hud map won\'t work")
+    ;
   }
   pcVar4 = (char *)idGameLocal::GetMapName((idGameLocal *)PTR_gameLocal_003e0cac);
   sStack_70 = 0;
@@ -123,19 +140,19 @@ LAB_0016bec4:
   pcVar6 = (char *)va("map_level_%d",0);
   idDict::GetFloat((idDict *)(*(int *)(PTR_gameLocal_003e0cac + 0x8f68) + 100),pcVar6,pcVar4,
                    (float *)(this + 0x1e80));
-  pcVar4 = (char *)va("%f",(double)_LAB_00372c2d_3);
+  pcVar4 = (char *)va("%f",(double)131072.0);
   pcVar6 = (char *)va("map_level_%d",1);
   idDict::GetFloat((idDict *)(*(int *)(PTR_gameLocal_003e0cac + 0x8f68) + 100),pcVar6,pcVar4,
                    (float *)(this + 0x1e84));
-  pcVar4 = (char *)va("%f",(double)_LAB_00372c2d_3);
+  pcVar4 = (char *)va("%f",(double)131072.0);
   pcVar6 = (char *)va("map_level_%d",2);
   idDict::GetFloat((idDict *)(*(int *)(PTR_gameLocal_003e0cac + 0x8f68) + 100),pcVar6,pcVar4,
                    (float *)(this + 0x1e88));
-  pcVar4 = (char *)va("%f",(double)_LAB_00372c2d_3);
+  pcVar4 = (char *)va("%f",(double)131072.0);
   pcVar6 = (char *)va("map_level_%d",3);
   idDict::GetFloat((idDict *)(*(int *)(PTR_gameLocal_003e0cac + 0x8f68) + 100),pcVar6,pcVar4,
                    (float *)(this + 0x1e8c));
-  pcVar4 = (char *)va("%f",(double)_LAB_00372c2d_3);
+  pcVar4 = (char *)va("%f",(double)131072.0);
   pcVar6 = (char *)va("map_level_%d",4);
   idDict::GetFloat((idDict *)(*(int *)(PTR_gameLocal_003e0cac + 0x8f68) + 100),pcVar6,pcVar4,
                    (float *)(this + 0x1e90));
@@ -151,7 +168,7 @@ LAB_0016bec4:
   if (*(float *)(this + 0x1e98) - *(float *)(this + 0x1ea0) < fVar2) {
     fVar2 = *(float *)(this + 0x1e98) - *(float *)(this + 0x1ea0);
   }
-  *(float *)(this + 0x1e4c) = fVar2 * _LAB_0036b1a1_3;
+  *(float *)(this + 0x1e4c) = fVar2 * 0.0078125;
   idStr::FreeData((idStr *)&sStack_70);
   return;
 }

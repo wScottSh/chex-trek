@@ -1,5 +1,6 @@
 // mkTrail::Present @ 002b6140
 // undefined Present(mkTrail * this)
+// literals: none
 
 /* WARNING: Function: __i686.get_pc_thunk.bx replaced with injection: get_pc_thunk_bx */
 /* mkTrail::Present() */

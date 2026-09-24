@@ -1,8 +1,12 @@
 // mkTrail::UpdateRenderEntity @ 002b4420
 // undefined UpdateRenderEntity(mkTrail * this, renderEntity_s * param_1, renderView_s * param_2)
+// literals (read from .rodata; Ghidra address, type, value):
+//   0036e4d0  double 0.001
+//   0036b0e4  float  0.5
+//   0036b0e8  float  1.5
+//   0036d260  float  -0.5
 
 /* WARNING: Function: __i686.get_pc_thunk.bx replaced with injection: get_pc_thunk_bx */
-/* WARNING: Globals starting with '_' overlap smaller symbols at the same address */
 /* mkTrail::UpdateRenderEntity(renderEntity_s*, renderView_s const*) const */
 
 undefined4 __thiscall
@@ -64,7 +68,7 @@ mkTrail::UpdateRenderEntity(mkTrail *this,renderEntity_s *param_1,renderView_s *
         if (fVar5 < 1.0) {
           local_20 = 1.0 - fVar5;
           local_24 = ABS(local_20);
-          if (local_24 <= (float)_LAB_0036e4cc_4) goto LAB_002b46d8;
+          if (local_24 <= (float)0.001) goto LAB_002b46d8;
           if (!bVar10) goto LAB_002b46e5;
         }
         else {
@@ -77,7 +81,7 @@ LAB_002b46e5:
           if (fVar2 < fVar5) {
             local_24 = fVar2 - fVar5;
             local_20 = ABS(local_24);
-            if ((float)_LAB_0036e4cc_4 < local_20) goto LAB_002b4560;
+            if ((float)0.001 < local_20) goto LAB_002b4560;
           }
           fVar1 = -fVar1;
           fVar5 = fVar2;
@@ -161,8 +165,8 @@ LAB_002b4560:
                (local_a4 - *pfVar14) * (local_a4 - *pfVar14);
     local_24 = (float)(0x5f3759df - ((int)local_20 >> 1));
     iVar17 = *(int *)(this + 4);
-    fVar5 = ((_LAB_0036b0e8 - local_24 * local_24 * local_20 * _LAB_0036b0e4) * local_24 * local_20
-            * fVar1) / *(float *)(this + 0x54) + fVar5;
+    fVar5 = ((1.5 - local_24 * local_24 * local_20 * 0.5) * local_24 *
+             local_20 * fVar1) / *(float *)(this + 0x54) + fVar5;
     if (iVar17 == 0) {
       iVar15 = *(int *)(iVar16 + iVar15);
       fVar1 = *(float *)(iVar15 + 0xc);
@@ -196,10 +200,10 @@ LAB_002b4560:
     *(float *)(*(int *)(iVar12 + 0x24) * 0x3c + 0xc + *(int *)(iVar12 + 0x28)) = fVar5;
     *(undefined4 *)(*(int *)(iVar12 + 0x24) * 0x3c + 0x10 + *(int *)(iVar12 + 0x28)) = 0;
     fVar4 = *(float *)(this + 0x4c);
-    fVar8 = fVar3 * fVar4 * _LAB_0036d260;
+    fVar8 = fVar3 * fVar4 * -0.5;
     pfVar14 = (float *)(*(int *)(iVar12 + 0x24) * 0x3c + *(int *)(iVar12 + 0x28));
-    fVar7 = fVar2 * fVar4 * _LAB_0036d260;
-    fVar4 = fVar4 * fVar1 * _LAB_0036d260;
+    fVar7 = fVar2 * fVar4 * -0.5;
+    fVar4 = fVar4 * fVar1 * -0.5;
     *(int *)(iVar12 + 0x24) = *(int *)(iVar12 + 0x24) + 1;
     *pfVar14 = fVar4 + local_a4;
     pfVar14[1] = fVar7 + local_a0;
@@ -227,9 +231,9 @@ LAB_002b4560:
     *(undefined4 *)(*(int *)(iVar12 + 0x24) * 0x3c + 0x10 + *(int *)(iVar12 + 0x28)) = 0x3f800000;
     iVar15 = *(int *)(iVar12 + 0x24);
     fVar5 = *(float *)(this + 0x4c);
-    fVar3 = fVar3 * fVar5 * _LAB_0036b0e4;
-    fVar2 = fVar2 * fVar5 * _LAB_0036b0e4;
-    fVar1 = fVar1 * fVar5 * _LAB_0036b0e4;
+    fVar3 = fVar3 * fVar5 * 0.5;
+    fVar2 = fVar2 * fVar5 * 0.5;
+    fVar1 = fVar1 * fVar5 * 0.5;
     *(int *)(iVar12 + 0x24) = iVar15 + 1;
     pfVar14 = (float *)(iVar15 * 0x3c + *(int *)(iVar12 + 0x28));
     *pfVar14 = fVar1 + local_a4;

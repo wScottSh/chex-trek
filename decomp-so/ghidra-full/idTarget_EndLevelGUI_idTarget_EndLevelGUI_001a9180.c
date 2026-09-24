@@ -1,5 +1,6 @@
 // idTarget_EndLevelGUI::~idTarget_EndLevelGUI @ 001a9180
 // undefined ~idTarget_EndLevelGUI(idTarget_EndLevelGUI * this)
+// literals: none
 
 /* WARNING: Function: __i686.get_pc_thunk.bx replaced with injection: get_pc_thunk_bx */
 /* idTarget_EndLevelGUI::~idTarget_EndLevelGUI() */

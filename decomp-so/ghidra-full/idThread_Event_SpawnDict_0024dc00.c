@@ -1,5 +1,6 @@
 // idThread::Event_SpawnDict @ 0024dc00
 // undefined Event_SpawnDict(idThread * this, char * param_1)
+// literals: none
 
 /* WARNING: Function: __i686.get_pc_thunk.bx replaced with injection: get_pc_thunk_bx */
 /* idThread::Event_SpawnDict(char const*) */

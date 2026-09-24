@@ -1,5 +1,6 @@
 // idTarget_EndLevelGUI::CreateInstance @ 0019de00
 // undefined CreateInstance(void)
+// literals: none
 
 /* WARNING: Function: __i686.get_pc_thunk.bx replaced with injection: get_pc_thunk_bx */
 /* idTarget_EndLevelGUI::CreateInstance() */

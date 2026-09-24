@@ -1,5 +1,6 @@
 // mkTrail::Save @ 002b3eb0
 // undefined Save(mkTrail * this, idSaveGame * param_1)
+// literals: none
 
 /* WARNING: Function: __i686.get_pc_thunk.bx replaced with injection: get_pc_thunk_bx */
 /* mkTrail::Save(idSaveGame*) const */

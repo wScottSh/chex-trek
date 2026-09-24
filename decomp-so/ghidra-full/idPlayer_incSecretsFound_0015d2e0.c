@@ -1,5 +1,6 @@
 // idPlayer::incSecretsFound @ 0015d2e0
 // undefined incSecretsFound(idPlayer * this)
+// literals: none
 
 /* idPlayer::incSecretsFound() */
 

@@ -1,5 +1,6 @@
 // matt_func_envshot::GetType @ 002b6b40
 // undefined GetType(void)
+// literals: none
 
 /* WARNING: Function: __i686.get_pc_thunk.cx replaced with injection: get_pc_thunk_cx */
 /* matt_func_envshot::GetType() const */

@@ -1,0 +1,11 @@
+# Literals check 2 accepts without the value appearing in the reconstruction.
+# One entry per line, 4 TAB-separated fields:
+#   function-pattern  literal-pattern  kind  reason
+# function-pattern: fnmatch glob on the binary function's demangled name, parameters stripped.
+# literal-pattern: fnmatch glob on the literal as the harness prints it,
+#   e.g. `float 1.5`, `double 0.001`, `string "0"` (see `verify.py --literals <group>`).
+# Kinds:
+#   stock-inline  the constant is inside an inlined stock SDK function the reconstruction
+#                 calls by name (e.g. the 0.5 / 1.5 of idMath::InvSqrt's Newton step);
+#                 name the stock function and file in the reason
+# No entries yet: every covered group states its literals explicitly.

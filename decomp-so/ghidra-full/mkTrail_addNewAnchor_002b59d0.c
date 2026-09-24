@@ -1,8 +1,11 @@
 // mkTrail::addNewAnchor @ 002b59d0
 // undefined addNewAnchor(mkTrail * this)
+// literals (read from .rodata; Ghidra address, type, value):
+//   0036b0e4  float  0.5
+//   0036b0e8  float  1.5
+//   0036d260  float  -0.5
 
 /* WARNING: Function: __i686.get_pc_thunk.bx replaced with injection: get_pc_thunk_bx */
-/* WARNING: Globals starting with '_' overlap smaller symbols at the same address */
 /* mkTrail::addNewAnchor() */
 
 undefined4 __thiscall mkTrail::addNewAnchor(mkTrail *this)
@@ -44,7 +47,7 @@ undefined4 __thiscall mkTrail::addNewAnchor(mkTrail *this)
   idClip::Translation((idClip *)(PTR_gameLocal_003e0cac + 0x2350a8),(trace_s *)&local_ac,
                       (idVec3 *)(this + 0x40),(idVec3 *)&local_30,(idClipModel *)0x0,
                       (idMat3 *)PTR_mat3_identity_003e13e0,2,*(idEntity **)(this + 4));
-  fVar5 = _LAB_0036b0e4;
+  fVar5 = 0.5;
   if (1.0 <= local_ac) {
     return 0;
   }
@@ -55,7 +58,7 @@ undefined4 __thiscall mkTrail::addNewAnchor(mkTrail *this)
                (pfVar7[1] - *(float *)(this + 0x44)) * (pfVar7[1] - *(float *)(this + 0x44)) +
                (*pfVar7 - *(float *)(this + 0x40)) * (*pfVar7 - *(float *)(this + 0x40));
     local_24 = (float)(0x5f3759df - ((int)local_20 >> 1));
-    if (local_20 * (_LAB_0036b0e8 - local_24 * local_24 * local_20 * _LAB_0036b0e4) * local_24 <=
+    if (local_20 * (1.5 - local_24 * local_24 * local_20 * 0.5) * local_24 <=
         *(float *)(this + 0x54)) {
       return 0;
     }
@@ -79,9 +82,9 @@ undefined4 __thiscall mkTrail::addNewAnchor(mkTrail *this)
   pfVar7[2] = local_a0;
   pfVar7[1] = local_a4;
   fVar8 = *(float *)(this + 0x4c);
-  fVar3 = fVar8 * pfVar7[5] * _LAB_0036d260;
-  fVar12 = pfVar7[4] * fVar8 * _LAB_0036d260;
-  pfVar7[6] = fVar8 * pfVar7[3] * _LAB_0036d260 + *pfVar7;
+  fVar3 = fVar8 * pfVar7[5] * -0.5;
+  fVar12 = pfVar7[4] * fVar8 * -0.5;
+  pfVar7[6] = fVar8 * pfVar7[3] * -0.5 + *pfVar7;
   pfVar7[7] = fVar12 + pfVar7[1];
   pfVar7[8] = fVar3 + pfVar7[2];
   fVar8 = *(float *)(this + 0x4c);
@@ -104,7 +107,7 @@ undefined4 __thiscall mkTrail::addNewAnchor(mkTrail *this)
       local_24 = fVar8 * pfVar7[5] * fVar8 * pfVar7[5] +
                  pfVar7[4] * fVar8 * pfVar7[4] * fVar8 + fVar8 * pfVar7[3] * fVar8 * pfVar7[3];
       local_20 = (float)(0x5f3759df - ((int)local_24 >> 1));
-      if (local_20 * (_LAB_0036b0e8 - local_20 * local_20 * local_24 * fVar5) * local_24 <
+      if (local_20 * (1.5 - local_20 * local_20 * local_24 * fVar5) * local_24 <
           *(float *)(this + 0x4c) * fVar5) {
         iVar2 = *(int *)(iVar13 + iVar9 * 4);
         fVar3 = *(float *)(iVar2 + 0x20) - pfVar7[8];
@@ -119,8 +122,8 @@ undefined4 __thiscall mkTrail::addNewAnchor(mkTrail *this)
                     /* catch() { ... } // from try @ 002b6430 with catch @ 002b5db0 */
         local_24 = fVar4 * fVar4 + fVar3 * fVar3 + fVar12 * fVar12;
         fVar12 = (float)(0x5f3759df - ((int)local_24 >> 1));
-        if (fVar8 * (_LAB_0036b0e8 - fVar14 * fVar14 * fVar8 * fVar5) * fVar14 <=
-            local_24 * fVar12 * (_LAB_0036b0e8 - fVar12 * fVar12 * local_24 * fVar5)) {
+        if (fVar8 * (1.5 - fVar14 * fVar14 * fVar8 * fVar5) * fVar14 <=
+            local_24 * fVar12 * (1.5 - fVar12 * fVar12 * local_24 * fVar5)) {
           iVar13 = *(int *)(iVar13 + iVar9 * 4);
           pfVar7[6] = *(float *)(iVar13 + 0x18);
           pfVar7[7] = *(float *)(iVar13 + 0x1c);
@@ -153,8 +156,8 @@ undefined4 __thiscall mkTrail::addNewAnchor(mkTrail *this)
         local_20 = fVar3 * fVar3 + fVar12 * fVar12 + fVar8 * fVar8;
         fVar8 = (float)((0x17c - ((uint)local_20 >> 0x17 & 0xff) >> 1) << 0x17 |
                        *(uint *)(PTR_iSqrt_003e0edc + ((uint)local_20 >> 0xf & 0x1ff) * 4));
-        fVar8 = (_LAB_0036b0e8 - fVar8 * fVar8 * local_20 * fVar5) * fVar8;
-        fVar8 = fVar8 * (_LAB_0036b0e8 - fVar8 * fVar8 * local_20 * fVar5);
+        fVar8 = (1.5 - fVar8 * fVar8 * local_20 * fVar5) * fVar8;
+        fVar8 = fVar8 * (1.5 - fVar8 * fVar8 * local_20 * fVar5);
         *local_c4 = *local_c4 * fVar8;
         pfVar7[4] = pfVar7[4] * fVar8;
         pfVar7[5] = fVar8 * pfVar7[5];

@@ -1,5 +1,6 @@
 // mkObjective::CreateInstance @ 0019dc60
 // undefined CreateInstance(void)
+// literals: none
 
 /* WARNING: Function: __i686.get_pc_thunk.bx replaced with injection: get_pc_thunk_bx */
 /* mkObjective::CreateInstance() */

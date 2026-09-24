@@ -1,8 +1,12 @@
 // idPlayer::updateHudMapAlpha @ 00164380
 // undefined updateHudMapAlpha(idPlayer * this, int param_1)
+// literals (read from .rodata; Ghidra address, type, value):
+//   0036b0e4  float  0.5
+//   0036b0e8  float  1.5
+//   00372bd4  float  255.0
+//   00372ca8  string "textures/guis/hudmap_alpha%d.tga"
 
 /* WARNING: Function: __i686.get_pc_thunk.bx replaced with injection: get_pc_thunk_bx */
-/* WARNING: Globals starting with '_' overlap smaller symbols at the same address */
 /* WARNING: Restarted to delay deadcode elimination for space: stack */
 /* idPlayer::updateHudMapAlpha(int) */
 
@@ -41,7 +45,8 @@ void __thiscall idPlayer::updateHudMapAlpha(idPlayer *this,int param_1)
               (*(float *)(this + 0x1e50) - *pfVar5) * (*(float *)(this + 0x1e50) - *pfVar5);
   fStack_18 = (float)(0x5f3759df - ((int)fStack_14 >> 1));
   if (*(float *)(this + 0x1e4c) <=
-      (_LAB_0036b0e8 - fStack_18 * fStack_18 * fStack_14 * _LAB_0036b0e4) * fStack_18 * fStack_14) {
+      (1.5 - fStack_18 * fStack_18 * fStack_14 * 0.5) * fStack_18 * fStack_14)
+  {
     piVar4 = (int *)idEntity::GetPhysics((idEntity *)this);
     puVar6 = (undefined4 *)(**(code **)(*piVar4 + 0x84))(piVar4,0);
     *(undefined4 *)(this + 0x1e50) = *puVar6;
@@ -51,7 +56,7 @@ void __thiscall idPlayer::updateHudMapAlpha(idPlayer *this,int param_1)
     piVar4 = (int *)idEntity::GetPhysics((idEntity *)this);
     piVar7 = (idVec2 *)(**(code **)(*piVar4 + 0x84))(piVar4,0);
     MapImageCoords(this,128.0,128.0,piVar7,(idVec2 *)&fStack_20);
-    fVar2 = _LAB_0036b0e8;
+    fVar2 = 1.5;
     iVar17 = *(int *)(this + 0x1e40);
     iStack_38 = (int)(fStack_20 - (float)iVar17);
     if (iStack_38 < 0) {
@@ -74,11 +79,11 @@ void __thiscall idPlayer::updateHudMapAlpha(idPlayer *this,int param_1)
     fStack_14 = (float)(iVar17 * iVar13);
     fVar9 = (float)((0x17c - ((uint)fStack_14 >> 0x17 & 0xff) >> 1) << 0x17 |
                    *(uint *)(PTR_iSqrt_003e0edc + ((uint)fStack_14 >> 0xf & 0x1ff) * 4));
-    fVar9 = (_LAB_0036b0e8 - fVar9 * fVar9 * fStack_14 * _LAB_0036b0e4) * fVar9;
-    fVar9 = fVar9 * (_LAB_0036b0e8 - fVar9 * fVar9 * fStack_14 * _LAB_0036b0e4) * fStack_14;
+    fVar9 = (1.5 - fVar9 * fVar9 * fStack_14 * 0.5) * fVar9;
+    fVar9 = fVar9 * (1.5 - fVar9 * fVar9 * fStack_14 * 0.5) * fStack_14;
     if (iStack_38 < iVar16) {
       do {
-        fVar3 = DAT_00372bd4;
+        fVar3 = 255.0;
         if (iVar8 < iVar15) {
           puVar18 = PTR_hudmap_alpha_003e11ec + ((param_1 * 0x80 + iVar8) * 0x80 + iStack_38) * 4;
           iVar17 = iVar8;
@@ -88,9 +93,9 @@ void __thiscall idPlayer::updateHudMapAlpha(idPlayer *this,int param_1)
             fVar10 = (float)((0x17c - ((uint)fStack_14 >> 0x17 & 0xff) >> 1) << 0x17 |
                             *(uint *)(PTR_iSqrt_003e0edc + ((uint)fStack_14 >> 0xf & 0x1ff) * 4));
             uVar14 = 0;
-            fVar10 = (fVar2 - fVar10 * fVar10 * fStack_14 * _LAB_0036b0e4) * fVar10;
-            uVar11 = (uint)((1.0 - ((fVar2 - fVar10 * fVar10 * fStack_14 * _LAB_0036b0e4) * fVar10 *
-                                   fStack_14) / fVar9) * fVar3);
+            fVar10 = (fVar2 - fVar10 * fVar10 * fStack_14 * 0.5) * fVar10;
+            uVar11 = (uint)((1.0 - ((fVar2 - fVar10 * fVar10 * fStack_14 * 0.5) * fVar10
+                                   * fStack_14) / fVar9) * fVar3);
             if ((-1 < (int)uVar11) && (uVar14 = 0xff, (int)uVar11 < 0x100)) {
               uVar14 = uVar11 & 0xff;
             }

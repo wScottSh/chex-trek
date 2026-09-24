@@ -1,5 +1,11 @@
 // idTarget_EndLevelGUI::Event_Activate @ 001a3ee0
 // undefined Event_Activate(idEntity * param_1)
+// literals (read from .rodata; Ghidra address, type, value):
+//   003710d9  string "gui"
+//   0036cc00  string "s_shader"
+//   0037412c  string "00:00:000"
+//   00374136  string "mapname"
+//   0037f468  string ""
 
 /* WARNING: Function: __i686.get_pc_thunk.bx replaced with injection: get_pc_thunk_bx */
 /* idTarget_EndLevelGUI::Event_Activate(idEntity*) */
@@ -16,7 +22,7 @@ void idTarget_EndLevelGUI::Event_Activate(idEntity *param_1)
   int iVar5;
   undefined4 uVar6;
   undefined4 *puVar7;
-  undefined1 *puVar8;
+  char *pcVar8;
   int iVar9;
   idStr *local_60;
   size_t local_50;
@@ -99,14 +105,14 @@ void idTarget_EndLevelGUI::Event_Activate(idEntity *param_1)
           (**(code **)(**(int **)(param_1 + 0x27c) + 0x40))
                     (*(int **)(param_1 + 0x27c),puVar7[0xe],0);
           (**(code **)(**(int **)(param_1 + 0x27c) + 0x38))
-                    (*(int **)(param_1 + 0x27c),puVar7[0x11],&LAB_0037412b_1);
+                    (*(int **)(param_1 + 0x27c),puVar7[0x11],"00:00:000");
           pcVar4 = *(code **)(**(int **)(param_1 + 0x27c) + 0x38);
           iVar9 = idDict::FindKey(this,"mapname");
-          puVar8 = &DAT_0037f468;
+          pcVar8 = "";
           if (iVar9 != 0) {
-            puVar8 = *(undefined1 **)(*(int *)(iVar9 + 4) + 4);
+            pcVar8 = *(char **)(*(int *)(iVar9 + 4) + 4);
           }
-          (*pcVar4)(*(undefined4 *)(param_1 + 0x27c),&LAB_00374135_1,puVar8);
+          (*pcVar4)(*(undefined4 *)(param_1 + 0x27c),"mapname",pcVar8);
           (**(code **)(**(int **)(param_1 + 0x27c) + 0x58))
                     (*(int **)(param_1 + 0x27c),*(undefined4 *)(PTR_gameLocal_003e0cac + 0x251884),0
                     );

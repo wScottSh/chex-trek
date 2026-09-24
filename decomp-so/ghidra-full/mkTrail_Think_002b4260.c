@@ -1,8 +1,10 @@
 // mkTrail::Think @ 002b4260
 // undefined Think(mkTrail * this)
+// literals (read from .rodata; Ghidra address, type, value):
+//   0036b0e4  float  0.5
+//   0036b0e8  float  1.5
 
 /* WARNING: Function: __i686.get_pc_thunk.bx replaced with injection: get_pc_thunk_bx */
-/* WARNING: Globals starting with '_' overlap smaller symbols at the same address */
 /* mkTrail::Think() */
 
 void __thiscall mkTrail::Think(mkTrail *this)
@@ -32,7 +34,7 @@ void __thiscall mkTrail::Think(mkTrail *this)
                (*(float *)(this + 0x40) - *pfVar5) * (*(float *)(this + 0x40) - *pfVar5);
     local_14 = (float)(0x5f3759df - ((int)local_10 >> 1));
     if (*(float *)(this + 0x50) <
-        (_LAB_0036b0e8 - local_14 * local_14 * _LAB_0036b0e4 * local_10) * local_14 * local_10) {
+        (1.5 - local_14 * local_14 * 0.5 * local_10) * local_14 * local_10) {
       *(uint *)(this + 0x3c) = *(uint *)(this + 0x3c) | 8;
       piVar4 = (int *)idEntity::GetPhysics(*(idEntity **)(this + 4));
       puVar6 = (undefined4 *)(**(code **)(*piVar4 + 0x84))(piVar4,0);

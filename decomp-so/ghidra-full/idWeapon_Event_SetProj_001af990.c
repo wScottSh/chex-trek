@@ -1,5 +1,6 @@
 // idWeapon::Event_SetProj @ 001af990
 // undefined Event_SetProj(idWeapon * this, char * param_1)
+// literals: none
 
 /* WARNING: Function: __i686.get_pc_thunk.bx replaced with injection: get_pc_thunk_bx */
 /* idWeapon::Event_SetProj(char const*) */

@@ -1,5 +1,6 @@
 // idCustomUI::UnregisterGUI @ 0019e0b0
 // undefined UnregisterGUI(idCustomUI * this)
+// literals: none
 
 /* WARNING: Function: __i686.get_pc_thunk.bx replaced with injection: get_pc_thunk_bx */
 /* idCustomUI::UnregisterGUI() */

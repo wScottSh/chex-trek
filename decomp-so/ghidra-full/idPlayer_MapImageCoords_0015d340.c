@@ -1,5 +1,6 @@
 // idPlayer::MapImageCoords @ 0015d340
 // undefined MapImageCoords(idPlayer * this, float param_1, float param_2, idVec2 * param_3, idVec2 * param_4)
+// literals: none
 
 /* idPlayer::MapImageCoords(float, float, idVec2 const&, idVec2&) */
 

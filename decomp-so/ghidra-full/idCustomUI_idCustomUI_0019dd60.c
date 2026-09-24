@@ -1,5 +1,6 @@
 // idCustomUI::idCustomUI @ 0019dd60
 // undefined idCustomUI(idCustomUI * this)
+// literals: none
 
 /* WARNING: Function: __i686.get_pc_thunk.bx replaced with injection: get_pc_thunk_bx */
 /* idCustomUI::idCustomUI() */

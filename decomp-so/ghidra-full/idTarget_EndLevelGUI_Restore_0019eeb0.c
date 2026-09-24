@@ -1,5 +1,6 @@
 // idTarget_EndLevelGUI::Restore @ 0019eeb0
 // undefined Restore(idTarget_EndLevelGUI * this, idRestoreGame * param_1)
+// literals: none
 
 /* WARNING: Function: __i686.get_pc_thunk.bx replaced with injection: get_pc_thunk_bx */
 /* idTarget_EndLevelGUI::Restore(idRestoreGame*) */

@@ -1,5 +1,10 @@
 // idTarget_EndLevelGUI::HandleCustomGUICommand @ 001a13c0
 // undefined HandleCustomGUICommand(idTarget_EndLevelGUI * this, idEntity * param_1, idToken * param_2)
+// literals (read from .rodata; Ghidra address, type, value):
+//   00374024  string "nextmap"
+//   0037402c  string "skip"
+//   00373d09  string "unregister"
+//   00374031  string "mm:ss:MMM"
 
 /* WARNING: Function: __i686.get_pc_thunk.bx replaced with injection: get_pc_thunk_bx */
 /* idTarget_EndLevelGUI::HandleCustomGUICommand(idEntity*, idToken*) */

@@ -1,5 +1,12 @@
 // idTarget_EndLevelGUI::Event_UpdateStats @ 001a5760
 // undefined Event_UpdateStats(idTarget_EndLevelGUI * this)
+// literals (read from .rodata; Ghidra address, type, value):
+//   00374031  string "mm:ss:MMM"
+//   003741b9  string "extHndNextMap"
+//   00372158  string "0"
+//   00374024  string "nextmap"
+//   00374127  string "map "
+//   0037f468  string ""
 
 /* WARNING: Function: __i686.get_pc_thunk.bx replaced with injection: get_pc_thunk_bx */
 /* idTarget_EndLevelGUI::Event_UpdateStats() */
@@ -15,7 +22,7 @@ void __thiscall idTarget_EndLevelGUI::Event_UpdateStats(idTarget_EndLevelGUI *th
   int iVar5;
   idPlayer *piVar6;
   int iVar7;
-  undefined1 *puVar8;
+  char *pcVar8;
   size_t local_50;
   undefined1 *local_4c;
   int local_48;
@@ -65,11 +72,11 @@ void __thiscall idTarget_EndLevelGUI::Event_UpdateStats(idTarget_EndLevelGUI *th
     goto LAB_001a592e;
   case 5:
     iVar5 = idDict::FindKey((idDict *)(this + 100),"extHndNextMap");
-    puVar8 = &LAB_00372157_1;
+    pcVar8 = "0";
     if (iVar5 != 0) {
-      puVar8 = *(undefined1 **)(*(int *)(iVar5 + 4) + 4);
+      pcVar8 = *(char **)(*(int *)(iVar5 + 4) + 4);
     }
-    iVar5 = __strtol_internal(puVar8,0,10,0);
+    iVar5 = __strtol_internal(pcVar8,0,10,0);
     if (iVar5 == 0) {
       idCustomUI::UnregisterGUI((idCustomUI *)this);
       iVar5 = idDict::FindKey((idDict *)(this + 100),"nextmap");

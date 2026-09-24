@@ -1,5 +1,6 @@
 // idAI::OpenDoors @ 001ce950
 // undefined OpenDoors(idAI * this, idEntity * param_1)
+// literals: none
 
 /* WARNING: Function: __i686.get_pc_thunk.bx replaced with injection: get_pc_thunk_bx */
 /* idAI::OpenDoors(idEntity*) */

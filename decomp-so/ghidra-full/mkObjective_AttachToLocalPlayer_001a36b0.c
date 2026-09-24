@@ -1,5 +1,12 @@
 // mkObjective::AttachToLocalPlayer @ 001a36b0
 // undefined AttachToLocalPlayer(mkObjective * this, bool param_1)
+// literals (read from .rodata; Ghidra address, type, value):
+//   003740cf  string "map_obj%d_v"
+//   003740db  string "map_obj%d"
+//   003740e5  string "map_obj%d_txt"
+//   003740f3  string "map_obj%d_tle"
+//   00374101  string "addmsg"
+//   0037f468  string ""
 
 /* WARNING: Function: __i686.get_pc_thunk.bx replaced with injection: get_pc_thunk_bx */
 /* mkObjective::AttachToLocalPlayer(bool) */

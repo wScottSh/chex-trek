@@ -1,5 +1,6 @@
 // idPlayer::clearCustomUI @ 0015d320
 // undefined clearCustomUI(idPlayer * this)
+// literals: none
 
 /* idPlayer::clearCustomUI() */
 

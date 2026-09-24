@@ -1,5 +1,6 @@
 // idCustomUI::Restore @ 0019e230
 // undefined Restore(idCustomUI * this, idRestoreGame * param_1)
+// literals: none
 
 /* WARNING: Function: __i686.get_pc_thunk.bx replaced with injection: get_pc_thunk_bx */
 /* idCustomUI::Restore(idRestoreGame*) */

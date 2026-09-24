@@ -1,5 +1,7 @@
 // matt_func_envshot::takeEnvShots_f @ 002b7890
 // undefined takeEnvShots_f(idCmdArgs * param_1)
+// literals (read from .rodata; Ghidra address, type, value):
+//   003815b6  string "%i envShots taken\n"
 
 /* WARNING: Function: __i686.get_pc_thunk.bx replaced with injection: get_pc_thunk_bx */
 /* matt_func_envshot::takeEnvShots_f(idCmdArgs const&) */

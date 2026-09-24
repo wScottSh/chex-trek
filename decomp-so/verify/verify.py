@@ -8,13 +8,23 @@ group's reference Markdown. Comments do not count, except for constructor/destru
 callees, whose calls are usually implicit. Indirect (virtual / function-pointer) calls
 cannot be named from the binary alone and are not checked. Missing callees are reported per function.
 
+Check 2 -- constants and strings. Every float/double constant and string literal the
+function reads from .rodata must appear, with the same value, in the code of its
+definition: floats as a decimal-point literal (`32.0f`, `-0.5f`, `.05`) equal at the
+binary's precision (a double constant must not carry an `f` suffix), strings as the exact
+text (adjacent literals are joined). A string literal in the definition that the binary
+function never reads is reported as mismatched. Float immediates baked into instructions
+(`mov [x], 0x42000000`) are not .rodata references and are not checked.
+
     python decomp-so/verify/verify.py              # every group with covered functions
     python decomp-so/verify/verify.py custom-ui    # one (or more) groups
-    python decomp-so/verify/verify.py --callees custom-ui   # just list binary callees
+    python decomp-so/verify/verify.py --callees custom-ui    # just list binary callees
+    python decomp-so/verify/verify.py --literals custom-ui   # just list binary literals
 
-Exit status is 0 only when nothing is missing. Callees that are never checked
+Exit status is 0 only when nothing is missing or mismatched. Callees that are never checked
 (_Unwind_Resume, __cxa_*, the PIC thunk) are listed in binary.py; exception-only and
-ABI-implicit callees are on allowlist.tsv. Dependencies: requirements.txt.
+ABI-implicit callees are on allowlist.tsv, literals that come from stock inline code on
+literal-allowlist.tsv. Dependencies: requirements.txt.
 """
 from __future__ import annotations
 
@@ -26,7 +36,17 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from binary import Binary, Callee, Function, source_name, split_qualified, strip_params  # noqa: E402
+from binary import (  # noqa: E402
+    Binary,
+    Callee,
+    Function,
+    Literal,
+    c_string,
+    source_name,
+    split_qualified,
+    strip_params,
+    to_precision,
+)
 
 VERIFY_DIR = Path(__file__).resolve().parent
 DECOMP_DIR = VERIFY_DIR.parent
@@ -35,6 +55,7 @@ BINARY_PATH = REPO_ROOT / "gamex86.so"
 REFERENCE_DIR = DECOMP_DIR / "reference"
 COVERAGE_PATH = REFERENCE_DIR / "coverage.md"
 ALLOWLIST_PATH = VERIFY_DIR / "allowlist.tsv"
+LITERAL_ALLOWLIST_PATH = VERIFY_DIR / "literal-allowlist.tsv"
 GHIDRA_DIR = DECOMP_DIR / "ghidra-full"
 GHIDRA_INDEX = GHIDRA_DIR / "_index.tsv"
 
@@ -48,7 +69,7 @@ MACRO_BODIES = {
     },
     "ABSTRACT_DECLARATION": {
         "CreateInstance": "idClass *{cls}::CreateInstance( void ) {{ "
-        'gameLocal.Error( "Cannot instanciate abstract class %s.", #{cls} ); return NULL; }}',
+        'gameLocal.Error( "Cannot instanciate abstract class %s.", "{cls}" ); return NULL; }}',  # #nameofclass
         "GetType": "idTypeInfo *{cls}::GetType( void ) const {{ return &( {cls}::Type ); }}",
     },
 }
@@ -115,6 +136,16 @@ def allowed(func: Function, callee: Callee, allow: list[AllowEntry]) -> AllowEnt
     for a in allow:
         if fnmatch.fnmatchcase(strip_params(func.name), a.function) and fnmatch.fnmatchcase(
             strip_params(callee.name), a.callee
+        ):
+            return a
+    return None
+
+
+def literal_allowed(func: Function, literal: Literal, allow: list[AllowEntry]) -> AllowEntry | None:
+    """Literal allow-list: the second field is an fnmatch pattern on `Literal.render()`."""
+    for a in allow:
+        if fnmatch.fnmatchcase(strip_params(func.name), a.function) and fnmatch.fnmatchcase(
+            literal.render(), a.callee
         ):
             return a
     return None
@@ -231,6 +262,93 @@ def code_only(text: str) -> str:
     return _COMMENT_OR_LITERAL.sub(" ", text)
 
 
+_SIMPLE_ESCAPES = {"n": "\n", "t": "\t", "r": "\r", "\\": "\\", '"': '"', "'": "'", "?": "?",
+                   "a": "\a", "b": "\b", "f": "\f", "v": "\v"}
+
+
+def c_unescape(body: str) -> str:
+    """Value of a C string literal's body (between the quotes)."""
+    out, i = [], 0
+    while i < len(body):
+        ch = body[i]
+        if ch != "\\" or i + 1 >= len(body):
+            out.append(ch)
+            i += 1
+            continue
+        nxt = body[i + 1]
+        if nxt in _SIMPLE_ESCAPES:
+            out.append(_SIMPLE_ESCAPES[nxt])
+            i += 2
+        elif nxt == "x":
+            m = re.match(r"[0-9a-fA-F]+", body[i + 2 :])
+            out.append(chr(int(m.group(0), 16) & 0xFF) if m else "x")
+            i += 2 + (len(m.group(0)) if m else 0)
+        elif nxt in "01234567":
+            m = re.match(r"[0-7]{1,3}", body[i + 1 :])
+            out.append(chr(int(m.group(0), 8)))
+            i += 1 + len(m.group(0))
+        else:
+            out.append(nxt)
+            i += 2
+    return "".join(out)
+
+
+def string_literals(text: str) -> list[str]:
+    """Values of the string literals in `text`'s code (not comments). Adjacent literals,
+    separated only by whitespace or comments, are joined as the compiler joins them."""
+    out: list[str] = []
+    joinable = False
+    pos = 0
+    for m in _COMMENT_OR_LITERAL.finditer(text):
+        tok = m.group(0)
+        gap_blank = not text[pos : m.start()].strip()
+        if tok.startswith('"'):
+            value = c_unescape(tok[1:-1])
+            if joinable and gap_blank:
+                out[-1] += value
+            else:
+                out.append(value)
+            joinable = True
+        elif tok.startswith("'"):
+            joinable = False
+        else:  # comment: transparent between adjacent literals
+            joinable = joinable and gap_blank
+        pos = m.end()
+    return out
+
+
+# A decimal floating literal (a point or an exponent is required), optional suffix, and an
+# optional leading minus sign. Integer tokens never count as float constants.
+_FLOAT_TOKEN = re.compile(
+    r"(?<![\w.])(-\s*)?((?:\d+\.\d*|\.\d+)(?:[eE][+-]?\d+)?|\d+[eE][+-]?\d+)([fFlL]?)(?![\w.])"
+)
+
+
+def float_literals(code: str) -> list[tuple[float, bool]]:
+    """(value, has an `f` suffix) for each float literal in `code` (comments and strings
+    already blanked). After a minus sign both signs are listed: the minus may be unary
+    (`-0.5f`, the constant -0.5) or binary (`x - 0.5f`, the constant 0.5)."""
+    out = []
+    for m in _FLOAT_TOKEN.finditer(code):
+        value = float(m.group(2))
+        f_suffix = m.group(3) in ("f", "F")
+        out.append((value, f_suffix))
+        if m.group(1):
+            out.append((-value, f_suffix))
+    return out
+
+
+def literal_present(lit: Literal, strings: list[str], floats: list[tuple[float, bool]]) -> bool:
+    if lit.kind == "string":
+        return lit.value in strings
+    for value, f_suffix in floats:
+        if lit.kind == "double" and f_suffix:
+            continue  # 0.001f is not the double 0.001
+        if to_precision(value, lit.kind) == lit.value:
+            return True
+    return False
+
+
 def is_structor(callee_name: str) -> bool:
     """Constructors/destructors: their calls are often implicit (base/member), so the
     reconstruction may only be able to name them in a comment."""
@@ -256,11 +374,33 @@ class FunctionResult:
     callees: list[Callee] = field(default_factory=list)
     missing: list[Callee] = field(default_factory=list)
     allowed: list[tuple[Callee, AllowEntry]] = field(default_factory=list)
+    # check 2
+    literals: list[Literal] = field(default_factory=list)
+    missing_literals: list[Literal] = field(default_factory=list)
+    mismatched_strings: list[str] = field(default_factory=list)  # in the source, not in the binary
+    allowed_literals: list[tuple[Literal, AllowEntry]] = field(default_factory=list)
     error: str | None = None
 
     @property
     def ok(self) -> bool:
-        return not self.missing and not self.error
+        return not self.missing and not self.missing_literals and not self.mismatched_strings and not self.error
+
+
+def check_literals(res: FunctionResult, binary: Binary, body: str, literal_allow: list[AllowEntry]) -> None:
+    """Check 2 for one function: fills res.literals / missing_literals / mismatched_strings."""
+    strings = string_literals(body)
+    floats = float_literals(code_only(body))
+    res.literals = binary.literals(res.function)
+    for lit in res.literals:
+        if literal_present(lit, strings, floats):
+            continue
+        entry = literal_allowed(res.function, lit, literal_allow)
+        if entry:
+            res.allowed_literals.append((lit, entry))
+        else:
+            res.missing_literals.append(lit)
+    in_binary = {lit.value for lit in res.literals if lit.kind == "string"}
+    res.mismatched_strings = list(dict.fromkeys(s for s in strings if s not in in_binary))
 
 
 def check_group(
@@ -269,8 +409,12 @@ def check_group(
     rows: list[CoverageRow],
     allow: list[AllowEntry],
     reference_text: str | None = None,
+    literal_allow: list[AllowEntry] | None = None,
 ) -> list[FunctionResult]:
+    """Checks 1 and 2 for every `covered` function of `group`."""
     covered = [r for r in rows if r.group == group and r.status == "covered"]
+    if literal_allow is None:
+        literal_allow = load_allowlist(LITERAL_ALLOWLIST_PATH)
     if reference_text is None:
         reference_text = (REFERENCE_DIR / f"{group}.md").read_text(encoding="utf-8")
     impl = implementation_block(reference_text)
@@ -303,6 +447,7 @@ def check_group(
                 res.allowed.append((callee, entry))
             else:
                 res.missing.append(callee)
+        check_literals(res, binary, body, literal_allow)
     return results
 
 
@@ -313,14 +458,24 @@ def format_results(results: list[FunctionResult]) -> list[str]:
         label = f"{res.row.function} @ {res.row.vaddr:#x}"
         if res.error:
             lines.append(f"  FAIL     {label}: {res.error}")
-        elif res.missing:
-            lines.extend(f"  MISSING  {label}: {c.name}" for c in res.missing)
-        else:
+            continue
+        lines.extend(f"  MISSING  {label}: {c.name}" for c in res.missing)
+        lines.extend(f"  LITERAL  {label}: missing {lit.render()}" for lit in res.missing_literals)
+        lines.extend(
+            f"  LITERAL  {label}: mismatched {c_string(s)} (the binary function reads no such string)"
+            for s in res.mismatched_strings
+        )
+        if res.ok:
             extra = "".join(f"; allow-listed {c.name} ({a.kind})" for c, a in res.allowed)
-            lines.append(f"  ok       {label}: {len(res.callees)} callee(s){extra}")
+            extra += "".join(f"; allow-listed {lit.render()} ({a.kind})" for lit, a in res.allowed_literals)
+            lines.append(f"  ok       {label}: {len(res.callees)} callee(s), {len(res.literals)} literal(s){extra}")
     n_missing = sum(len(r.missing) for r in results)
+    n_lit = sum(len(r.missing_literals) + len(r.mismatched_strings) for r in results)
     n_err = sum(1 for r in results if r.error)
-    lines.append(f"  => {len(results)} functions, {n_missing} missing callee(s), {n_err} error(s)")
+    lines.append(
+        f"  => {len(results)} functions, {n_missing} missing callee(s), "
+        f"{n_lit} missing/mismatched literal(s), {n_err} error(s)"
+    )
     return lines
 
 
@@ -328,6 +483,7 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("groups", nargs="*", help="group names (default: every group with covered functions)")
     ap.add_argument("--callees", action="store_true", help="list each function's binary callees and exit")
+    ap.add_argument("--literals", action="store_true", help="list each function's binary literals and exit")
     args = ap.parse_args(argv)
 
     binary = Binary(BINARY_PATH)
@@ -347,6 +503,15 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"{g}\t{source_name(f.name)}\t{f.vaddr:#x}+{f.size}")
                 for c in binary.callees(f):
                     print(f"\t{'(ignored) ' if c.ignored else ''}{c.name}")
+        return 0
+    if args.literals:
+        sys.stdout.reconfigure(encoding="utf-8")
+        for g in groups:
+            for r in (r for r in rows if r.group == g):
+                f = binary.by_raw[r.symbol]
+                print(f"{g}\t{source_name(f.name)}\t{f.vaddr:#x}+{f.size}")
+                for lit in binary.literals(f):
+                    print(f"\t{lit.render()}")
         return 0
 
     failed = False
