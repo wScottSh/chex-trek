@@ -1,6 +1,6 @@
 // idCmdSystem::ArgCompletion_GuiName @ 00183a40
 // undefined ArgCompletion_GuiName(idCmdArgs * param_1, _func_void_char_ptr * param_2)
-// literals (read from .rodata; Ghidra address, type, value):
+// literals (Ghidra address of the data, or of the instruction for an immediate; type; value):
 //   003710d8  string ".gui"
 //   00371a0c  string "guis/"
 

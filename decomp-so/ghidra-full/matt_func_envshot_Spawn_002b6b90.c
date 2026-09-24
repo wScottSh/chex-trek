@@ -1,6 +1,6 @@
 // matt_func_envshot::Spawn @ 002b6b90
 // undefined Spawn(matt_func_envshot * this)
-// literals (read from .rodata; Ghidra address, type, value):
+// literals (Ghidra address of the data, or of the instruction for an immediate; type; value):
 //   0038158b  string "atSpawn"
 //   00372158  string "0"
 

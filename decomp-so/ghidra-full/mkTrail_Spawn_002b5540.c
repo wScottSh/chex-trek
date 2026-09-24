@@ -1,6 +1,6 @@
 // mkTrail::Spawn @ 002b5540
 // undefined Spawn(mkTrail * this)
-// literals (read from .rodata; Ghidra address, type, value):
+// literals (Ghidra address of the data, or of the instruction for an immediate; type; value):
 //   003814f2  string "mtr_trail"
 //   0037f468  string ""
 //   003814fc  string "updateDist"

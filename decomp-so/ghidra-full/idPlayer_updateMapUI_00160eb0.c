@@ -1,6 +1,6 @@
 // idPlayer::updateMapUI @ 00160eb0
 // undefined updateMapUI(idPlayer * this, idUserInterface * param_1, int param_2, bool param_3)
-// literals (read from .rodata; Ghidra address, type, value):
+// literals (Ghidra address of the data, or of the instruction for an immediate; type; value):
 //   00371d2b  string "%s%i"
 //   00372bc8  float  320.0
 //   00372bcc  float  240.0

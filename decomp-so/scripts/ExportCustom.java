@@ -4,14 +4,22 @@
 // function reads from .rodata is resolved from the bytes and typed in the listing (float,
 // double or C string) before anything is decompiled, and any label of one of the function's
 // literals still left in the pseudo-C is replaced by its value, so the pseudo-C shows values
-// instead of label addresses (`_LAB_0036b0e4` -> 0.5, `&LAB_00370e03` -> "32"). Each file also starts with
+// instead of label addresses (`_LAB_0036b0e4` -> 0.5, `&LAB_00370e03` -> "32", and
+// `0x42000000` -> `0x42000000 /* 32.0f */`). Each file also starts with
 // a `// literals:` block listing them. The verification harness (decomp-so/verify) finds the same
 // literals from the binary on its own; its tests check that the two lists agree.
 //
-// A literal is an operand `[reg + disp]` with no index register whose address, taken as
-// _GLOBAL_OFFSET_TABLE_ + disp (i386 PIC addressing), lies in .rodata, and whose instruction is
-//   - an x87 read (FLD FADD FSUB FSUBR FMUL FDIV FDIVR FCOM FCOMP) of a dword/qword: float/double;
-//   - LEA of a NUL-terminated printable run: string.
+// Mirrors decomp-so/verify/binary.py (Binary.literals), which the tests compare it with:
+//   - PIC register: one seen to receive _GLOBAL_OFFSET_TABLE_ (start of .got.plt) from
+//     `call __i686.get_pc_thunk.<r>` / `call next; pop <r>` followed by `add <r>, imm`.
+//   - float/double: an x87 read (FLD FADD FSUB FSUBR FMUL FDIV FDIVR FCOM FCOMP) of a
+//     dword/qword at [pic + disp] in .rodata, or through a register that a LEA of such an
+//     address loaded (that LEA is then a pointer, not a string).
+//   - string: LEA of [pic + disp] in .rodata pointing at a NUL-terminated printable run.
+//   - float immediate: `mov <4-byte dest>, imm32` whose bits read as a float with
+//     1/65536 <= |x| <= 2^24 and at most 6 significant digits (0x42000000 = 32.0). It is not
+//     in .rodata, so it is listed as `(immediate ...)` and annotated where the hex appears.
+// The C-escape rules (cString) and the x87 mnemonic set are duplicated in binary.py.
 //
 // Args: <outDir> <comma-separated classes> <file of extra qualified method names>
 // Run (fresh project, Ghidra 12.1.4 headless; this produced decomp-so/ghidra-full/):
@@ -29,11 +37,16 @@ import ghidra.program.model.scalar.Scalar;
 import java.io.*;
 import java.nio.file.*;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class ExportCustom extends GhidraScript {
     static final Set<String> X87_READS = Set.of("FLD", "FADD", "FSUB", "FSUBR", "FMUL", "FDIV", "FDIVR", "FCOM", "FCOMP");
 
-    record Lit(Address addr, String kind, String text, int length) {}
+    /** kind: float, double, string, pointer (placeholder), immediate (float imm32 `bits`). */
+    record Lit(Address addr, String kind, String text, int length, long bits) {
+        Lit(Address addr, String kind, String text, int length) { this(addr, kind, text, length, 0); }
+    }
     record LeaRef(int index, Address addr) {}
 
     MemoryBlock rodata;
@@ -63,7 +76,7 @@ public class ExportCustom extends GhidraScript {
             List<Lit> list = literals(f);
             lits.put(f, list);
             for (Lit l : list) {
-                if (typed.stream().anyMatch(t -> overlaps(t, l))) continue; // keep the first of overlapping strings
+                if (l.kind().equals("immediate") || typed.stream().anyMatch(t -> overlaps(t, l))) continue; // keep the first of overlapping strings
                 typeLiteral(l);
                 typed.add(l);
             }
@@ -115,9 +128,47 @@ public class ExportCustom extends GhidraScript {
         List<Lit> found = new ArrayList<>();
         Map<Register, LeaRef> leaRegs = new HashMap<>();
         Set<String> clobbered = Set.of("EAX", "ECX", "EDX"); // caller-saved
+        Set<Register> pic = new HashSet<>();
+        Register pendingReg = null;
+        long pendingValue = -1; // return address a thunk / `call next` left in pendingReg
         for (Instruction ins : instructions(f)) {
             String mn = ins.getMnemonicString().toUpperCase();
-            if (mn.equals("CALL")) leaRegs.keySet().removeIf(r -> clobbered.contains(r.getName()));
+            if (mn.equals("CALL")) {
+                leaRegs.keySet().removeIf(r -> clobbered.contains(r.getName()));
+                Address[] flows = ins.getFlows();
+                if (flows.length == 1) {
+                    Function callee = getFunctionAt(flows[0]);
+                    long next = ins.getAddress().getOffset() + ins.getLength();
+                    if (callee != null && callee.getName().startsWith("__i686.get_pc_thunk.")) {
+                        String sfx = callee.getName().substring("__i686.get_pc_thunk.".length());
+                        pendingReg = currentProgram.getRegister("E" + sfx.toUpperCase());
+                        pendingValue = next;
+                    } else if (flows[0].getOffset() == next) {
+                        pendingReg = null;
+                        pendingValue = next; // `call next; pop <r>`
+                    }
+                }
+                continue;
+            }
+            if (pendingValue >= 0 && pendingReg == null && mn.equals("POP")
+                    && ins.getOpObjects(0).length == 1 && ins.getOpObjects(0)[0] instanceof Register r) {
+                pendingReg = r;
+                continue;
+            }
+            if (pendingValue >= 0 && pendingReg != null && mn.equals("ADD")
+                    && ins.getOpObjects(0).length == 1 && pendingReg.equals(ins.getOpObjects(0)[0])
+                    && ins.getOpObjects(1).length == 1 && ins.getOpObjects(1)[0] instanceof Scalar imm) {
+                if (((pendingValue + imm.getSignedValue()) & 0xffffffffL) == got) pic.add(pendingReg);
+                pendingReg = null;
+                pendingValue = -1;
+                continue;
+            }
+            if (mn.equals("MOV") && ins.getNumOperands() == 2 && ins.getOpObjects(1).length == 1
+                    && ins.getOpObjects(1)[0] instanceof Scalar imm && fourBytes(ins)) {
+                long bits = imm.getUnsignedValue() & 0xffffffffL;
+                Float v = floatImmediate(bits);
+                if (v != null) found.add(new Lit(ins.getAddress(), "immediate", Float.toString(v), 4, bits));
+            }
             boolean x87 = X87_READS.contains(mn);
             boolean lea = mn.equals("LEA");
             int leaIndex = -1;
@@ -142,7 +193,7 @@ public class ExportCustom extends GhidraScript {
                         found.set(ref.index(), null);
                         a = ref.addr().add(disp);
                     } else {
-                        if (!hasDisp) continue;
+                        if (!hasDisp || !pic.contains(reg)) continue;
                         a = toAddr((got + disp) & 0xffffffffL);
                     }
                     if (!rodata.contains(a)) continue;
@@ -172,6 +223,25 @@ public class ExportCustom extends GhidraScript {
             if (l != null && !l.kind().equals("pointer")) out.putIfAbsent(l.addr(), l);
         }
         return new ArrayList<>(out.values());
+    }
+
+    /** Destination of a MOV is 4 bytes: a 32-bit register or a dword memory operand. */
+    static boolean fourBytes(Instruction ins) {
+        Object[] dest = ins.getOpObjects(0);
+        if (dest.length == 1 && dest[0] instanceof Register r) return r.getBitLength() == 32;
+        return ins.getDefaultOperandRepresentation(0).toLowerCase().startsWith("dword ptr");
+    }
+
+    static final double FLOAT_IMM_MIN = Math.pow(2, -16), FLOAT_IMM_MAX = Math.pow(2, 24);
+
+    /** The float an imm32 encodes, or null if it does not look like a float constant. */
+    static Float floatImmediate(long bits) {
+        float v = Float.intBitsToFloat((int) bits);
+        if (!Float.isFinite(v) || Math.abs(v) < FLOAT_IMM_MIN || Math.abs(v) > FLOAT_IMM_MAX) return null;
+        // Float.toString is the shortest round-trip text (JDK 19+), like binary.py's shortest_float
+        String digits = Float.toString(Math.abs(v)).split("E")[0].replace(".", "")
+            .replaceAll("^0+", "").replaceAll("0+$", "");
+        return digits.length() <= 6 ? v : null;
     }
 
     /** NUL-terminated printable ASCII at a, C-escaped with quotes; null if not a string. */
@@ -214,7 +284,7 @@ public class ExportCustom extends GhidraScript {
 
     // A label Ghidra prints for a data address: `LAB_0036b0e4`, `_LAB_...` (read through it),
     // `FLOAT_...` / `DOUBLE_...` (typed data), `DAT_...`; `_N` is an offcut (address + N).
-    static final java.util.regex.Pattern LABEL = java.util.regex.Pattern.compile(
+    static final Pattern LABEL = Pattern.compile(
         "(?<![A-Za-z0-9])(&?)_?(?:LAB|DAT|FLOAT|DOUBLE)_([0-9a-f]{8})(?:_(\\d+))?(?![A-Za-z0-9_])");
 
     /** Replace labels of this function's literals with their values. Typing the data first
@@ -223,7 +293,13 @@ public class ExportCustom extends GhidraScript {
     static String resolveLabels(String c, List<Lit> lits) {
         Map<Long, Lit> byAddr = new HashMap<>();
         for (Lit l : lits) byAddr.put(l.addr().getOffset(), l);
-        java.util.regex.Matcher m = LABEL.matcher(c);
+        for (Lit l : lits) {
+            if (!l.kind().equals("immediate")) continue;
+            String hex = String.format("0x%x", l.bits());
+            c = c.replaceAll("(?<![0-9A-Za-z_])" + hex + "(?![0-9A-Za-z_])",
+                Matcher.quoteReplacement(hex + " /* " + l.text() + "f */"));
+        }
+        Matcher m = LABEL.matcher(c);
         StringBuilder sb = new StringBuilder();
         while (m.find()) {
             long a = Long.parseLong(m.group(2), 16) + (m.group(3) == null ? 0 : Long.parseLong(m.group(3)));
@@ -231,8 +307,8 @@ public class ExportCustom extends GhidraScript {
             boolean addrOf = !m.group(1).isEmpty();
             String rep = m.group(0);
             if (l != null && l.kind().equals("string") && addrOf) rep = l.text();
-            else if (l != null && !l.kind().equals("string") && !addrOf) rep = l.text();
-            m.appendReplacement(sb, java.util.regex.Matcher.quoteReplacement(rep));
+            else if (l != null && (l.kind().equals("float") || l.kind().equals("double")) && !addrOf) rep = l.text();
+            m.appendReplacement(sb, Matcher.quoteReplacement(rep));
         }
         m.appendTail(sb);
         return sb.toString();
@@ -240,10 +316,13 @@ public class ExportCustom extends GhidraScript {
 
     static String literalBlock(List<Lit> lits) {
         if (lits.isEmpty()) return "// literals: none\n";
-        StringBuilder sb = new StringBuilder("// literals (read from .rodata; Ghidra address, type, value):\n");
+        StringBuilder sb = new StringBuilder(
+            "// literals (Ghidra address of the data, or of the instruction for an immediate; type; value):\n");
         for (Lit l : lits) {
-            sb.append("//   ").append(l.addr()).append("  ").append(String.format("%-6s", l.kind()))
-              .append(" ").append(l.text()).append("\n");
+            boolean imm = l.kind().equals("immediate");
+            sb.append("//   ").append(l.addr()).append("  ").append(String.format("%-6s", imm ? "float" : l.kind()))
+              .append(" ").append(l.text())
+              .append(imm ? String.format("  (immediate 0x%08x)", l.bits()) : "").append("\n");
         }
         return sb.toString();
     }

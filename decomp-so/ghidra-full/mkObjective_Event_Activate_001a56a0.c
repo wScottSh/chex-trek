@@ -1,6 +1,6 @@
 // mkObjective::Event_Activate @ 001a56a0
 // undefined Event_Activate(mkObjective * this, idEntity * param_1)
-// literals (read from .rodata; Ghidra address, type, value):
+// literals (Ghidra address of the data, or of the instruction for an immediate; type; value):
 //   0036d91b  string "remove"
 //   00372158  string "0"
 

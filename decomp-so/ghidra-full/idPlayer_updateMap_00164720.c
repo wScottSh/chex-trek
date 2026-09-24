@@ -1,6 +1,6 @@
 // idPlayer::updateMap @ 00164720
 // undefined updateMap(idPlayer * this)
-// literals (read from .rodata; Ghidra address, type, value):
+// literals (Ghidra address of the data, or of the instruction for an immediate; type; value):
 //   00372158  string "0"
 //   00371dc8  string "HudMap"
 

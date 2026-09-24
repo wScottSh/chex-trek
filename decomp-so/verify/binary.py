@@ -6,6 +6,7 @@ Ghidra output -- so the verification harness checks reconstructions against the 
 """
 from __future__ import annotations
 
+import math
 import re
 import struct
 from dataclasses import dataclass
@@ -49,8 +50,9 @@ class Callee:
 
 @dataclass(frozen=True)
 class Literal:
-    """A constant a function reads from .rodata: `float`/`double` (x87 memory operand)
-    or `string` (address taken with `lea`, NUL-terminated printable text)."""
+    """A constant a function uses: `float`/`double` read from .rodata by x87 code, a
+    `float` stored as an instruction immediate (`mov [x], 0x42000000`), or a `string`
+    (.rodata address taken with `lea`, NUL-terminated printable text)."""
 
     kind: str  # "float" | "double" | "string"
     value: float | str
@@ -79,14 +81,33 @@ def to_precision(value: float, kind: str) -> float:
     return value
 
 
+def _shortest_digits(value: float, kind: str) -> int:
+    for digits in range(1, 18):
+        if to_precision(float(f"{value:.{digits}g}"), kind) == value:
+            return digits
+    return 17
+
+
 def shortest_float(value: float, kind: str) -> str:
     """Fewest significant digits that read back as `value` at the binary's precision,
     written positionally where Python would (`32.0`, `0.001`, `-100.0`)."""
-    for digits in range(1, 18):
-        text = f"{value:.{digits}g}"
-        if to_precision(float(text), kind) == value:
-            return repr(float(text))
-    return repr(value)
+    return repr(float(f"{value:.{_shortest_digits(value, kind)}g}"))
+
+
+# An imm32 moved into a 4-byte destination is taken as a float constant when its bits read
+# as a float with 1/65536 <= |x| <= 2^24 and at most 6 significant digits (32.0, 73.74).
+# Integers in that bit range are 0x37800000 and up (>= ~15 million), and the ones that occur
+# -- magic reciprocal multipliers such as 0x4a90be59 for / 3600000 -- need 7+ digits.
+FLOAT_IMM_MIN, FLOAT_IMM_MAX, FLOAT_IMM_DIGITS = 2.0**-16, 2.0**24, 6
+
+
+def float_immediate(imm: int) -> float | None:
+    """The float an instruction immediate encodes, or None if it does not look like one."""
+    bits = imm & 0xFFFFFFFF
+    (value,) = struct.unpack("<f", struct.pack("<I", bits))
+    if not math.isfinite(value) or not FLOAT_IMM_MIN <= abs(value) <= FLOAT_IMM_MAX:
+        return None
+    return value if _shortest_digits(value, "float") <= FLOAT_IMM_DIGITS else None
 
 
 _C_ESCAPES = {"\\": "\\\\", '"': '\\"', "\n": "\\n", "\t": "\\t", "\r": "\\r"}
@@ -258,7 +279,9 @@ class Binary:
                     # address of a float constant, not of a string.
                     i, target = lea_regs[op.mem.base]
                     out[i] = RodataRef(out[i].at, target, "pointer", None)
-                    out.append(self._classify(ins.mnemonic, op.size, target + op.mem.disp, ins.address))
+                    target += op.mem.disp
+                    if ro_addr <= target < ro_addr + len(ro):
+                        out.append(self._classify(ins.mnemonic, op.size, target, ins.address))
                     continue
                 if op.mem.base not in pic:
                     continue
@@ -288,12 +311,30 @@ class Binary:
         return RodataRef(at, target, "unclassified", None)
 
     def literals(self, func: Function) -> list[Literal]:
-        """Distinct float constants and string literals the function reads, first-seen order."""
+        """Distinct float constants and string literals the function uses, in address order."""
+        found = [(ref.at, ref.literal) for ref in self.rodata_refs(func) if ref.literal is not None]
+        found += self.immediate_floats(func)
         seen: dict[Literal, None] = {}
-        for ref in self.rodata_refs(func):
-            if ref.literal is not None:
-                seen.setdefault(ref.literal, None)
+        for _, lit in sorted(found, key=lambda x: x[0]):
+            seen.setdefault(lit, None)
         return list(seen)
+
+    def immediate_floats(self, func: Function) -> list[tuple[int, Literal]]:
+        """(instruction address, float) for each `mov <4-byte dest>, imm32` whose immediate
+        looks like a float constant (see float_immediate)."""
+        from capstone import x86
+
+        out = []
+        for ins in self._md_detail.disasm(self._bytes(func.vaddr, func.size), func.vaddr):
+            if ins.mnemonic != "mov" or len(ins.operands) != 2:
+                continue
+            dest, src = ins.operands
+            if src.type != x86.X86_OP_IMM or dest.size != 4:
+                continue
+            value = float_immediate(src.imm)
+            if value is not None:
+                out.append((ins.address, Literal("float", value)))
+        return out
 
     def _name_for(self, target: int) -> str:
         if target in self.plt:

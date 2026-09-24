@@ -1,8 +1,9 @@
 // idPlayer::updateHudMapAlpha @ 00164380
 // undefined updateHudMapAlpha(idPlayer * this, int param_1)
-// literals (read from .rodata; Ghidra address, type, value):
+// literals (Ghidra address of the data, or of the instruction for an immediate; type; value):
 //   0036b0e4  float  0.5
 //   0036b0e8  float  1.5
+//   00164475  float  128.0  (immediate 0x43000000)
 //   00372bd4  float  255.0
 //   00372ca8  string "textures/guis/hudmap_alpha%d.tga"
 

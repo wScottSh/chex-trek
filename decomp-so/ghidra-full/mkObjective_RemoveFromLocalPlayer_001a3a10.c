@@ -1,6 +1,6 @@
 // mkObjective::RemoveFromLocalPlayer @ 001a3a10
 // undefined RemoveFromLocalPlayer(mkObjective * this, bool param_1)
-// literals (read from .rodata; Ghidra address, type, value):
+// literals (Ghidra address of the data, or of the instruction for an immediate; type; value):
 //   003740cf  string "map_obj%d_v"
 //   00374108  string "rmmsg"
 //   0037f468  string ""

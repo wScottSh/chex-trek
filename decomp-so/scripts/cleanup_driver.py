@@ -42,7 +42,8 @@ RULES = """\
   noise, stray `unaff_*` arguments) instead of turning them into behavior.
 - Show float constants as real values and strings as the literal text read from the binary.
   Every literal listed below for a function must appear in its definition with the same
-  value (check 2): floats as decimal literals (`32.0f`, `-0.5f`; a `double` without an `f`
+  value (check 2), including floats the binary stores as immediates (`0x42000000` = 32.0):
+  floats as decimal literals (`32.0f`, `-0.5f`; a `double` without an `f`
   suffix), strings exactly, including stock defaults the call inlines (write
   `spawnArgs.GetFloat( "key", "0" )` when the binary reads "0"). Do not add string literals
   the function does not read. Literals from stock inline code go on

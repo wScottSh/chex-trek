@@ -1,6 +1,6 @@
 // idPlayer::Cmd_ShowMap_f @ 00160c00
 // undefined Cmd_ShowMap_f(idCmdArgs * param_1)
-// literals (read from .rodata; Ghidra address, type, value):
+// literals (Ghidra address of the data, or of the instruction for an immediate; type; value):
 //   0037f468  string ""
 //   00371d1d  string "bad level %s\n"
 //   00371d05  string "usage: showMap [level]\n"

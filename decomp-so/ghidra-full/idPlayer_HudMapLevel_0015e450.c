@@ -1,6 +1,6 @@
 // idPlayer::HudMapLevel @ 0015e450
 // undefined HudMapLevel(idPlayer * this, idVec3 * param_1)
-// literals (read from .rodata; Ghidra address, type, value):
+// literals (Ghidra address of the data, or of the instruction for an immediate; type; value):
 //   0036b0e4  float  0.5
 //   00372c4c  string "Location below lowest MapLevel"
 

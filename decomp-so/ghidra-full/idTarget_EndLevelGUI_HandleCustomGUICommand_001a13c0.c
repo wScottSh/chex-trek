@@ -1,6 +1,6 @@
 // idTarget_EndLevelGUI::HandleCustomGUICommand @ 001a13c0
 // undefined HandleCustomGUICommand(idTarget_EndLevelGUI * this, idEntity * param_1, idToken * param_2)
-// literals (read from .rodata; Ghidra address, type, value):
+// literals (Ghidra address of the data, or of the instruction for an immediate; type; value):
 //   00374024  string "nextmap"
 //   0037402c  string "skip"
 //   00373d09  string "unregister"

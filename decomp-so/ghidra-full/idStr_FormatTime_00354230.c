@@ -1,6 +1,6 @@
 // idStr::FormatTime @ 00354230
 // undefined FormatTime(idStr * this, char * param_1, int param_2)
-// literals (read from .rodata; Ghidra address, type, value):
+// literals (Ghidra address of the data, or of the instruction for an immediate; type; value):
 //   00371002  string "%i"
 //   00385bfa  string "%0"
 

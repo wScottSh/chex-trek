@@ -1,10 +1,11 @@
 // idActor::Event_FootPrint @ 000c6210
 // undefined Event_FootPrint(idActor * this, char * param_1, char * param_2)
-// literals (read from .rodata; Ghidra address, type, value):
+// literals (Ghidra address of the data, or of the instruction for an immediate; type; value):
 //   0036beab  string "footprint_s_z"
 //   00372158  string "0"
 //   0036beb9  string "footprint_e_z"
 //   0036bec7  string "-8"
+//   000c638d  float  8.0  (immediate 0x41000000)
 //   0036beca  string "footprint_time_%s"
 //   0036beed  string "mtr_footprint"
 //   0037f468  string ""
@@ -14,13 +15,18 @@
 //   0036bf1f  string "footprint_size"
 //   00371dbd  string "16"
 //   0036bf34  string "footprint_offset_%s"
+//   000c66f4  float  1.0  (immediate 0x3f800000)
 //   0036b0e4  float  0.5
 //   0036b0e8  float  1.5
 //   0036bbbe  string "%s_%s"
+//   000c6968  float  -1.0  (immediate 0xbf800000)
+//   000c69b2  float  8.0  (immediate 0x41000000)
 //   0036bedc  string "mtr_footprint_%s"
 //   0036c140  float  -12.0
 //   0036bf2e  string "_r"
 //   0037d0f7  string "%s%s"
+//   000c6aee  float  -1.0  (immediate 0xbf800000)
+//   000c6b83  float  8.0  (immediate 0x41000000)
 //   0036c144  float  12.0
 //   0036bf31  string "_l"
 
@@ -134,7 +140,7 @@ void __thiscall idActor::Event_FootPrint(idActor *this,char *param_1,char *param
   lVar14 = (longdouble)__strtod_internal(pcVar10,0,0);
   local_58 = (float)lVar14 + fVar1;
   cVar6 = (**(code **)(**(int **)PTR_gameRenderWorld_003e10a0 + 0x7c))
-                    (*(int **)PTR_gameRenderWorld_003e10a0,auStack_d0,&local_54,&local_60,0x41000000
+                    (*(int **)PTR_gameRenderWorld_003e10a0,auStack_d0,&local_54,&local_60,0x41000000 /* 8.0f */ /* 8.0f */ /* 8.0f */
                      ,0,1);
   if ((cVar6 != '\0') && (iStack_b4 != 0)) {
     pcVar10 = (char *)va("footprint_time_%s",
@@ -212,7 +218,7 @@ LAB_000c64b6:
                 ((idAnimatedEntity *)this,uVar11,uVar2,&fStack_78,&fStack_a8);
       uStack_90 = 0;
       uStack_8c = 0;
-      uStack_88 = 0x3f800000;
+      uStack_88 = 0x3f800000 /* 1.0f */;
       fStack_a0 = *(float *)(this + 0x8e0) * 0.0 + *(float *)(this + 0x8dc) * 0.0 +
                   *(float *)(this + 0x8e4);
       fStack_a4 = fStack_a0 * 0.0;
@@ -252,7 +258,7 @@ LAB_000c64b6:
       pcVar10 = (char *)va("%s_%s",pcStack_128,param_1);
       uStack_30 = 0;
       uStack_2c = 0;
-      uStack_28 = 0xbf800000;
+      uStack_28 = 0xbf800000 /* -1.0f */ /* -1.0f */;
       fStack_1c = fStack_70 + fStack_7c;
       fStack_20 = fStack_74 + fStack_80;
       fStack_24 = fStack_78 + fStack_84;
@@ -278,7 +284,7 @@ LAB_000c64b6:
     pcVar10 = (char *)va("%s%s",pcStack_128,pcVar10);
     uStack_48 = 0;
     uStack_44 = 0;
-    uStack_40 = 0xbf800000;
+    uStack_40 = 0xbf800000 /* -1.0f */ /* -1.0f */;
     piVar7 = (int *)idEntity::GetPhysics((idEntity *)this);
     pfVar13 = (float *)(**(code **)(*piVar7 + 0x84))(piVar7,0);
     fStack_34 = fStack_114 + pfVar13[2];

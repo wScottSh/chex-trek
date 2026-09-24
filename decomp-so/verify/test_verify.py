@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import re
+import struct
 import sys
 import unittest
 from pathlib import Path
@@ -157,10 +158,17 @@ class ConstantsAndStrings(unittest.TestCase):
         body = "void mkTrail::addNewAnchor( void ) { a = b * 0.5f; c = 1.5f * d; e = f * 0.5f; }"
         results = verify.check_group("synthetic", BINARY, rows, [], synthetic_reference(body))
         self.assertEqual(literal_problems(results), {("mkTrail::addNewAnchor", "float -0.5")})
+        # a unary -0.5f is not the constant 0.5; a binary `x-0.5f` is
+        body = "void mkTrail::addNewAnchor( void ) { a = b * -0.5f; c = 1.5f * d; }"
+        results = verify.check_group("synthetic", BINARY, rows, [], synthetic_reference(body))
+        self.assertEqual(literal_problems(results), {("mkTrail::addNewAnchor", "float 0.5")})
+        body = "void mkTrail::addNewAnchor( void ) { a = b-0.5f; c = 1.5f * d * -0.5f; }"
+        results = verify.check_group("synthetic", BINARY, rows, [], synthetic_reference(body))
+        self.assertEqual(literal_problems(results), set())
 
     def test_a_double_constant_must_not_be_written_as_float(self):
         rows = synthetic("mkTrail::UpdateRenderEntity")
-        body = "bool mkTrail::UpdateRenderEntity( void ) {{ y = 1.5f * 0.5f * -0.5f; z < {}; }}"
+        body = "bool mkTrail::UpdateRenderEntity( void ) {{ y = 1.5f * 0.5f * -0.5f; w = 1.0f; z < {}; }}"
         good = verify.check_group("synthetic", BINARY, rows, [], synthetic_reference(body.format("0.001")))
         self.assertEqual(literal_problems(good), set())
         bad = verify.check_group("synthetic", BINARY, rows, [], synthetic_reference(body.format("0.001f")))
@@ -184,8 +192,9 @@ class ConstantsAndStrings(unittest.TestCase):
                 if body is None:
                     continue  # macro-generated; see test_macro_literals_are_checked
                 for lit in BINARY.literals(func):
+                    if lit.kind != "string":
+                        continue  # float mutations: test_changing_a_float_fails_and_names_it and siblings
                     with self.subTest(function=row.function, literal=lit.render()):
-                        self.assertEqual(lit.kind, "string")  # no float literals in covered groups yet
                         quoted = verify.c_string(lit.value)
                         self.assertIn(quoted, body)
                         mutated = text.replace(body, body.replace(quoted, quoted[:-1] + '~"'))
@@ -227,9 +236,11 @@ class LiteralParsing(unittest.TestCase):
         self.assertEqual(verify.string_literals('x = "";'), [""])
 
     def test_float_tokens(self):
-        code = verify.code_only('a = 32.0f + .05 - 1e-3 * 2 + 0x1f + 7 + b.x + 1.5F; c = -0.5f; // 9.0')
+        code = verify.code_only(
+            "a = 32.0f + .05 - 1e-3 * 2 + 0x1f + 7 + b.x + 1.5F; c = -0.5f; d = f()-4.0 + x*-2.0; // 9.0"
+        )
         values = sorted({v for v, _ in verify.float_literals(code)})
-        self.assertEqual(values, sorted({32.0, 0.05, 1e-3, -1e-3, 1.5, 0.5, -0.5}))
+        self.assertEqual(values, sorted({32.0, 0.05, 1e-3, 1.5, -0.5, 4.0, -2.0}))
         self.assertEqual(dict(verify.float_literals("a = 2.5f;")), {2.5: True})
 
     def test_rendering(self):
@@ -239,13 +250,20 @@ class LiteralParsing(unittest.TestCase):
         self.assertEqual(Literal("float", 0.1).render(), "float 0.1")
         self.assertEqual(Literal("double", 0.001).render(), "double 0.001")
         self.assertEqual(Literal("string", 'a"b\n').render(), 'string "a\\"b\\n"')
-        import struct
-
         f01 = struct.unpack("<f", struct.pack("<f", 0.1))[0]
         self.assertEqual(Literal("float", f01).render(), "float 0.1")
 
 
 class BinaryLiterals(unittest.TestCase):
+    def test_float_immediates(self):
+        from binary import float_immediate
+
+        self.assertEqual(float_immediate(0x42000000), 32.0)
+        self.assertEqual(float_immediate(0xBF800000), -1.0)
+        self.assertAlmostEqual(float_immediate(0x42937AE1), 73.74, places=4)
+        for integer in (0x14, 0x21080, 0x2B5549, 0x5F3759DF, 0x4A90BE59, 0x45E7B273, 0xFFFFFFFF):
+            self.assertIsNone(float_immediate(integer), hex(integer))
+
     def test_every_rodata_read_in_the_export_is_classified(self):
         for r in ROWS:
             refs = BINARY.rodata_refs(BINARY.by_raw[r.symbol])
@@ -255,18 +273,22 @@ class BinaryLiterals(unittest.TestCase):
     def test_mktrail_spot_values(self):
         spawn = [l.render() for l in BINARY.literals(BINARY.find("mkTrail::Spawn")[0])]
         self.assertEqual(spawn[spawn.index('string "trailWidth"') + 1], 'string "32"')  # width 32.0, not 4.0
+        for row in (r for r in ROWS if r.function == "mkTrail::mkTrail"):
+            # the constructors store width 32.0 as an immediate (0x42000000) at this+0x4c
+            ctor_lits = [l.render() for l in BINARY.literals(BINARY.by_raw[row.symbol])]
+            self.assertEqual(ctor_lits, ["float 2.0", "float 32.0", "float 16.0"], hex(row.vaddr))
         anchor = {l.render() for l in BINARY.literals(BINARY.find("mkTrail::addNewAnchor")[0])}
         self.assertEqual(anchor, {"float 0.5", "float 1.5", "float -0.5"})
         render = {l.render() for l in BINARY.literals(BINARY.find("mkTrail::UpdateRenderEntity")[0])}
         # 0.5 is read through a register: `lea edx, [ebx-0x7651c]` then an x87 read of [edx].
-        self.assertEqual(render, {"double 0.001", "float 0.5", "float 1.5", "float -0.5"})
+        self.assertEqual(render, {"double 0.001", "float 0.5", "float 1.5", "float -0.5", "float 1.0"})
 
 
 def export_literals(text: str) -> set[tuple[str, float | str]]:
     """(kind, value) from an export file's `// literals` block."""
     out = set()
     for line in text.splitlines():
-        m = re.match(r"//\s+[0-9a-f]{8}\s+(float|double|string)\s+(.*)$", line)
+        m = re.match(r"//\s+[0-9a-f]{8}\s+(float|double|string)\s+(.*?)(?:\s+\(immediate 0x[0-9a-f]{8}\))?$", line)
         if not m:
             continue
         kind, raw = m.groups()
@@ -292,6 +314,9 @@ class EnrichedExport(unittest.TestCase):
 
     def test_mktrail_values_are_readable(self):
         by_fn = {r.function: self.read(r) for r in ROWS if r.function.startswith("mkTrail::")}
+        for row in (r for r in ROWS if r.function == "mkTrail::mkTrail"):
+            ctor = self.read(row)
+            self.assertIn("(this + 0x4c) = 0x42000000 /* 32.0f */;", ctor.replace("*(undefined4 *)", ""))
         spawn = by_fn["mkTrail::Spawn"]
         self.assertRegex(spawn, r'"trailWidth"\);\s*\n\s*\w+ = "32";')
         anchor = by_fn["mkTrail::addNewAnchor"]

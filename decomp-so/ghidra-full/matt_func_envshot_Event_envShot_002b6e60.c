@@ -1,6 +1,9 @@
 // matt_func_envshot::Event_envShot @ 002b6e60
 // undefined Event_envShot(matt_func_envshot * this)
-// literals (read from .rodata; Ghidra address, type, value):
+// literals (Ghidra address of the data, or of the instruction for an immediate; type; value):
+//   002b6f1e  float  1.0  (immediate 0x3f800000)
+//   002b6fec  float  90.0  (immediate 0x42b40000)
+//   002b6ff3  float  73.74  (immediate 0x42937ae1)
 //   0037d670  string "name"
 //   00386ca6  string "size"
 //   003815af  string "blends"
@@ -88,15 +91,15 @@ void __thiscall matt_func_envshot::Event_envShot(matt_func_envshot *this)
   __s[0x14] = uVar5;
   __s[4] = 0x1e0;
   *__s = 0;
-  __s[10] = 0x3f800000;
+  __s[10] = 0x3f800000 /* 1.0f */;
   __s[0xb] = 0;
   __s[0xc] = 0;
   __s[0xd] = 0;
-  __s[0xe] = 0x3f800000;
+  __s[0xe] = 0x3f800000 /* 1.0f */;
   __s[0xf] = 0;
   __s[0x10] = 0;
   __s[0x11] = 0;
-  __s[0x12] = 0x3f800000;
+  __s[0x12] = 0x3f800000 /* 1.0f */;
   this_00 = (idDict *)(this + 100);
   piVar6 = (int *)idEntity::GetPhysics((idEntity *)this);
   puVar7 = (undefined4 *)(**(code **)(*piVar6 + 0x84))(piVar6,0);
@@ -105,8 +108,8 @@ void __thiscall matt_func_envshot::Event_envShot(matt_func_envshot *this)
   __s[8] = puVar7[1];
   __s[9] = uVar5;
   puVar4 = PTR_gameRenderWorld_003e10a0;
-  __s[5] = 0x42b40000;
-  __s[6] = 0x42937ae1;
+  __s[5] = 0x42b40000 /* 90.0f */;
+  __s[6] = 0x42937ae1 /* 73.74f */;
   (**(code **)(**(int **)puVar4 + 0x48))(*(int **)puVar4,__s);
   local_d0 = 0;
   local_c8 = 0x14;

@@ -1,6 +1,6 @@
 // idTarget_EndLevelGUI::Event_UpdateStats @ 001a5760
 // undefined Event_UpdateStats(idTarget_EndLevelGUI * this)
-// literals (read from .rodata; Ghidra address, type, value):
+// literals (Ghidra address of the data, or of the instruction for an immediate; type; value):
 //   00374031  string "mm:ss:MMM"
 //   003741b9  string "extHndNextMap"
 //   00372158  string "0"

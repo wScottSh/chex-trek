@@ -1,6 +1,9 @@
 // mkTrail::mkTrail @ 002b65f0
 // undefined mkTrail(mkTrail * this)
-// literals: none
+// literals (Ghidra address of the data, or of the instruction for an immediate; type; value):
+//   002b6753  float  2.0  (immediate 0x40000000)
+//   002b675a  float  32.0  (immediate 0x42000000)
+//   002b6761  float  16.0  (immediate 0x41800000)
 
 /* WARNING: Function: __i686.get_pc_thunk.bx replaced with injection: get_pc_thunk_bx */
 /* mkTrail::mkTrail() */
@@ -70,9 +73,9 @@ void __thiscall mkTrail::mkTrail(mkTrail *this)
   *(undefined4 *)(this + 0x180) = 0xffffffff;
   *(undefined4 *)(this + 0x94) = 0;
   this[0x184] = (mkTrail)0x0;
-  *(undefined4 *)(this + 0x50) = 0x40000000;
-  *(undefined4 *)(this + 0x4c) = 0x42000000;
-  *(undefined4 *)(this + 0x54) = 0x41800000;
+  *(undefined4 *)(this + 0x50) = 0x40000000 /* 2.0f */;
+  *(undefined4 *)(this + 0x4c) = 0x42000000 /* 32.0f */;
+  *(undefined4 *)(this + 0x54) = 0x41800000 /* 16.0f */;
   *(undefined4 *)(this + 0x90) = 0xf;
   *(undefined4 *)(this + 0x68) = 0;
   return;

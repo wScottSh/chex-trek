@@ -1,6 +1,6 @@
 // idPlayer::tryOpen @ 0017c420
 // undefined tryOpen(void)
-// literals (read from .rodata; Ghidra address, type, value):
+// literals (Ghidra address of the data, or of the instruction for an immediate; type; value):
 //   0037048b  string "requires"
 //   00372945  string "lockedtext"
 //   00372979  string "Door Locked"

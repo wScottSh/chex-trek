@@ -1,6 +1,6 @@
 // idCustomUI::CreateInstance @ 0019e300
 // undefined CreateInstance(void)
-// literals (read from .rodata; Ghidra address, type, value):
+// literals (Ghidra address of the data, or of the instruction for an immediate; type; value):
 //   00373d14  string "idCustomUI"
 //   0036c5ec  string "Cannot instanciate abstract class %s."
 

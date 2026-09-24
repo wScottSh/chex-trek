@@ -1,6 +1,6 @@
 // idGameLocal::GetLevelStats @ 00100800
 // undefined GetLevelStats(idGameLocal * this, playerStats_s * param_1)
-// literals (read from .rodata; Ghidra address, type, value):
+// literals (Ghidra address of the data, or of the instruction for an immediate; type; value):
 //   0036d77a  string "secret"
 //   00372158  string "0"
 //   0036d781  string "level_item"

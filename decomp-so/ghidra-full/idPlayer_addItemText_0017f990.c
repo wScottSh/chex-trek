@@ -1,6 +1,6 @@
 // idPlayer::addItemText @ 0017f990
 // undefined addItemText(idPlayer * this, idItemInfo * param_1)
-// literals (read from .rodata; Ghidra address, type, value):
+// literals (Ghidra address of the data, or of the instruction for an immediate; type; value):
 //   00372b4d  string "itemicon"
 //   00372b56  string "invPickup"
 

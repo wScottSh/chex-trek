@@ -9,12 +9,14 @@ callees, whose calls are usually implicit. Indirect (virtual / function-pointer)
 cannot be named from the binary alone and are not checked. Missing callees are reported per function.
 
 Check 2 -- constants and strings. Every float/double constant and string literal the
-function reads from .rodata must appear, with the same value, in the code of its
-definition: floats as a decimal-point literal (`32.0f`, `-0.5f`, `.05`) equal at the
-binary's precision (a double constant must not carry an `f` suffix), strings as the exact
-text (adjacent literals are joined). A string literal in the definition that the binary
-function never reads is reported as mismatched. Float immediates baked into instructions
-(`mov [x], 0x42000000`) are not .rodata references and are not checked.
+function reads from .rodata, and every float stored as an instruction immediate
+(`mov [x], 0x42000000` = 32.0; see binary.float_immediate for the rule), must appear, with
+the same value, in the code of its definition: floats as a decimal-point literal (`32.0f`,
+`-0.5f`, `.05`) equal at the binary's precision (a double constant must not carry an `f`
+suffix; `x - 0.5f` is the constant 0.5, `x * -0.5f` is -0.5), strings as the exact text
+(adjacent literals are joined). A string literal in the definition that the binary function
+never reads is reported as mismatched. Integer-load x87 operands (`fild`) are integers, not
+float constants, and are not checked.
 
     python decomp-so/verify/verify.py              # every group with covered functions
     python decomp-so/verify/verify.py custom-ui    # one (or more) groups
@@ -115,7 +117,9 @@ def callee_pattern(callee_name: str) -> re.Pattern:
 @dataclass
 class AllowEntry:
     function: str  # fnmatch pattern on the binary function's demangled name
-    callee: str  # fnmatch pattern on the callee's demangled name (params stripped)
+    # fnmatch pattern on what is allowed: in allowlist.tsv the callee's demangled name
+    # (params stripped); in literal-allowlist.tsv the literal as rendered (`float 1.5`)
+    pattern: str
     kind: str
     reason: str
 
@@ -132,23 +136,19 @@ def load_allowlist(path: Path = ALLOWLIST_PATH) -> list[AllowEntry]:
     return out
 
 
-def allowed(func: Function, callee: Callee, allow: list[AllowEntry]) -> AllowEntry | None:
+def _allow_entry(func: Function, subject: str, allow: list[AllowEntry]) -> AllowEntry | None:
     for a in allow:
-        if fnmatch.fnmatchcase(strip_params(func.name), a.function) and fnmatch.fnmatchcase(
-            strip_params(callee.name), a.callee
-        ):
+        if fnmatch.fnmatchcase(strip_params(func.name), a.function) and fnmatch.fnmatchcase(subject, a.pattern):
             return a
     return None
+
+
+def allowed(func: Function, callee: Callee, allow: list[AllowEntry]) -> AllowEntry | None:
+    return _allow_entry(func, strip_params(callee.name), allow)
 
 
 def literal_allowed(func: Function, literal: Literal, allow: list[AllowEntry]) -> AllowEntry | None:
-    """Literal allow-list: the second field is an fnmatch pattern on `Literal.render()`."""
-    for a in allow:
-        if fnmatch.fnmatchcase(strip_params(func.name), a.function) and fnmatch.fnmatchcase(
-            literal.render(), a.callee
-        ):
-            return a
-    return None
+    return _allow_entry(func, literal.render(), allow)
 
 
 # ---------------------------------------------------------------- coverage record
@@ -319,22 +319,33 @@ def string_literals(text: str) -> list[str]:
 
 # A decimal floating literal (a point or an exponent is required), optional suffix, and an
 # optional leading minus sign. Integer tokens never count as float constants.
-_FLOAT_TOKEN = re.compile(
-    r"(?<![\w.])(-\s*)?((?:\d+\.\d*|\.\d+)(?:[eE][+-]?\d+)?|\d+[eE][+-]?\d+)([fFlL]?)(?![\w.])"
-)
+_FLOAT_TOKEN = re.compile(r"(?<![\w.])((?:\d+\.\d*|\.\d+)(?:[eE][+-]?\d+)?|\d+[eE][+-]?\d+)([fFlL]?)(?![\w.])")
+
+
+def _unary_minus_before(code: str, start: int) -> bool:
+    """Is the token at `start` preceded by a unary minus? `-0.5f`, `( -0.5f`, `* -0.5f` are
+    unary; in `x - 0.5f`, `f() - 0.5f`, `a[i]-0.5f` the minus is binary subtraction."""
+    i = start - 1
+    while i >= 0 and code[i].isspace():
+        i -= 1
+    if i < 0 or code[i] != "-":
+        return False
+    i -= 1
+    while i >= 0 and code[i].isspace():
+        i -= 1
+    return i < 0 or not (code[i].isalnum() or code[i] in "_)]")
 
 
 def float_literals(code: str) -> list[tuple[float, bool]]:
     """(value, has an `f` suffix) for each float literal in `code` (comments and strings
-    already blanked). After a minus sign both signs are listed: the minus may be unary
-    (`-0.5f`, the constant -0.5) or binary (`x - 0.5f`, the constant 0.5)."""
+    already blanked). A literal after a unary minus is negative (`-0.5f` is -0.5); after a
+    binary minus it is not (`x - 0.5f` subtracts the constant 0.5)."""
     out = []
     for m in _FLOAT_TOKEN.finditer(code):
-        value = float(m.group(2))
-        f_suffix = m.group(3) in ("f", "F")
-        out.append((value, f_suffix))
-        if m.group(1):
-            out.append((-value, f_suffix))
+        value = float(m.group(1))
+        if _unary_minus_before(code, m.start()):
+            value = -value
+        out.append((value, m.group(2) in ("f", "F")))
     return out
 
 

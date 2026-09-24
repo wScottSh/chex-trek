@@ -1,6 +1,6 @@
 // mkTrail::FadeTrail @ 002b5470
 // undefined FadeTrail(mkTrail * this)
-// literals (read from .rodata; Ghidra address, type, value):
+// literals (Ghidra address of the data, or of the instruction for an immediate; type; value):
 //   003814e8  string "fadeDelay"
 //   00372158  string "0"
 

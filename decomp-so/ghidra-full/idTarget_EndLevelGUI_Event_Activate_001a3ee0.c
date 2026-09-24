@@ -1,6 +1,6 @@
 // idTarget_EndLevelGUI::Event_Activate @ 001a3ee0
 // undefined Event_Activate(idEntity * param_1)
-// literals (read from .rodata; Ghidra address, type, value):
+// literals (Ghidra address of the data, or of the instruction for an immediate; type; value):
 //   003710d9  string "gui"
 //   0036cc00  string "s_shader"
 //   0037412c  string "00:00:000"

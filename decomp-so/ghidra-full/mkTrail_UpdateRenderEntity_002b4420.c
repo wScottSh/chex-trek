@@ -1,10 +1,12 @@
 // mkTrail::UpdateRenderEntity @ 002b4420
 // undefined UpdateRenderEntity(mkTrail * this, renderEntity_s * param_1, renderView_s * param_2)
-// literals (read from .rodata; Ghidra address, type, value):
+// literals (Ghidra address of the data, or of the instruction for an immediate; type; value):
 //   0036e4d0  double 0.001
+//   002b4683  float  1.0  (immediate 0x3f800000)
 //   0036b0e4  float  0.5
 //   0036b0e8  float  1.5
 //   0036d260  float  -0.5
+//   002b4a95  float  1.0  (immediate 0x3f800000)
 
 /* WARNING: Function: __i686.get_pc_thunk.bx replaced with injection: get_pc_thunk_bx */
 /* mkTrail::UpdateRenderEntity(renderEntity_s*, renderView_s const*) const */
@@ -129,7 +131,7 @@ LAB_002b4560:
         *(undefined1 *)((int)puVar13 + 0x3a) = 0;
         *(undefined1 *)((int)puVar13 + 0x39) = 0;
         *(undefined1 *)(puVar13 + 0xe) = 0;
-        puVar13[4] = 0x3f800000;
+        puVar13[4] = 0x3f800000 /* 1.0f */ /* 1.0f */;
         *puVar13 = 0;
         puVar13[5] = 0;
         puVar13[8] = 0;
@@ -228,7 +230,7 @@ LAB_002b4560:
     *(undefined1 *)((int)puVar13 + 0x39) = 0;
     *(undefined1 *)(puVar13 + 0xe) = 0;
     *(float *)(*(int *)(iVar12 + 0x24) * 0x3c + 0xc + *(int *)(iVar12 + 0x28)) = fVar5;
-    *(undefined4 *)(*(int *)(iVar12 + 0x24) * 0x3c + 0x10 + *(int *)(iVar12 + 0x28)) = 0x3f800000;
+    *(undefined4 *)(*(int *)(iVar12 + 0x24) * 0x3c + 0x10 + *(int *)(iVar12 + 0x28)) = 0x3f800000 /* 1.0f */ /* 1.0f */;
     iVar15 = *(int *)(iVar12 + 0x24);
     fVar5 = *(float *)(this + 0x4c);
     fVar3 = fVar3 * fVar5 * 0.5;

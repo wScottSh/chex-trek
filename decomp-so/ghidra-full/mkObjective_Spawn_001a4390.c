@@ -1,6 +1,6 @@
 // mkObjective::Spawn @ 001a4390
 // undefined Spawn(mkObjective * this)
-// literals (read from .rodata; Ghidra address, type, value):
+// literals (Ghidra address of the data, or of the instruction for an immediate; type; value):
 //   003722fd  string "title"
 //   0037413e  string "description"
 //   0037414a  string "image"

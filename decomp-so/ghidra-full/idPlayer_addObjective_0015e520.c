@@ -1,6 +1,6 @@
 // idPlayer::addObjective @ 0015e520
 // undefined addObjective(idPlayer * this, mkObjective * param_1, idVec3 * param_2, int * param_3)
-// literals (read from .rodata; Ghidra address, type, value):
+// literals (Ghidra address of the data, or of the instruction for an immediate; type; value):
 //   00371b3c  string "MAX_OBJS reached!"
 
 /* WARNING: Function: __i686.get_pc_thunk.bx replaced with injection: get_pc_thunk_bx */
