@@ -530,8 +530,13 @@ def compile_job(group: str, reference_text: str) -> dict:
             "header": blocks[0], "header_line": lines[0], "impl": blocks[1], "impl_line": lines[1]}
 
 
+def dockerfile() -> bytes:
+    """The Dockerfile with LF line ends, whatever the checkout's (core.autocrlf)."""
+    return DOCKERFILE.read_bytes().replace(b"\r\n", b"\n")
+
+
 def image_tag() -> str:
-    return "chex-decomp-compile:" + hashlib.sha256(DOCKERFILE.read_bytes()).hexdigest()[:12]
+    return "chex-decomp-compile:" + hashlib.sha256(dockerfile()).hexdigest()[:12]
 
 
 def _docker(*args: str, stdin: bytes | None = None) -> subprocess.CompletedProcess:
@@ -545,7 +550,7 @@ def ensure_image() -> str:
     tag = image_tag()
     if _docker("image", "inspect", tag).returncode == 0:
         return tag
-    proc = _docker("build", "-t", tag, "-", stdin=DOCKERFILE.read_bytes())
+    proc = _docker("build", "-t", tag, "-", stdin=dockerfile())
     if proc.returncode:
         where = os.environ.get("DOCKER_HOST", "the local docker daemon")
         raise CompileUnavailable(f"building {tag} on {where} failed: "
