@@ -11,7 +11,7 @@ Scope (spec #16, issue #22): `idPlayer::initHudMap`, `HudMapLevel`, `MapImageCoo
 ```cpp
 // ---------------------------------------------------------------------------
 // HUD map
-// The player's map of the level, shown on the HUD (a corner box, always centred on the player)
+// The player's map of the level, shown on the HUD (a corner box, always centered on the player)
 // and on the PDA (a full view the player can scroll and zoom). Each map level (floor) has a map
 // material, guis/hud_maps/<map name><level>, whose first stage takes its alpha from a
 // "fog of war" image the game draws at run time: walking through the level reveals the map
@@ -29,7 +29,7 @@ extern byte				hudmap_alpha[ 5 ][ 128 * 128 * 4 ];
 
 // idPlayer::mapControl bits: the PDA map's buttons (guis/pda.gui, guis/pda_chex.gui) send these
 // GUI commands, and the edited stock idPlayer::HandleSingleGuiCommand sets the bits (see Notes).
-// Scrolling replaces the whole value; centring and zooming add a bit.
+// Scrolling replaces the whole value; centering and zooming add a bit.
 // UNCERTAIN: names and form (enum or #defines). Only the values are known.
 enum {
 	MAP_CENTER			= BIT( 0 ),		// "map_scroll_center": keep the view on the player
@@ -66,7 +66,7 @@ public:
 
 	int						mapControl;			// +0x1e30  MAP_* bits. Init zeroes it. Not saved.
 	float					mapScale;			// +0x1e34  PDA zoom, "map_scale" (default 1), 0.1 .. 9. Saved.
-	idVec2					mapView;			// +0x1e38  world x, y at the centre of the map box. Not saved.
+	idVec2					mapView;			// +0x1e38  world x, y at the center of the map box. Not saved.
 	int						mapRadius;			// +0x1e40  reveal radius in alpha texels, "map_radius" (default 8). Saved.
 	float					mapWidth;			// +0x1e44  map image width at scale 1, GUI units, "map_x" (default 640). Saved.
 	float					mapHeight;			// +0x1e48  map image height at scale 1, GUI units, "map_y" (default 480). Saved.
@@ -221,7 +221,7 @@ void idPlayer::updateMap( void ) {
 idPlayer::updateMapUI
 
 Sets one GUI's map variables. The map box is 640 x 480 GUI units (each GUI scales them to its
-box). The HUD map is always centred on the player; the PDA map follows mapControl.
+box). The HUD map is always centered on the player; the PDA map follows mapControl.
 ================
 */
 void idPlayer::updateMapUI( idUserInterface *gui, int level, bool isHud ) {
@@ -275,7 +275,7 @@ void idPlayer::updateMapUI( idUserInterface *gui, int level, bool isHud ) {
 		}
 	}
 
-	// Top left of the map image, so that mapView is at the box's centre (320, 240).
+	// Top left of the map image, so that mapView is at the box's center (320, 240).
 	MapImageCoords( width, height, mapView, mapPos );
 	mapPos.x = 320.0f - mapPos.x;
 	mapPos.y = 240.0f - mapPos.y;
@@ -436,8 +436,9 @@ void idGameLocal::InitConsoleCommands( void ) {
 - **Names agree with `objectives.md`.** `HudMapLevel` is declared there (its caller `addObjective` is in that group) and defined here. `updateMapUI` reads `objectives[ i ]` (+0x1ef4) and each objective's `mapLevel` (+0x2c0), the values `addObjective` stores. The new members are added to `reference/idPlayer-additions.md`; they fill +0x1e30 .. +0x1ea3, right before `levelStats` (+0x1ea4), and overlap nothing listed there.
 - **GUIs, cross-checked with `guis/`.**
   - `guis/hud.gui` (HUD corner box, 200 x 150) and `guis/pda.gui` / `guis/pda_chex.gui` (PDA map page, 570 x 390) read exactly the variables `updateMapUI` sets: `hud_map_mtr` (`map` window), `hud_map_faded_mtr` (`faded_map`, drawn at 0.25 alpha under it), `map_w`, `map_h`, `map_pos_x`, `map_pos_y` (both windows' rects, scaled from 640 x 480), `player_x`, `player_y` and `player_direction` (`map_direction`, `rotate`), and `map_obj1_x` ... `map_obj5_c` (`objective_1` ... `objective_5`; `_c` 1, 2, 3 set the icon's matcolor to red, green, white).
+  - The older HUDs `guis/hud2.gui`, `guis/hud_old.gui` and `guis/hud_stoney.gui` read a subset (`HudMap`, `hud_map_mtr`, `map_pos_x`, `map_pos_y`, `player_direction`). The player's HUD is `guis/hud.gui` (`def/player.def`, `"hud"`).
   - `HudMap` is the GUIs' own flag: `hud.gui`'s `hudmap_open` / `hudmap_close` windows set it to 1 / 0 (the named events `openMap` / `closeMap`), and `pda_chex.gui` sets it when its map page opens and closes. `pda.gui` only reads it.
-  - The PDA's arrow, centre and zoom buttons send `map_scroll_up`, `map_scroll_down`, `map_scroll_left`, `map_scroll_right`, `map_scroll_center`, `map_zoom_in`, `map_zoom_out`, and `map_stop` on release: the command names the edited `HandleSingleGuiCommand` compares (see the leads below). `pda_chex.gui` also sends `map_scroll_center` when its map page opens.
+  - The PDA's arrow, center and zoom buttons send `map_scroll_up`, `map_scroll_down`, `map_scroll_left`, `map_scroll_right`, `map_scroll_center`, `map_zoom_in`, `map_zoom_out`, and `map_stop` on release: the command names the edited `HandleSingleGuiCommand` compares (see the leads below). `pda_chex.gui` also sends `map_scroll_center` when its map page opens.
 - **Map data, cross-checked with `def/`, `maps/` and `materials/`.**
   - `def/misc.def` (`worldspawn`) documents `map_coords` ("top left, and lower right corners", e.g. `-256 256 256 -256`: left, top, right, bottom, as `MapImageCoords` uses them), `map_x`, `map_y` and `map_radius` ("in pixels of an alpha image 128x128"). `map_scale` and `map_level_N` are not documented there.
   - Maps: `e1m1`, `e1m1_2`, `rail_1`, `credits` set `map_coords "-1768 1840 1752 -2120"`, `map_x "640"`, `map_y "800"`, `map_radius "12"`; `sf_923` and `storage_facility` set `"-1856 2240 384 -1408"`, 640, 1000, 12. Only `e1m1` (`map_level_0 "-256"`) and `sf_923` (`map_level_0 "-128"`) set a level floor. No map sets `map_scale`.
@@ -448,7 +449,7 @@ void idGameLocal::InitConsoleCommands( void ) {
   - The fog of war is a single global, not per player, and is not reset per map by this group's code: `idPlayer::Init` zeroes it (lead below). `showMap` fills whole levels with 0xff (RGB too, which the `maskcolor` stage ignores) but does not upload; the change shows at the next reveal, and only for the level the player is on.
   - Only the current level is revealed. `revealDistance` is one texel of the shorter map side, so the image is redrawn about once per texel of movement.
   - `hud_map_faded_mtr` at level 0 is the level 0 map itself.
-  - Scrolling (`==` compare) stops while a zoom or centre bit is set; `map_stop` keeps only `MAP_CENTER`, and only when a zoom bit was set with it.
+  - Scrolling (`==` compare) stops while a zoom or center bit is set; `map_stop` keeps only `MAP_CENTER`, and only when a zoom bit was set with it.
 - **Stock-inline callees (check 1 allow-list).** `initHudMap`: `strlen`, `strcpy`, `idStr::ReAllocate` inside `idStr( const char * )`, `idStr::operator=( const idStr & )` and `operator+=( const idStr & )`; `idStr::Mid` inside `idStr::Right`; `idStr::FreeData` inside `~idStr()` (all `ID_INLINE`, `idlib/Str.h`). `Cmd_ShowMap_f`: `__strtol_internal` inside glibc's inline `atoi` (kind `libc-inline`, new with this group: the inline function is the C library's, not the SDK's). Each is on `verify/allowlist.tsv` for the exact function.
 - **Literals (check 2).** Every string and float the group's functions read appears with its value. Allow-listed (`verify/literal-allowlist.tsv`, `stock-inline`): `updateHudMapAlpha`'s 0.5 and 1.5 are the Newton steps of `idMath::RSqrt` (in `idVec3::LengthFast`) and `idMath::InvSqrt` (in `idMath::Sqrt` and `idVec2::Length`); `Cmd_ShowMap_f`'s `""` is `idCmdArgs::Argv`'s out-of-range result (`idlib/CmdArgs.h`). `HudMapLevel`'s 0.5 is its own. `"guis/hud_maps/"` is not in `.rodata`: the binary stores its text as `mov` immediates, and check 2 accepts it from there (new with this group, `binary.immediate_bytes`). `1.0f` in `updateHudMapAlpha` is an `fld1`, not a constant read.
 - **Compile (check 3).** Compiles with g++ 12 `-m32` against stock DOOM-3 GPL a9c49da, on top of `objectives.md`'s header block (the **Depends on** line). The `idPlayer` partial declaration is spliced into a scratch copy of `game/Player.h`. The `idGameLocal::InitConsoleCommands` excerpt compiles as a definition in this translation unit only; the stock body is not repeated.

@@ -153,6 +153,23 @@ class CalleeCoverage(unittest.TestCase):
         self.assertIn("no definition", errors["idCustomUI::setGUI"])
 
 
+def assert_documented(test: unittest.TestCase, entry: verify.AllowEntry, source_pattern: str) -> None:
+    """An inline-code allow-list entry: one exact function, and the reason names the source."""
+    test.assertGreater(len(entry.reason), 20)
+    test.assertNotIn("*", entry.function)
+    test.assertRegex(entry.reason, source_pattern)
+
+
+def unused_entries(entries: list[verify.AllowEntry], allowed_of) -> list[tuple[str, str]]:
+    """(function, pattern) of each entry that excuses nothing in any covered group;
+    allowed_of( FunctionResult ) gives the (item, entry) pairs a result allowed."""
+    used = set()
+    for group in COVERED_GROUPS:
+        for res in verify.check_group(group, BINARY, ROWS, ALLOW):
+            used |= {(a.function, a.pattern) for _, a in allowed_of(res)}
+    return [(a.function, a.pattern) for a in entries if (a.function, a.pattern) not in used]
+
+
 def literal_problems(results) -> set[tuple[str, str]]:
     out = {(r.row.function, lit.render()) for r in results for lit in r.missing_literals}
     out |= {(r.row.function, "mismatched " + s) for r in results for s in r.mismatched_strings}
@@ -289,18 +306,11 @@ class ConstantsAndStrings(unittest.TestCase):
     def test_literal_allowlist_is_documented(self):
         for entry in LITERAL_ALLOW:
             self.assertEqual(entry.kind, "stock-inline")
-            self.assertGreater(len(entry.reason), 20)
-            self.assertNotIn("*", entry.function)
-            self.assertRegex(entry.reason, r"idlib/(\w+/)*\w+\.h")
+            assert_documented(self, entry, r"idlib/(\w+/)*\w+\.h")
 
     def test_every_literal_allowlist_entry_is_used(self):
-        """No stale entries: each one excuses at least one literal of a covered function."""
-        used = set()
-        for group in COVERED_GROUPS:
-            for res in verify.check_group(group, BINARY, ROWS, ALLOW):
-                used |= {(a.function, a.pattern) for _, a in res.allowed_literals}
         self.assertTrue(LITERAL_ALLOW)
-        self.assertEqual([(a.function, a.pattern) for a in LITERAL_ALLOW if (a.function, a.pattern) not in used], [])
+        self.assertEqual(unused_entries(LITERAL_ALLOW, lambda res: res.allowed_literals), [])
 
 
 class LiteralParsing(unittest.TestCase):
@@ -512,19 +522,13 @@ class HarnessRules(unittest.TestCase):
             self.assertIn(entry.kind, {"exception-only", "abi-implicit", "stock-inline", "libc-inline"})
             self.assertGreater(len(entry.reason), 20)
             if entry.kind == "stock-inline":  # one exact function, and the stock code named
-                self.assertNotIn("*", entry.function)
-                self.assertRegex(entry.reason, r"(idlib|game)/(\w+/)*\w+\.h")  # e.g. idlib/containers/List.h
+                assert_documented(self, entry, r"(idlib|game)/(\w+/)*\w+\.h")  # e.g. idlib/containers/List.h
             if entry.kind == "libc-inline":  # one exact function, and the libc header named
-                self.assertNotIn("*", entry.function)
-                self.assertRegex(entry.reason, r"glibc's <\w+\.h>")
+                assert_documented(self, entry, r"glibc's <\w+\.h>")
 
     def test_every_allowlist_entry_is_used(self):
         """No stale entries: each one excuses at least one callee of a covered function."""
-        used = set()
-        for group in COVERED_GROUPS:
-            for res in verify.check_group(group, BINARY, ROWS, ALLOW):
-                used |= {(a.function, a.pattern) for _, a in res.allowed}
-        self.assertEqual([(a.function, a.pattern) for a in ALLOW if (a.function, a.pattern) not in used], [])
+        self.assertEqual(unused_entries(ALLOW, lambda res: res.allowed), [])
 
 
 class Records(unittest.TestCase):

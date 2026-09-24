@@ -51,8 +51,8 @@ DOCKER_HOST=ssh://qwen. The image is built on first use (tag = hash of the Docke
 Exit status is 0 only when nothing is missing or mismatched and every group compiles (a
 check 3 that cannot run fails, unless --no-compile). Callees that are never checked
 (_Unwind_Resume, __cxa_*, the PIC thunk) are listed in binary.py; exception-only,
-ABI-implicit, stock-inline and libc-inline callees are on allowlist.tsv, literals that come from stock inline code on
-literal-allowlist.tsv. Dependencies: requirements.txt.
+ABI-implicit, stock-inline and libc-inline callees are on allowlist.tsv, literals that come
+from stock inline code on literal-allowlist.tsv. Dependencies: requirements.txt.
 """
 from __future__ import annotations
 
@@ -454,6 +454,11 @@ class FunctionResult:
         return not self.missing and not self.missing_literals and not self.mismatched_strings and not self.error
 
 
+# Shortest source string check 2 accepts from instruction immediates: shorter texts ("0" + NUL)
+# turn up in ordinary integer immediates by chance.
+IMMEDIATE_STRING_MIN = 4
+
+
 def check_literals(res: FunctionResult, binary: Binary, body: str, literal_allow: list[AllowEntry]) -> None:
     """Check 2 for one function: fills res.literals / missing_literals / mismatched_strings."""
     strings = string_literals(body)
@@ -475,11 +480,6 @@ def check_literals(res: FunctionResult, binary: Binary, body: str, literal_allow
             res.immediate_strings.append(s)
         else:
             res.mismatched_strings.append(s)
-
-
-# Shortest source string check 2 accepts from instruction immediates: shorter texts ("0" + NUL)
-# turn up in ordinary integer immediates by chance.
-IMMEDIATE_STRING_MIN = 4
 
 
 def check_group(
