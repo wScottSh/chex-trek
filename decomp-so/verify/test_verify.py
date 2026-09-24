@@ -20,6 +20,7 @@ from binary import GHIDRA_IMAGE_BASE, Binary, source_name  # noqa: E402
 BINARY = Binary(verify.BINARY_PATH)
 ROWS = verify.load_coverage()
 ALLOW = verify.load_allowlist()
+LITERAL_ALLOW = verify.load_allowlist(verify.LITERAL_ALLOWLIST_PATH)
 COVERED_GROUPS = sorted({r.group for r in ROWS if r.status == "covered"})
 
 
@@ -66,6 +67,15 @@ class CalleeCoverage(unittest.TestCase):
             | {r.function for r in ROWS if r.function.startswith("mkObjective::")},
         )
         self.assertEqual(len([r for r in ROWS if r.group == "objectives"]), 13)
+
+    def test_hud_map_covers_its_scope(self):
+        names = {r.function for r in ROWS if r.group == "hud-map" and r.status == "covered"}
+        self.assertEqual(
+            names,
+            {f"idPlayer::{m}" for m in ("initHudMap", "HudMapLevel", "MapImageCoords", "updateMap",
+                                        "updateMapUI", "updateHudMapAlpha", "Cmd_ShowMap_f")},
+        )
+        self.assertEqual(len([r for r in ROWS if r.group == "hud-map"]), 7)
 
     def test_class_declaration_names_the_base_constructor(self):
         """CreateInstance calls the superclass's constructor; CLASS_DECLARATION must name it."""
@@ -219,6 +229,19 @@ class ConstantsAndStrings(unittest.TestCase):
         results = verify.check_group("custom-ui", BINARY, ROWS, ALLOW, text)
         self.assertEqual(literal_problems(results), {("idCustomUI::HandleCustomGUICommand", 'string "unregister"')})
 
+    def test_a_string_built_from_immediates_is_accepted_and_checked(self):
+        """initHudMap's "guis/hud_maps/" is stored as `mov` immediates, not in .rodata."""
+        text = reference("hud-map")
+        results = verify.check_group("hud-map", BINARY, ROWS, ALLOW, text)
+        hit = [r for r in results if r.row.function == "idPlayer::initHudMap"][0]
+        self.assertEqual(hit.immediate_strings, ["guis/hud_maps/"])
+        self.assertIn('string "guis/hud_maps/" built from immediates', "\n".join(verify.format_results([hit])))
+        for wrong in ("guis/hud_mapz/", "guis/hud_maps", "gui"):  # changed, cut before the NUL, too short
+            with self.subTest(wrong=wrong):
+                mutated = text.replace('idStr( "guis/hud_maps/" )', f'idStr( "{wrong}" )')
+                results = verify.check_group("hud-map", BINARY, ROWS, ALLOW, mutated)
+                self.assertEqual(literal_problems(results), {("idPlayer::initHudMap", "mismatched " + wrong)})
+
     def test_every_checked_literal_is_load_bearing(self):
         """Mutation sweep: alter each binary string literal in its function's definition -> reported."""
         for group in COVERED_GROUPS:
@@ -232,6 +255,8 @@ class ConstantsAndStrings(unittest.TestCase):
                 for lit in BINARY.literals(func):
                     if lit.kind != "string":
                         continue  # float mutations: test_changing_a_float_fails_and_names_it and siblings
+                    if verify.literal_allowed(func, lit, LITERAL_ALLOW):
+                        continue  # made by stock inline code, not written in the body
                     with self.subTest(function=row.function, literal=lit.render()):
                         quoted = verify.c_string(lit.value)
                         self.assertIn(quoted, body)
@@ -262,9 +287,20 @@ class ConstantsAndStrings(unittest.TestCase):
         self.assertIn("allow-listed float 0.5 (stock-inline)", "\n".join(verify.format_results(results)))
 
     def test_literal_allowlist_is_documented(self):
-        for entry in verify.load_allowlist(verify.LITERAL_ALLOWLIST_PATH):
+        for entry in LITERAL_ALLOW:
             self.assertEqual(entry.kind, "stock-inline")
             self.assertGreater(len(entry.reason), 20)
+            self.assertNotIn("*", entry.function)
+            self.assertRegex(entry.reason, r"idlib/(\w+/)*\w+\.h")
+
+    def test_every_literal_allowlist_entry_is_used(self):
+        """No stale entries: each one excuses at least one literal of a covered function."""
+        used = set()
+        for group in COVERED_GROUPS:
+            for res in verify.check_group(group, BINARY, ROWS, ALLOW):
+                used |= {(a.function, a.pattern) for _, a in res.allowed_literals}
+        self.assertTrue(LITERAL_ALLOW)
+        self.assertEqual([(a.function, a.pattern) for a in LITERAL_ALLOW if (a.function, a.pattern) not in used], [])
 
 
 class LiteralParsing(unittest.TestCase):
@@ -473,11 +509,14 @@ class HarnessRules(unittest.TestCase):
 
     def test_allowlist_is_documented(self):
         for entry in ALLOW:
-            self.assertIn(entry.kind, {"exception-only", "abi-implicit", "stock-inline"})
+            self.assertIn(entry.kind, {"exception-only", "abi-implicit", "stock-inline", "libc-inline"})
             self.assertGreater(len(entry.reason), 20)
             if entry.kind == "stock-inline":  # one exact function, and the stock code named
                 self.assertNotIn("*", entry.function)
                 self.assertRegex(entry.reason, r"(idlib|game)/(\w+/)*\w+\.h")  # e.g. idlib/containers/List.h
+            if entry.kind == "libc-inline":  # one exact function, and the libc header named
+                self.assertNotIn("*", entry.function)
+                self.assertRegex(entry.reason, r"glibc's <\w+\.h>")
 
     def test_every_allowlist_entry_is_used(self):
         """No stale entries: each one excuses at least one callee of a covered function."""
@@ -526,6 +565,9 @@ class Records(unittest.TestCase):
         self.assertIn("0x1ea4", offsets)
         self.assertIn("0x1ef4", offsets)
         self.assertIn("0x1f08", offsets)
+        for off in ("0x1e30", "0x1e34", "0x1e38", "0x1e40", "0x1e44", "0x1e48", "0x1e4c", "0x1e50", "0x1e5c",
+                    "0x1e60", "0x1e80", "0x1e94"):
+            self.assertIn(off, offsets)  # hud-map
         self.assertEqual(len(offsets), len(set(offsets)))
 
 
@@ -693,6 +735,7 @@ class Compile(unittest.TestCase):
         mutated = ref.replace(old, "\tplayerStat_s\t\t\tlevelStats[ 4 ];")
         jobs.append(dict(verify.compile_job("end-level-stats", mutated), group="els_spliced_member"))
         cls.els_line = md_line(mutated, "playerStat_s\t")
+        jobs.append(verify.compile_job("hud-map", reference("hud-map")))
         cls.toolchain, results = verify.run_compile(jobs)
         cls.results = {r.group: r for r in results}
 
@@ -724,6 +767,14 @@ class Compile(unittest.TestCase):
         lines = [int(m.group(1)) for m in (re.match(r"decomp-so/reference/end-level-stats\.md:(\d+):", e)
                                            for e in res.errors) if m]
         self.assertIn(self.els_line, lines, res.errors)
+
+    def test_hud_map_compiles_on_top_of_objectives(self):
+        res = self.results["hud-map"]
+        self.assertEqual(res.errors, [])
+        self.assertTrue(res.ok)
+        self.assertEqual({(s["class"], s["file"], s.get("from")) for s in res.splices},
+                         {("idPlayer", "game/Player.h", "decomp-so/reference/objectives.md"),
+                          ("idPlayer", "game/Player.h", None)})
 
     def test_a_syntax_error_fails_and_is_reported_at_its_markdown_line(self):
         for name in self.MUTATIONS:

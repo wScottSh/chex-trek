@@ -81,7 +81,7 @@ public:
 	void					freeObjective( int num );
 	void					addItemText( const idItemInfo &info );
 
-	// Declared here for addObjective's call. Its body belongs to the hud-map group (#22).
+	// Declared here for addObjective's call. Its body is in reference/hud-map.md (#22).
 	// Return type int (binary: the result is stored through addObjective's int &).
 	int						HudMapLevel( const idVec3 *pos );
 
@@ -313,7 +313,7 @@ void idPlayer::addItemText( const idItemInfo &info ) {
 
 ## Notes
 
-- **Base class and names agree between `mkObjective` and `idPlayer`.** `mkObjective` derives from `idEntity` (evidence in the header). `addObjective` fills the objective's `mapLevel` (+0x2c0) through its `int &` argument, and its return value becomes `objectiveNum` (+0x27c), which `freeObjective` takes back. `idPlayer::objectives` (+0x1ef4) holds `mkObjective *`: `updateMapUI` (hud-map, #22) reads `objectives[ i ]->mapLevel` (+0x2c0) and the objective's origin from it (not reconstructed here). The members are added to `reference/idPlayer-additions.md`.
+- **Base class and names agree between `mkObjective` and `idPlayer`.** `mkObjective` derives from `idEntity` (evidence in the header). `addObjective` fills the objective's `mapLevel` (+0x2c0) through its `int &` argument, and its return value becomes `objectiveNum` (+0x27c), which `freeObjective` takes back. `idPlayer::objectives` (+0x1ef4) holds `mkObjective *`: `updateMapUI` (hud-map, #22) reads `objectives[ i ]->mapLevel` (+0x2c0) and the objective's origin from it (`reference/hud-map.md`). The members are added to `reference/idPlayer-additions.md`.
 - **Numbering.** An objective's number is its slot + 1 (1-5), and the GUI variables use it: `map_obj1` ... `map_obj5`. The GUIs have exactly these five: `guis/hud.gui` (HUD map: `map_objN`, `_v`, `_x`, `_y`, `_c`), `guis/pda.gui` and `guis/pda_chex.gui` (PDA map, plus `_tle` and `_txt`). This group sets `_v` on both GUIs, `map_objN` (the image) on both, and `_txt` / `_tle` on the PDA only, matching where the GUIs read them. `_x`, `_y` and `_c` are set by `idPlayer::updateMapUI` (hud-map, #22).
 - **GUIs.** `pda` is the stock `idPlayer::objectiveSystem` (+0x142c) and `hud` the stock `idPlayer::hud` (+0x1428). Evidence (binary): the stock `idPlayer::HideTip` calls `HandleNamedEvent` on +0x1428 (stock: `hud->HandleNamedEvent( "tipWindowDown" )`), and the stock `idPlayer::TogglePDA` uses +0x142c with `objectiveSystemOpen` at +0x1430, the stock member order. `inventory.pickupItemNames` is +0x1404: the stock `idInventory::AddPickupName` uses the list at inventory+0x154, and the stock `idPlayer::UpdateHud` reads +0x1404 next to `hud`. These stock members are 0x14 bytes further on than in a GCC 12 `-m32` build of the stock headers (hud +0x1414, objectiveSystem +0x1418, pickupItemNames +0x13f0, inventory +0x12a0, pickupItemNames inventory+0x150). So this build's `idPlayer` / `idInventory` differ from stock a9c49da before them. Not examined (edits inside stock declarations are out of scope).
 - **spawnArgs, cross-checked with `def/` and `maps/`.**

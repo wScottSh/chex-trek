@@ -379,6 +379,24 @@ class Binary:
                 out.append((ins.address, Literal("float", value)))
         return out
 
+    def immediate_bytes(self, func: Function) -> bytes:
+        """The immediates of the function's `mov` instructions, in instruction order, each as
+        little-endian bytes of its destination's size (1, 2 or 4).
+
+        GCC inlines a copy of a short string literal (`idStr( "guis/hud_maps/" )`) as `mov`s of
+        its text: dword immediates, then the tail as a word/byte and a NUL. The literal is then
+        not in .rodata at all, but its text, NUL included, runs through these bytes."""
+        from capstone import x86
+
+        out = bytearray()
+        for ins in self._md_detail.disasm(self._bytes(func.vaddr, func.size), func.vaddr):
+            if ins.mnemonic != "mov" or len(ins.operands) != 2:
+                continue
+            dest, src = ins.operands
+            if src.type == x86.X86_OP_IMM and dest.size in (1, 2, 4):
+                out += (src.imm & ((1 << (8 * dest.size)) - 1)).to_bytes(dest.size, "little")
+        return bytes(out)
+
     DOUBLE_WINDOW = 6
 
     def _double_high_word(self, insns: list, k: int) -> float | None:

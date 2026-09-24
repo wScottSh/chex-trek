@@ -8,4 +8,5 @@
 #   stock-inline  the constant is inside an inlined stock SDK function the reconstruction
 #                 calls by name (e.g. the 0.5 / 1.5 of idMath::InvSqrt's Newton step);
 #                 name the stock function and file in the reason
-# No entries yet: every covered group states its literals explicitly.
+idPlayer::updateHudMapAlpha	float [01].5	stock-inline	the Newton step ( 1.5f - r * r * ( x * 0.5f ) ) of idMath::RSqrt (in idVec3::LengthFast) and idMath::InvSqrt (in idMath::Sqrt, idVec2::Length); ID_INLINE in idlib/math/Math.h
+idPlayer::Cmd_ShowMap_f	string ""	stock-inline	args.Argv( 1 ) in the "bad level" message: idCmdArgs::Argv returns "" for an out-of-range index; inline in idlib/CmdArgs.h

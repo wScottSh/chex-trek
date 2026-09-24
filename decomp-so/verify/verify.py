@@ -18,8 +18,11 @@ the same value, in the code of its definition: floats as a decimal-point literal
 `-0.5f`, `.05`) equal at the binary's precision (a double constant must not carry an `f`
 suffix; `x - 0.5f` is the constant 0.5, `x * -0.5f` is -0.5), strings as the exact text
 (adjacent literals are joined). A string literal in the definition that the binary function
-never reads is reported as mismatched. Integer-load x87 operands (`fild`) are integers, not
-float constants, and are not checked.
+never reads is reported as mismatched, unless the function builds its text from instruction
+immediates: a string of IMMEDIATE_STRING_MIN or more characters whose bytes, NUL included,
+run through the function's `mov` immediates (binary.immediate_bytes) is accepted and reported.
+Such a string is not required, since it cannot be told from integers without its source text.
+Integer-load x87 operands (`fild`) are integers, not float constants, and are not checked.
 
 Check 3 -- compile. The group's header block and implementation block are compiled, 32-bit,
 against an unmodified checkout of the stock DOOM-3 GPL source (id-Software/DOOM-3 at
@@ -48,7 +51,7 @@ DOCKER_HOST=ssh://qwen. The image is built on first use (tag = hash of the Docke
 Exit status is 0 only when nothing is missing or mismatched and every group compiles (a
 check 3 that cannot run fails, unless --no-compile). Callees that are never checked
 (_Unwind_Resume, __cxa_*, the PIC thunk) are listed in binary.py; exception-only,
-ABI-implicit and stock-inline callees are on allowlist.tsv, literals that come from stock inline code on
+ABI-implicit, stock-inline and libc-inline callees are on allowlist.tsv, literals that come from stock inline code on
 literal-allowlist.tsv. Dependencies: requirements.txt.
 """
 from __future__ import annotations
@@ -442,6 +445,7 @@ class FunctionResult:
     literals: list[Literal] = field(default_factory=list)
     missing_literals: list[Literal] = field(default_factory=list)
     mismatched_strings: list[str] = field(default_factory=list)  # in the source, not in the binary
+    immediate_strings: list[str] = field(default_factory=list)  # in the source, built from immediates
     allowed_literals: list[tuple[Literal, AllowEntry]] = field(default_factory=list)
     error: str | None = None
 
@@ -464,7 +468,18 @@ def check_literals(res: FunctionResult, binary: Binary, body: str, literal_allow
         else:
             res.missing_literals.append(lit)
     in_binary = {lit.value for lit in res.literals if lit.kind == "string"}
-    res.mismatched_strings = list(dict.fromkeys(s for s in strings if s not in in_binary))
+    not_read = list(dict.fromkeys(s for s in strings if s not in in_binary))
+    immediates = binary.immediate_bytes(res.function) if not_read else b""
+    for s in not_read:
+        if len(s) >= IMMEDIATE_STRING_MIN and s.isascii() and s.encode() + b"\0" in immediates:
+            res.immediate_strings.append(s)
+        else:
+            res.mismatched_strings.append(s)
+
+
+# Shortest source string check 2 accepts from instruction immediates: shorter texts ("0" + NUL)
+# turn up in ordinary integer immediates by chance.
+IMMEDIATE_STRING_MIN = 4
 
 
 def check_group(
@@ -665,6 +680,7 @@ def format_results(results: list[FunctionResult]) -> list[str]:
         if res.ok:
             extra = "".join(f"; allow-listed {c.name} ({a.kind})" for c, a in res.allowed)
             extra += "".join(f"; allow-listed {lit.render()} ({a.kind})" for lit, a in res.allowed_literals)
+            extra += "".join(f"; string {c_string(s)} built from immediates" for s in res.immediate_strings)
             lines.append(f"  ok       {label}: {len(res.callees)} callee(s), {len(res.literals)} literal(s){extra}")
     n_missing = sum(len(r.missing) for r in results)
     n_lit = sum(len(r.missing_literals) + len(r.mismatched_strings) for r in results)
