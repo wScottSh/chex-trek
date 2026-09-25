@@ -46,8 +46,8 @@ tells you to build it if it's missing, but doesn't build it for you):
 3. Launches `dhewm3.exe` with the mod mounted and that script queued via `+exec`.
 4. Kills it if it doesn't exit within the timeout (an error dialog hanging it).
 5. Copies the run's log and any screenshot into
-   `Documents\My Games\dhewm3\chextrek-harness-artifacts\<run-id>\` - next to, but never inside,
-   this repo - and reports PASS/FAIL for: `chextrek.dll` (not `base.dll`) loaded, the
+   `Documents\My Games\dhewm3\chextrek-harness-artifacts\<run-id>\` - next to dhewm3's own save
+   path, never inside this repo - and reports PASS/FAIL for: `chextrek.dll` (not `base.dll`) loaded, the
    `CHEXTREK-STATE-DUMP v1` header appeared, and the spec #28 always-on checks (no `ERROR:`, no
    unknown event/spawnclass, no script-compile error).
 

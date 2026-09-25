@@ -51,14 +51,18 @@ if ! echo "$HARNESS_OUT" | grep -qF "PASS: state-dump header present"; then
 	FAIL=1
 fi
 
-# The red reason must be the known failure, not some other regression. The engine's log write can
-# truncate the line mid-word when killed (see docs/dev-setup.md): prefer matching the full known
-# message, but accept the shortest prefix that's actually been observed to survive truncation, so
-# this doesn't flake on a slow run without also silently accepting an unrelated ERROR line.
+# The red reason must be the known failure, not some other regression: require the specific
+# script name and event name, not just any "ERROR:" line. This deliberately does NOT fall back to
+# a truncation-tolerant short prefix (e.g. "ERROR: Error: fi") - a prefix that short would also
+# match an unrelated compile error, making the check a no-op. The engine's log write was observed
+# to truncate mid-word when a stale per-mod save profile confused init (see docs/dev-setup.md);
+# run-harness.sh now wipes that profile before every run specifically so this full message is
+# reliably captured. If this check starts flaking, that's a real regression to chase, not a signal
+# to loosen the match back down.
 ARTIFACT_ROOT="${DHEWM3_DOCUMENTS_DIR:-${HOME}/Documents}/My Games/dhewm3/chextrek-harness-artifacts"
 ARTIFACT_DIR="$(ls -td "${ARTIFACT_ROOT}"/*/ 2>/dev/null | head -1)"
-if [ -z "$ARTIFACT_DIR" ] || ! grep -qE "ERROR: Error: file script.chex_events\.script|ERROR: Error: fi" "${ARTIFACT_DIR}dhewm3log.txt" 2>/dev/null; then
-	echo "FAIL: expected the log to report the known chex_events.script compile failure"
+if [ -z "$ARTIFACT_DIR" ] || ! grep -qF "chex_events.script, line 2: Unknown event 'openDoors'" "${ARTIFACT_DIR}dhewm3log.txt" 2>/dev/null; then
+	echo "FAIL: expected the log to report the known chex_events.script line 2 'openDoors' compile failure"
 	FAIL=1
 fi
 
