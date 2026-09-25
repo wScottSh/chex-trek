@@ -6,6 +6,8 @@
 
 #include "gamesys/SysCvar.h"
 #include "Game_local.h"
+#include "Player.h"
+#include "Target.h"
 
 #include "ChexTrekDump.h"
 
@@ -83,4 +85,18 @@ void ChexTrek_Dump_f( const idCmdArgs &args ) {
 	ChexTrek_PrintHeader();
 	gameLocal.Printf( "entities: %d\n", gameLocal.spawnedEntities.Num() );
 	gameLocal.Printf( "footprints: %d\n", chextrekFootprintCount );
+
+	// chextrek: spec #31. One line per objective slot (idPlayer::objectives[], MAX_OBJS = 5, see
+	// decomp-so/reference/objectives.md), so a scenario can assert a slot filled/emptied by a
+	// trigger_objective without depending on GUI state. "objective_slot_<N>: empty" when the slot
+	// is NULL, else its mkObjective's title (the same text placed on the PDA).
+	idPlayer *player = gameLocal.GetLocalPlayer();
+	for ( int i = 0; i < idPlayer::MAX_OBJS; i++ ) {
+		mkObjective *obj = player ? player->objectives[ i ] : NULL;
+		if ( obj ) {
+			gameLocal.Printf( "objective_slot_%d: %s\n", i + 1, obj->title.c_str() );
+		} else {
+			gameLocal.Printf( "objective_slot_%d: empty\n", i + 1 );
+		}
+	}
 }

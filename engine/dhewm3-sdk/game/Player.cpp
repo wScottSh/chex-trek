@@ -727,6 +727,79 @@ void idInventory::AddPickupName( const char *name, const char *icon ) {
 
 /*
 ==============
+idPlayer::HudMapLevel
+
+chextrek: spec #16/#31 stub (decomp-so/reference/objectives.md declares this; its real body is
+decomp-so/reference/hud-map.md, which needs idPlayer::mapLevels[] and the rest of the hud-map
+group's members - not yet ported, see docs/harness-coverage.md's "HUD map" row). addObjective
+needs a level to hand back through its int & argument; nothing yet reads mkObjective::mapLevel
+(only the not-yet-ported idPlayer::updateMapUI does), so a stub is behaviorally inert until the
+HUD map sub-issue lands and replaces this body with the real one.
+==============
+*/
+int idPlayer::HudMapLevel( const idVec3 *pos ) {
+	return 0;
+}
+
+/*
+==============
+idPlayer::addObjective
+
+chextrek: spec #16/#31 (decomp-so/reference/objectives.md). Puts obj in the first free slot from
+nextObjective on, and sets level to the HUD map level of origin. Returns the objective's number:
+its slot + 1 (the N of the GUI's map_objN). Returns -1 if no slot from nextObjective to the end is
+free: the search does not wrap around.
+==============
+*/
+int idPlayer::addObjective( mkObjective *obj, const idVec3 &origin, int &level ) {
+	while ( nextObjective != MAX_OBJS ) {
+		if ( objectives[ nextObjective ] == NULL ) {
+			objectives[ nextObjective ] = obj;
+			nextObjective++;
+			level = HudMapLevel( &origin );
+			return nextObjective;
+		}
+		nextObjective++;
+	}
+	gameLocal.Warning( "MAX_OBJS reached!" );
+	return -1;
+}
+
+/*
+==============
+idPlayer::freeObjective
+
+chextrek: spec #16/#31 (decomp-so/reference/objectives.md). num is the objective's number
+(slot + 1), as addObjective returned it. As in the binary, the next search starts at slot num,
+after the freed slot: freed slots below it are not searched again (recorded as an open question in
+the reference, not fixed here - out of scope per spec #28's "fixing the original mod's own bugs").
+==============
+*/
+void idPlayer::freeObjective( int num ) {
+	objectives[ num - 1 ] = NULL;
+	nextObjective = num;
+}
+
+/*
+==============
+idPlayer::addItemText
+
+chextrek: spec #16/#31 (decomp-so/reference/objectives.md). Queues a text (and icon) in the item
+pickup list, the way stock item pickups are shown, and shows the icon on the HUD at once. Appends
+straight to pickupItemNames rather than going through AddPickupName, matching the binary (no
+dedup, no #str_ language-table lookup).
+==============
+*/
+void idPlayer::addItemText( const idItemInfo &info ) {
+	inventory.pickupItemNames.Append( info );
+	if ( hud ) {
+		hud->SetStateString( "itemicon", info.icon );
+		hud->HandleNamedEvent( "invPickup" );
+	}
+}
+
+/*
+==============
 idInventory::Give
 ==============
 */
@@ -977,6 +1050,13 @@ idPlayer::idPlayer() {
 	objectiveSystem			= NULL;
 	objectiveSystemOpen		= false;
 
+	// chextrek: spec #16/#31 (decomp-so/reference/objectives.md; edits-inside-stock-functions
+	// lead: both idPlayer constructors NULL objectives[] and zero nextObjective).
+	for ( int i = 0; i < MAX_OBJS; i++ ) {
+		objectives[ i ] = NULL;
+	}
+	nextObjective			= 0;
+
 	heartRate				= BASE_HEARTRATE;
 	heartInfo.Init( 0, 0, 0, 0 );
 	lastHeartAdjust			= 0;
@@ -1211,6 +1291,10 @@ void idPlayer::Init( void ) {
 	previousWeapon			= -1;
 	weaponSwitchTime		= 0;
 	weaponEnabled			= true;
+	// chextrek: spec #16/#31 (decomp-so/reference/objectives.md; edits-inside-stock-functions
+	// lead: idPlayer::Init also zeroes nextObjective, not the slots themselves).
+	nextObjective			= 0;
+
 	weapon_soulcube			= SlotForWeapon( "weapon_soulcube" );
 	weapon_pda				= SlotForWeapon( "weapon_pda" );
 	weapon_fists			= SlotForWeapon( "weapon_fists" );

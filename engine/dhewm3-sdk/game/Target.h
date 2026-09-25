@@ -567,4 +567,41 @@ private:
 };
 
 
+/*
+===============================================================================
+
+mkObjective
+
+chextrek: spec #16/#31 (decomp-so/reference/objectives.md). A map objective (entityDef
+trigger_objective, def/func_envshot.def). Triggering it adds it to the local player's objective
+list: its image goes on the HUD map and the PDA map, its title and description on the PDA.
+Triggering it again removes it (and, with "remove" "1", the entity).
+
+===============================================================================
+*/
+
+class mkObjective : public idEntity {
+public:
+	CLASS_PROTOTYPE( mkObjective );
+
+	void				Spawn( void );
+	void				Save( idSaveGame *savefile ) const;
+	void				Restore( idRestoreGame *savefile );
+
+	// UNCERTAIN: access level of everything below except mapLevel in the reference - kept public
+	// there (and here) because idPlayer::updateMapUI, the hud-map group's future reader, needs it.
+	int					objectiveNum;	// number addObjective gave (1-5), -1 if the list was full
+	idStr				image;			// map icon material (map_obj%d)
+	idStr				title;			// PDA title (map_obj%d_tle)
+	int					mapLevel;		// HUD map level of the origin (idPlayer::HudMapLevel)
+	idStr				description;	// PDA text (map_obj%d_txt)
+	bool				active;			// true while on the player's list. Saved.
+
+	bool				AttachToLocalPlayer( bool showMessage );
+	void				RemoveFromLocalPlayer( bool showMessage );
+
+private:
+	void				Event_Activate( idEntity *activator );
+};
+
 #endif /* !__GAME_TARGET_H__ */

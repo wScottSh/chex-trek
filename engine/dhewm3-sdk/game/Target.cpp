@@ -1760,3 +1760,153 @@ void idTarget_FadeSoundClass::Event_RestoreVolume() {
 	// restore volume
 	gameSoundWorld->FadeSoundClasses( 0, fadeDB, fadeTime );
 }
+
+
+/*
+===============================================================================
+
+mkObjective
+
+chextrek: spec #16/#31, ported from decomp-so/reference/objectives.md.
+
+===============================================================================
+*/
+
+CLASS_DECLARATION( idEntity, mkObjective )
+	EVENT( EV_Activate,		mkObjective::Event_Activate )
+END_CLASS
+
+/*
+================
+mkObjective::Spawn
+
+A missing title or description falls back to the key's own name (idDict::GetString's own
+fallback behavior when default == key).
+================
+*/
+void mkObjective::Spawn( void ) {
+	spawnArgs.GetString( "title", "title", title );
+	spawnArgs.GetString( "description", "description", description );
+	spawnArgs.GetString( "image", "", image );
+	active = false;
+	// objectiveNum and mapLevel are not set here: only by AttachToLocalPlayer.
+}
+
+/*
+================
+mkObjective::Save
+================
+*/
+void mkObjective::Save( idSaveGame *savefile ) const {
+	savefile->WriteString( title );
+	savefile->WriteString( description );
+	savefile->WriteString( image );
+	savefile->WriteBool( active );
+	// objectiveNum and mapLevel are not saved: Restore re-attaches, which sets both again.
+}
+
+/*
+================
+mkObjective::Restore
+================
+*/
+void mkObjective::Restore( idRestoreGame *savefile ) {
+	savefile->ReadString( title );
+	savefile->ReadString( description );
+	savefile->ReadString( image );
+	savefile->ReadBool( active );
+
+	// The player's objective list is not saved. If this objective was on it, put it back: half a
+	// second on, activate itself with itself as the activator, which re-attaches it without the
+	// "addmsg" message (see Event_Activate).
+	if ( active ) {
+		PostEventMS( &EV_Activate, 500, this );
+	}
+}
+
+/*
+================
+mkObjective::AttachToLocalPlayer
+
+Adds this objective to the local player's list and shows it on the HUD and PDA. With
+showMessage, also shows the "addmsg" text as an item pickup message. Returns true if added.
+================
+*/
+bool mkObjective::AttachToLocalPlayer( bool showMessage ) {
+	idItemInfo			info;
+	idPlayer *			player;
+	idUserInterface *	pda;
+	idUserInterface *	hud;
+
+	player = gameLocal.GetLocalPlayer();
+	if ( !player || ( pda = player->objectiveSystem ) == NULL || ( hud = player->hud ) == NULL ) {
+		return false;
+	}
+
+	objectiveNum = player->addObjective( this, GetPhysics()->GetOrigin(), mapLevel );
+	if ( objectiveNum == -1 ) {
+		return false;
+	}
+
+	pda->SetStateBool( va( "map_obj%d_v", objectiveNum ), true );
+	hud->SetStateBool( va( "map_obj%d_v", objectiveNum ), true );
+	pda->SetStateString( va( "map_obj%d", objectiveNum ), image );
+	hud->SetStateString( va( "map_obj%d", objectiveNum ), image );
+	pda->SetStateString( va( "map_obj%d_txt", objectiveNum ), description );
+	pda->SetStateString( va( "map_obj%d_tle", objectiveNum ), title );
+
+	// The message has no icon (info.icon stays empty).
+	if ( showMessage && spawnArgs.GetString( "addmsg", "", info.name ) ) {
+		player->addItemText( info );
+	}
+	return true;
+}
+
+/*
+================
+mkObjective::RemoveFromLocalPlayer
+
+Takes this objective off the local player's list and hides it on the HUD and PDA. With
+showMessage, also shows the "rmmsg" text as an item pickup message.
+================
+*/
+void mkObjective::RemoveFromLocalPlayer( bool showMessage ) {
+	idItemInfo			info;
+	idPlayer *			player;
+	idUserInterface *	pda;
+	idUserInterface *	hud;
+
+	player = gameLocal.GetLocalPlayer();
+	if ( !player || ( pda = player->objectiveSystem ) == NULL || ( hud = player->hud ) == NULL ) {
+		return;
+	}
+
+	player->freeObjective( objectiveNum );
+	pda->SetStateBool( va( "map_obj%d_v", objectiveNum ), false );
+	hud->SetStateBool( va( "map_obj%d_v", objectiveNum ), false );
+
+	if ( showMessage && spawnArgs.GetString( "rmmsg", "", info.name ) ) {
+		player->addItemText( info );
+	}
+}
+
+/*
+================
+mkObjective::Event_Activate
+
+Off the list: attach, with the message. On the list: remove, with the message, and with
+"remove" also remove the entity. Activated by itself (Restore) while on the list: attach again,
+without the message.
+================
+*/
+void mkObjective::Event_Activate( idEntity *activator ) {
+	if ( !active || activator == this ) {
+		active = AttachToLocalPlayer( !active );
+		return;
+	}
+	RemoveFromLocalPlayer( true );
+	active = false;
+	if ( spawnArgs.GetBool( "remove", "0" ) ) {
+		ProcessEvent( &EV_Remove );
+	}
+}

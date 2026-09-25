@@ -40,6 +40,10 @@ If you have questions concerning this license or the applicable additional terms
 #include "GameEdit.h"
 
 class idAI;
+// chextrek: spec #16/#31 (decomp-so/reference/objectives.md). idPlayer::objectives holds
+// mkObjective *, declared in Target.h/Target.cpp; forward-declared here so idPlayer doesn't need
+// to include Target.h.
+class mkObjective;
 
 /*
 ===============================================================================
@@ -264,6 +268,28 @@ public:
 	idUserInterface *		hud;				// MP: is NULL if not local player
 	idUserInterface *		objectiveSystem;
 	bool					objectiveSystemOpen;
+
+	// chextrek: spec #16/#31 (decomp-so/reference/objectives.md). Level objectives
+	// (trigger_objective / mkObjective): a fixed 5-slot list, slot i shown on the HUD/PDA map as
+	// map_obj<i+1>. MAX_OBJS's name comes from the binary's "MAX_OBJS reached!" warning.
+	static const int		MAX_OBJS = 5;
+
+	mkObjective *			objectives[ MAX_OBJS ];
+	int						nextObjective;
+
+	// Declared here for addObjective's call; its real body belongs to the (pending) HUD map
+	// feature (decomp-so/reference/hud-map.md) - see the stub comment above its definition in
+	// Player.cpp.
+	int						HudMapLevel( const idVec3 *pos );
+
+	// Puts obj in the first free slot from nextObjective on (does not wrap around); sets level to
+	// the HUD map level of origin; returns the objective's number (slot + 1), or -1 if full.
+	int						addObjective( mkObjective *obj, const idVec3 &origin, int &level );
+	// num is the objective's number (slot + 1), as addObjective returned it.
+	void					freeObjective( int num );
+	// Queues info in the pickup-message list (bypassing idInventory::AddPickupName's dedup/
+	// localization) and shows its icon on the HUD at once. Used by mkObjective's addmsg/rmmsg.
+	void					addItemText( const idItemInfo &info );
 
 	int						weapon_soulcube;
 	int						weapon_pda;
