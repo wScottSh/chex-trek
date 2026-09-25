@@ -1139,8 +1139,9 @@ starts from the entityDef defName's own keys, then overrides them with whatever 
 already staged in the thread's spawnArgs (see Notes: corvette_notes.txt 1/3/06, "spawnDict added
 to script system, allows spawning dicts by name, stuff set by setSpawnArg overrides defaults").
 No script, map or def in this repo calls it (idThread event; a script would call it as
-sys.spawnDict(...)) - "1" argument to SpawnEntityDef's setDefaults matches the stock spawn event
-above, which passes the same default.
+sys.spawnDict(...)) - unlike Event_Spawn above (which omits SpawnEntityDef's setDefaults argument,
+taking its default of true), this passes `false` explicitly, matching the binary (reference:
+"Third argument false ... Stock names it setDefaults ... and never reads it").
 ================
 */
 void idThread::Event_SpawnDict( const char *defName ) {

@@ -469,10 +469,10 @@ idActor::idActor( void ) {
 	finalBoss			= false;
 
 	// chextrek: spec #30, decomp-so/reference/script-events.md. Binary sets these two on
-	// construction; it does not set footprintRight (open question in the reference - the first
-	// footstep's side may be arbitrary in the original. Zero-initializing here, rather than
-	// leaving it uninitialized, is a deliberate deviation for determinism, not a behavior port).
-	footprintRight		= false;
+	// construction; it does not set footprintRight (an open question in the reference - the first
+	// footstep's side may be arbitrary in the original). Per spec #28 ("keep the reference's
+	// choice unless a scenario shows it's wrong"), footprintRight is deliberately left
+	// uninitialized here too, matching the binary rather than forcing determinism.
 	footprintEndTime	= 0;
 	footprintSurfaceType = -1;
 
@@ -3378,7 +3378,7 @@ void idActor::Event_FootPrint( const char *side, const char *jointName ) {
 	// viewAxis: only yaw is used, to turn the print to face along the view.
 	idAngles angles = viewAxis.ToAngles();
 
-	if ( jointName && jointName[ 0 ] ) {
+	if ( jointName ) {
 		// Frame command: print at the joint, moved by footprint_offset_<side> in the actor's
 		// ground-plane frame. GetVector( key, NULL, out ) leaves out at 0 0 0 when missing.
 		spawnArgs.GetVector( va( "footprint_offset_%s", side ), NULL, offset );

@@ -1,8 +1,11 @@
 // chextrek: developer-only state-dump console command (spec #28/#29).
 //
 // Prints the mod's custom state to the game log in a stable, line-based format meant for the
-// AFK test harness to parse. It's the only test-only code in the library and never changes game
-// behavior. See decomp-so/reference/coverage.md and the spec #28 issue body for the full list of
+// AFK test harness to parse. This file is the bulk of the test-only code in the library and never
+// changes game behavior; #30 adds a little more alongside it for the same reason (a footprint
+// counter here, plus a handful of test-only string-literal cvars - see the comment above
+// chextrek_test_str1 in ChexTrekDump.cpp), all likewise inert. See decomp-so/reference/coverage.md
+// and the spec #28 issue body for the full list of
 // state the finished command will report (objective slots, level stats, map/fog-of-war coverage,
 // trail/anchor counts, the active custom UI and its GUI state). Each feature sub-issue adds its
 // own section under the stable header as that feature lands; #29 only lands the header itself, so

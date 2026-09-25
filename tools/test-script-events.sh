@@ -43,10 +43,10 @@ spawn monster_flemoid name chextrek_removeme
 wait 10
 chextrek_dump
 
-script sys.println( sys.getEntity( $chextrek_test_str2 ).isOpen() )
+script sys.println( 100 + sys.getEntity( $chextrek_test_str2 ).isOpen() )
 script sys.getEntity( $chextrek_test_str3 ).openDoors( sys.getEntity( $chextrek_test_str2 ) )
 wait 10
-script sys.println( sys.getEntity( $chextrek_test_str2 ).isOpen() )
+script sys.println( 200 + sys.getEntity( $chextrek_test_str2 ).isOpen() )
 
 script sys.println( sys.getEntity( $chextrek_test_str6 ).getWeaponEntity().createProjectile().getKey( $chextrek_test_str8 ) )
 script sys.getEntity( $chextrek_test_str6 ).getWeaponEntity().setProj( $chextrek_test_str7 )
@@ -100,51 +100,73 @@ if grep -qE "^Error: |Unknown command|Unknown punctuation" "$LOCAL_LOG"; then
 fi
 
 # --- openDoors: monster_chex_cly_2.openDoors(func_door_17) opens the unlocked, at-rest door ---
-# isOpen() is printed twice, in order: before (expect 0, unlocked-but-closed) and after (expect a
-# nonzero value once idAI::OpenDoors's door->Use() has had a few frames to start the door moving).
-ISOPEN_VALUES="$(grep -oE '^[0-9]+(\.[0-9]+)?$' "$LOCAL_LOG" | head -2)"
-ISOPEN_BEFORE="$(echo "$ISOPEN_VALUES" | sed -n '1p')"
-ISOPEN_AFTER="$(echo "$ISOPEN_VALUES" | sed -n '2p')"
-if [ "$ISOPEN_BEFORE" = "0" ] && [ -n "$ISOPEN_AFTER" ] && [ "$ISOPEN_AFTER" != "0" ]; then
-	echo "PASS: openDoors - func_door_17.isOpen() went from ${ISOPEN_BEFORE} to ${ISOPEN_AFTER} after monster_chex_cly_2.openDoors(func_door_17)"
+# isOpen() before/after are printed as 100+isOpen() and 200+isOpen() (expect 100, then 201 once
+# idAI::OpenDoors's door->Use() has had a few frames to start the door moving) instead of bare 0/1,
+# so this can't be confused with an unrelated bare-number line landing anywhere else in the log.
+ISOPEN_BEFORE="$(grep -oE '^10[01]$' "$LOCAL_LOG" | head -1)"
+ISOPEN_AFTER="$(grep -oE '^20[01]$' "$LOCAL_LOG" | head -1)"
+if [ "$ISOPEN_BEFORE" = "100" ] && [ "$ISOPEN_AFTER" = "201" ]; then
+	echo "PASS: openDoors - func_door_17.isOpen() went from 0 to 1 after monster_chex_cly_2.openDoors(func_door_17)"
 else
-	echo "FAIL: openDoors - expected isOpen() to go from 0 to nonzero, got '${ISOPEN_BEFORE}' then '${ISOPEN_AFTER}'"
+	echo "FAIL: openDoors - expected isOpen() markers 100 then 201, got '${ISOPEN_BEFORE}' then '${ISOPEN_AFTER}'"
 	FAIL=1
 fi
 
 # --- setProj: the weapon's createProjectile() classname changes to the def passed to setProj ---
-if grep -qF "projectile_minizorchblast" "$LOCAL_LOG" && grep -qF "projectile_minizorchblast_nodamage" "$LOCAL_LOG"; then
-	echo "PASS: setProj - createProjectile()'s classname changed to projectile_minizorchblast_nodamage after setProj"
+# Exact-line (not substring) matches, in order: "projectile_minizorchblast_nodamage" is NOT a
+# substring match away from also satisfying a plain "projectile_minizorchblast" check, so this
+# proves both the before value and that the swap actually happened in the right order.
+SETPROJ_LINES="$(grep -nE '^projectile_minizorchblast(_nodamage)?$' "$LOCAL_LOG")"
+SETPROJ_BEFORE_LINE="$(echo "$SETPROJ_LINES" | grep ':projectile_minizorchblast$' | head -1 | cut -d: -f1)"
+SETPROJ_AFTER_LINE="$(echo "$SETPROJ_LINES" | grep ':projectile_minizorchblast_nodamage$' | head -1 | cut -d: -f1)"
+if [ -n "$SETPROJ_BEFORE_LINE" ] && [ -n "$SETPROJ_AFTER_LINE" ] && [ "$SETPROJ_AFTER_LINE" -gt "$SETPROJ_BEFORE_LINE" ]; then
+	echo "PASS: setProj - createProjectile()'s classname changed from projectile_minizorchblast to projectile_minizorchblast_nodamage after setProj"
 else
-	echo "FAIL: setProj - expected to see both the default and the swapped-to projectile classname in the log"
+	echo "FAIL: setProj - expected 'projectile_minizorchblast' then, later, 'projectile_minizorchblast_nodamage' as exact lines - got lines '${SETPROJ_BEFORE_LINE}' and '${SETPROJ_AFTER_LINE}'"
 	FAIL=1
 fi
 
 # --- spawnDict: sys.spawnDict(...) actually spawns an entity of the given def ---
-if grep -qF "idMoveableItem_moveable_item_shotgun" "$LOCAL_LOG"; then
+if grep -qE '^idMoveableItem_moveable_item_shotgun_[0-9]+$' "$LOCAL_LOG"; then
 	echo "PASS: spawnDict - spawned an idMoveableItem from moveable_item_shotgun's dict"
 else
 	echo "FAIL: spawnDict - expected to see a spawned idMoveableItem_moveable_item_shotgun_* entity name in the log"
 	FAIL=1
 fi
 
-# --- footPrint: the footprints counter (ChexTrekDump.cpp) goes above zero once triggered ---
-LAST_FOOTPRINTS="$(grep -oE '^footprints: [0-9]+' "$LOCAL_LOG" | tail -1 | grep -oE '[0-9]+')"
-if [ -n "$LAST_FOOTPRINTS" ] && [ "$LAST_FOOTPRINTS" -gt 0 ]; then
-	echo "PASS: footPrint - a decal was projected (chextrek_dump reports footprints: ${LAST_FOOTPRINTS})"
+# --- footPrint: the footprints counter (ChexTrekDump.cpp) rises across the trigger, not just
+# "ends up above zero" (which the AI's own idle behavior could satisfy on its own without proving
+# our leftFoot() call did anything). The scenario's 5th and 6th chextrek_dump calls are,
+# respectively, the baseline right before chextrek_footprint_actor is even spawned and the
+# reading right after triggering its leftFoot() - see the console script above.
+FOOTPRINTS_COUNTS="$(grep -oE '^footprints: [0-9]+' "$LOCAL_LOG" | grep -oE '[0-9]+$')"
+FOOTPRINTS_BASELINE="$(echo "$FOOTPRINTS_COUNTS" | sed -n '3p')"
+FOOTPRINTS_AFTER="$(echo "$FOOTPRINTS_COUNTS" | sed -n '4p')"
+if [ -n "$FOOTPRINTS_BASELINE" ] && [ -n "$FOOTPRINTS_AFTER" ] && [ "$FOOTPRINTS_AFTER" -gt "$FOOTPRINTS_BASELINE" ]; then
+	echo "PASS: footPrint - a decal was projected (chextrek_dump's footprints counter went from ${FOOTPRINTS_BASELINE} to ${FOOTPRINTS_AFTER})"
 else
-	echo "FAIL: footPrint - expected chextrek_dump's footprints counter to be above zero, got '${LAST_FOOTPRINTS}'"
+	echo "FAIL: footPrint - expected chextrek_dump's footprints counter to rise across the trigger, got '${FOOTPRINTS_BASELINE}' then '${FOOTPRINTS_AFTER}'"
 	FAIL=1
 fi
 
 # --- remove: a script's remove() call actually shrinks the live entity count ---
-ENTITY_COUNTS="$(grep -oE '^entities: [0-9]+' "$LOCAL_LOG" | grep -oE '[0-9]+')"
-BEFORE_REMOVE="$(echo "$ENTITY_COUNTS" | tail -2 | head -1)"
-AFTER_REMOVE="$(echo "$ENTITY_COUNTS" | tail -1)"
+# Same 5 chextrek_dump calls as above: the 4th is right before chextrek_removeme.remove(), the
+# 5th right after.
+ENTITY_COUNTS="$(grep -oE '^entities: [0-9]+' "$LOCAL_LOG" | grep -oE '[0-9]+$')"
+BEFORE_REMOVE="$(echo "$ENTITY_COUNTS" | sed -n '4p')"
+AFTER_REMOVE="$(echo "$ENTITY_COUNTS" | sed -n '5p')"
 if [ -n "$BEFORE_REMOVE" ] && [ -n "$AFTER_REMOVE" ] && [ "$AFTER_REMOVE" -eq $(( BEFORE_REMOVE - 1 )) ]; then
 	echo "PASS: remove - entities went from ${BEFORE_REMOVE} to ${AFTER_REMOVE} after chextrek_removeme.remove()"
 else
-	echo "FAIL: remove - expected the last entity count to be exactly one less than the previous one, got '${BEFORE_REMOVE}' then '${AFTER_REMOVE}'"
+	echo "FAIL: remove - expected the 5th entity count to be exactly one less than the 4th, got '${BEFORE_REMOVE}' then '${AFTER_REMOVE}'"
+	FAIL=1
+fi
+
+# --- map finishes loading (spec #28 always-on check): e1m1's own load-complete log line ---
+if grep -qE '^ *[0-9]+ msec to load e1m1$' "$LOCAL_LOG"; then
+	echo "PASS: e1m1 finished loading"
+else
+	echo "FAIL: expected to see '<N> msec to load e1m1' in the log"
 	FAIL=1
 fi
 

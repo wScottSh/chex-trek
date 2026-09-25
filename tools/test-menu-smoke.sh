@@ -42,14 +42,14 @@ for marker in "PASS: chextrek.dll loaded (not base.dll)" "PASS: state-dump heade
 	fi
 done
 
-# Find the log the harness just archived and prove the specific known #29 failure is gone (not
-# just that no error happens to show up right now) and that the main menu's own GUI actually
-# loaded (a stronger signal than "no error" that the menu map itself was reached).
-ARTIFACT_ROOT="${DHEWM3_DOCUMENTS_DIR:-${HOME}/Documents}/My Games/dhewm3/chextrek-harness-artifacts"
-ARTIFACT_DIR="$(ls -td "${ARTIFACT_ROOT}"/*/ 2>/dev/null | head -1)"
-LOCAL_LOG="${ARTIFACT_DIR}dhewm3log.txt"
+# Use the log path run-harness.sh just printed (not a "most recently modified artifact dir"
+# guess, which could pick up a stale run from a concurrent/previous invocation) and prove the
+# specific known #29 failure is gone (not just that no error happens to show up right now) and
+# that the main menu's own GUI actually loaded (a stronger signal than "no error" that the menu
+# map itself was reached).
+LOCAL_LOG="$(echo "$HARNESS_OUT" | sed -n 's/^CHEXTREK_LOCAL_LOG=//p')"
 
-if [ -z "$ARTIFACT_DIR" ] || [ ! -f "$LOCAL_LOG" ]; then
+if [ -z "$LOCAL_LOG" ] || [ ! -f "$LOCAL_LOG" ]; then
 	echo "FAIL: couldn't find this run's archived log to check further"
 	FAIL=1
 else

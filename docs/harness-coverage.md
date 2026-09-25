@@ -20,7 +20,7 @@ one tracks spec #28 features against harness scenarios).
 | Developer-only state-dump console command (`chextrek_dump`), stable header line | `tools/run-harness.sh` asserts `CHEXTREK-STATE-DUMP v1` in the log | covered (header only - #29 lands the skeleton; later sub-issues add state under it as their features land) |
 | Harness proves *chextrek.dll* (not `base.dll`) loaded | `tools/run-harness.sh` asserts `loaded game library '...chextrek.dll'` and the state-dump header | covered |
 | Harness run to the main menu is green (script compile passes, menu loads) | `tools/run-harness.sh`, `tools/test-menu-smoke.sh` | covered - flipped green by #30 (was expected red under #29; `tools/test-menu-smoke.sh` replaces the old `tools/test-tracer-bullet.sh`, which asserted the opposite) |
-| Always-on checks: no `ERROR`, no unknown event/spawnclass, no script-compile error, map finishes loading | `tools/run-harness.sh`, `tools/test-script-events.sh` (loads `e1m1`) | covered |
+| Always-on checks: no `ERROR`, no unknown event/spawnclass, no script-compile error, map finishes loading | `tools/run-harness.sh`, `tools/test-script-events.sh` (loads `e1m1`, asserts `<N> msec to load e1m1`) | covered. The unknown-spawnclass check (`tools/lib-harness.sh`) matches the engine's real message (`Could not spawn '<name>'.  Class '<classname>' not found` - the "Unknown spawnclass" text #29 guessed never actually appears) and allowlists exactly one pre-existing, tracked gap: `idTarget_EndLevelGUI` isn't implemented yet (below, "Custom UI + end-level stats"), so `e1m1`'s `target_endlevelgui_1` fails to spawn independently of #30's own changes. |
 
 ## Per-feature (spec #28 order; #30 onward)
 
@@ -28,7 +28,7 @@ one tracks spec #28 features against harness scenarios).
 |---|---|---|
 | Script events `openDoors` (`idAI::OpenDoors`/`Event_OpenDoors`), `setProj`, `spawnDict`, `footPrint` (anim frame command + `PlayFootStepSound` lead); `idActor` extra `EV_Remove` entry; `ProjectDecal` 8-arg overload | `tools/test-script-events.sh` | covered - each event's observable effect: `openDoors` opens `e1m1`'s `func_door_17`, `setProj` changes the weapon's `createProjectile()` classname, `spawnDict` spawns an entity from a def, `footPrint`/`ProjectDecal` show up in `chextrek_dump`'s `footprints:` counter, and a script's `remove()` shrinks `chextrek_dump`'s `entities:` counter. `idActor`'s extra `EV_Remove` entry is ported for fidelity to the reconstruction but is behaviorally a no-op (routes to the same `idClass::Event_Remove` already inherited) - not separately observable, see `decomp-so/reference/script-events.md` Notes. |
 | Objectives (`mkObjective`) + item text (`addItemText`) | - | pending (#31+) |
-| Custom UI + end-level stats (incl. stat counting) | - | pending |
+| Custom UI + end-level stats (incl. stat counting) | - | pending. `idTarget_EndLevelGUI` not existing yet is why the always-on unknown-spawnclass check above allowlists `e1m1`'s `target_endlevelgui_1`. |
 | HUD map | - | pending |
 | Door opening (player + AI) | - | pending |
 | Trails | - | pending |
