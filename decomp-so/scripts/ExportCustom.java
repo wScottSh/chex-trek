@@ -63,7 +63,7 @@ public class ExportCustom extends GhidraScript {
         Path outDir = Paths.get(args[0]);
         Set<String> classes = new HashSet<>(Arrays.asList(args[1].split(",")));
         Set<String> methods = new HashSet<>();
-        Set<String> overloads = new HashSet<>(); // "name@entry" (entry as hex offset)
+        Set<String> overloads = new HashSet<>(); // "name@<entry offset, decimal>"
         for (String line : Files.readAllLines(Paths.get(args[2]))) {
             if (line.isBlank()) continue;
             int at = line.indexOf('@');

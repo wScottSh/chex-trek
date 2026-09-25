@@ -109,7 +109,6 @@ ARG_SLOT_MAX = 0x20  # [esp+d] with d <= this is taken as an outgoing argument s
 
 def _esp_slot(op) -> int | None:
     """d for a dword memory operand [esp + d] (no index), else None."""
-
     if op.type == x86.X86_OP_MEM and op.size == 4 and op.mem.base == x86.X86_REG_ESP and not op.mem.index:
         return op.mem.disp
     return None
@@ -118,7 +117,6 @@ def _esp_slot(op) -> int | None:
 def _is_zero(insns: list, j: int, src) -> bool:
     """Is operand `src` of insns[j] zero: imm 0, or a register last set by `xor r, r`
     within the preceding DOUBLE_WINDOW instructions?"""
-
     if src.type == x86.X86_OP_IMM:
         return src.imm == 0
     if src.type != x86.X86_OP_REG:
@@ -250,7 +248,7 @@ class Binary:
     def _symbols(self) -> dict[str, tuple[int, int]]:
         out: dict[str, tuple[int, int]] = {}
         for sym in self.elf.get_section_by_name(".symtab").iter_symbols():
-            out.setdefault(sym.name, (sym["st_value"], sym["st_size"]))  # the first, as before
+            out.setdefault(sym.name, (sym["st_value"], sym["st_size"]))  # first definition wins
         return out
 
     def symbol(self, name: str) -> tuple[int, int]:
@@ -302,7 +300,6 @@ class Binary:
         `pop`s on early-return paths are followed by more code. A reuse of that register
         for something else cannot fake a literal: small displacements land in the GOT,
         and only PIC addressing reaches .rodata (~0x70000 below it)."""
-
         ro_addr, ro = self._rodata
         pic: set[int] = set()  # capstone register ids seen to receive the GOT address
         pending: tuple[int | None, int] | None = None  # (register, value it was given)
@@ -394,7 +391,6 @@ class Binary:
         immediate reaches an argument slot [esp+d] (d <= ARG_SLOT_MAX, a call follows) and a
         zero is stored at [esp+d-4] within DOUBLE_WINDOW instructions, the pair is taken as
         that double, if it too is short (<= 6 digits)."""
-
         insns = list(self._md_detail.disasm(self._bytes(func.vaddr, func.size), func.vaddr))
         out = []
         for k, ins in enumerate(insns):
@@ -420,7 +416,6 @@ class Binary:
         GCC inlines a copy of a short string literal (`idStr( "guis/hud_maps/" )`) as `mov`s of
         its text: dword immediates, then the tail as a word/byte and a NUL. The literal is then
         not in .rodata at all, but its text, NUL included, runs through these bytes."""
-
         out = bytearray()
         for ins in self._md_detail.disasm(self._bytes(func.vaddr, func.size), func.vaddr):
             if ins.mnemonic != "mov" or len(ins.operands) != 2:
@@ -438,7 +433,6 @@ class Binary:
         one byte store per character, so the text is a whole run. A run continues across `mov`s
         that store or load no immediate (GCC reloads `data` between the stores) and ends at any
         other instruction, or at a `mov` of an immediate that is not a byte store to memory."""
-
         runs, run = [], bytearray()
         for ins in self._md_detail.disasm(self._bytes(func.vaddr, func.size), func.vaddr):
             if ins.mnemonic == "mov" and len(ins.operands) == 2:
@@ -460,7 +454,6 @@ class Binary:
     def _double_high_word(self, insns: list, k: int) -> float | None:
         """If insns[k] (`mov <dest>, imm32`) is the high word of a stack double whose low word
         is zero, the double's value (see immediate_floats); else None."""
-
         imm = insns[k].operands[1].imm & 0xFFFFFFFF
         slot = _esp_slot(insns[k].operands[0])  # stored straight to [esp+d]?
         if slot is None and insns[k].operands[0].type == x86.X86_OP_REG:

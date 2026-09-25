@@ -1,4 +1,5 @@
-# Callee coverage of the first full Ghidra export (bf8196f, before the issue #18 enrichment).
+# Callee coverage of the first full Ghidra export (bf8196f, before the issue #18 enrichment); the last
+# rows, for functions that export lacked, are from the later export that added them (see below).
 # export	found	total	callees that export did not name. test_verify.py requires the current
 # export to name at least as many of each function's direct callees (no truncation regression).
 idActor_Event_FootPrint_000c6210.c	10	10	

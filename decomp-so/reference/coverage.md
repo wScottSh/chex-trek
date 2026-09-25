@@ -35,10 +35,10 @@ except:
   `CRC32` / `MD4` / `MD5`, but not in the GPL release. They call only each other: nothing else in the binary
   calls them. UNCERTAIN: taken as id's SDK code, not the mod's, so not reconstructed.
 
-Every other function the stock build lacks is in the table below and covered. The check found three that
-the first target list had missed, now exported and covered: the 8-argument `idGameLocal::ProjectDecal`
-overload (found in #26, `script-events`) and `idWorldspawn::Think` / `idWorldspawn::Save( idSaveGame * )`
-(`worldspawn`).
+Every other function the stock build lacks is in the table below and covered. Three were missing from the
+first target list and are now exported and covered: the 8-argument `idGameLocal::ProjectDecal` overload
+(found in #26, confirmed by this check; `script-events`) and `idWorldspawn::Think` /
+`idWorldspawn::Save( idSaveGame * )` (found by this check; `worldspawn`).
 
 Custom code the export does not reach, by design: code inside stock functions. One example is the `g_PDA` cvar, which
 registers `idCmdSystem::ArgCompletion_GuiName` from `Player.cpp`'s static initializer (see `reference/custom-ui.md`).

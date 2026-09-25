@@ -41,6 +41,24 @@ GROUP_SCOPES = {
     "worldspawn": ({"idWorldspawn::Think", "idWorldspawn::Save"}, None, 2),
 }
 
+# Each group's check-3 splices: (stock class, stock header, the dependency reference it came from, or None).
+CUSTOM_UI = "decomp-so/reference/custom-ui.md"
+OBJECTIVES = "decomp-so/reference/objectives.md"
+GROUP_SPLICES = {
+    "custom-ui": {("idPlayer", "game/Player.h", None), ("idCmdSystem", "framework/CmdSystem.h", None)},
+    "end-level-stats": {("idPlayer", "game/Player.h", CUSTOM_UI), ("idCmdSystem", "framework/CmdSystem.h", CUSTOM_UI),
+                        ("idPlayer", "game/Player.h", None), ("idGameLocal", "game/Game_local.h", None),
+                        ("idStr", "idlib/Str.h", None)},
+    "objectives": {("idPlayer", "game/Player.h", None)},
+    "hud-map": {("idPlayer", "game/Player.h", OBJECTIVES), ("idPlayer", "game/Player.h", None)},
+    "trails": {("idGameLocal", "game/Game_local.h", None)},
+    "door-opening": {("idPlayer", "game/Player.h", None), ("idAI", "game/ai/AI.h", None)},
+    "env-shots": set(),
+    "script-events": {("idGameLocal", "game/Game_local.h", None), ("idActor", "game/Actor.h", None),
+                      ("idWeapon", "game/Weapon.h", None), ("idThread", "game/script/Script_Thread.h", None)},
+    "worldspawn": {("idWorldspawn", "game/WorldSpawn.h", None)},
+}
+
 
 def reference(group: str) -> str:
     return (verify.REFERENCE_DIR / f"{group}.md").read_text(encoding="utf-8")
@@ -73,8 +91,8 @@ class CalleeCoverage(unittest.TestCase):
     def test_every_exported_function_is_covered(self):
         """Spec #16's end state: every function in the coverage record is in a group reference that
         passes the harness (checks 1 and 2 here; check 3 in Compile)."""
-        self.assertEqual([r.function for r in ROWS if r.status != "covered"], [])
         self.assertEqual(COVERED_GROUPS, sorted(GROUP_SCOPES))
+        self.assertEqual([r.function for r in ROWS if r.status != "covered"], [])  # incl. rows of no known group
 
     def test_static_init_entry_needs_the_class_declaration(self):
         """_GLOBAL__I__ZN7mkTrail4TypeE only calls the file's __static_initialization_and_destruction_0;
@@ -909,24 +927,6 @@ class CompileSplicing(unittest.TestCase):
                "impl_line": 3}
         with self.assertRaisesRegex(ValueError, "more than one stock header"):
             worker.prepare(neo, job)
-
-
-CUSTOM_UI = "decomp-so/reference/custom-ui.md"
-OBJECTIVES = "decomp-so/reference/objectives.md"
-GROUP_SPLICES = {
-    "custom-ui": {("idPlayer", "game/Player.h", None), ("idCmdSystem", "framework/CmdSystem.h", None)},
-    "end-level-stats": {("idPlayer", "game/Player.h", CUSTOM_UI), ("idCmdSystem", "framework/CmdSystem.h", CUSTOM_UI),
-                        ("idPlayer", "game/Player.h", None), ("idGameLocal", "game/Game_local.h", None),
-                        ("idStr", "idlib/Str.h", None)},
-    "objectives": {("idPlayer", "game/Player.h", None)},
-    "hud-map": {("idPlayer", "game/Player.h", OBJECTIVES), ("idPlayer", "game/Player.h", None)},
-    "trails": {("idGameLocal", "game/Game_local.h", None)},
-    "door-opening": {("idPlayer", "game/Player.h", None), ("idAI", "game/ai/AI.h", None)},
-    "env-shots": set(),
-    "script-events": {("idGameLocal", "game/Game_local.h", None), ("idActor", "game/Actor.h", None),
-                      ("idWeapon", "game/Weapon.h", None), ("idThread", "game/script/Script_Thread.h", None)},
-    "worldspawn": {("idWorldspawn", "game/WorldSpawn.h", None)},
-}
 
 
 class Compile(unittest.TestCase):

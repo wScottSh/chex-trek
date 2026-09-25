@@ -1,6 +1,6 @@
 # `idPlayer` additions: consolidated list
 
-**Provenance:** compiled by **Claude Opus 5.5** from the group references in this folder. Those were reconstructed from the complete Ghidra export `decomp-so/ghidra-full/` of `gamex86.so` (Ghidra 12.1.4, discovered non-returning functions disabled), with offsets checked against the binary's disassembly. Reference material only.
+**Provenance:** compiled by **Claude Opus 5.5** from the group references in this folder. Those were reconstructed from the complete Ghidra export `decomp-so/ghidra-full/` of `gamex86.so` (Ghidra 12.1.4, "Non-Returning Functions - Discovered" disabled), with offsets checked against the binary's disassembly. Reference material only.
 
 One place for every `idPlayer` member and method the mod added, so they can be added to a modern `idPlayer` together. Each feature group adds its own rows. If a group finds a conflict (same offset, different type or meaning), fix it here and note it in the group's Notes.
 

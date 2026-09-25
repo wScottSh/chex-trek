@@ -81,7 +81,8 @@ def main() -> int:
         reason = next((r for pat, r in NOT_CUSTOM.items() if re.fullmatch(pat, name)), None)
         status = "covered" if name in covered else f"not custom: {reason}" if reason else "UNEXPLAINED"
         unexplained += status == "UNEXPLAINED"
-        print(f"{addr:#x}\t{size}\t{bind[4:]}\t{pretty}\t{status}")
+        binding = bind.removeprefix("STB_")
+        print(f"{addr:#x}\t{size}\t{binding}\t{pretty}\t{status}")
     print(f"=> {unexplained} unexplained function(s)")
     return 1 if unexplained else 0
 
