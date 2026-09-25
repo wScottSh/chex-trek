@@ -20,7 +20,7 @@ set(src_game_mod
 	# add additional .cpp files of your mod in game/
 	# (that you added to the ones already existant in the SDK/in dhewm3)
 	# like "game/MyFile.cpp" (without quotes, one file per line)
-	game/ChexTrekDump.cpp
+	game/ChexTrekDump.cpp # chextrek
 )
 
 set(src_d3xp_mod

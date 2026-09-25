@@ -16,7 +16,6 @@
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 echo "=== #29 tracer-bullet test: build ==="
 if ! bash "${SCRIPT_DIR}/build-chextrek.sh"; then
@@ -53,9 +52,12 @@ if ! echo "$HARNESS_OUT" | grep -qF "PASS: state-dump header present"; then
 fi
 
 # The red reason must be the known failure, not some other regression. The engine's log write can
-# truncate the line mid-word when killed (see docs/dev-setup.md), so match a safely-short prefix.
-ARTIFACT_DIR="$(ls -td "${REPO_ROOT}/.harness-artifacts"/*/ 2>/dev/null | head -1)"
-if [ -z "$ARTIFACT_DIR" ] || ! grep -qE "ERROR: Error: fi" "${ARTIFACT_DIR}dhewm3log.txt" 2>/dev/null; then
+# truncate the line mid-word when killed (see docs/dev-setup.md): prefer matching the full known
+# message, but accept the shortest prefix that's actually been observed to survive truncation, so
+# this doesn't flake on a slow run without also silently accepting an unrelated ERROR line.
+ARTIFACT_ROOT="${DHEWM3_DOCUMENTS_DIR:-${HOME}/Documents}/My Games/dhewm3/chextrek-harness-artifacts"
+ARTIFACT_DIR="$(ls -td "${ARTIFACT_ROOT}"/*/ 2>/dev/null | head -1)"
+if [ -z "$ARTIFACT_DIR" ] || ! grep -qE "ERROR: Error: file script.chex_events\.script|ERROR: Error: fi" "${ARTIFACT_DIR}dhewm3log.txt" 2>/dev/null; then
 	echo "FAIL: expected the log to report the known chex_events.script compile failure"
 	FAIL=1
 fi

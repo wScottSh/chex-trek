@@ -1,0 +1,4 @@
+# The tools/*.sh scripts run under Git Bash and must keep LF line endings even on a Windows
+# checkout with core.autocrlf=true (CRLF makes bash choke on trailing \r, e.g. in shebangs and
+# heredocs) - spec #28/#29.
+*.sh text eol=lf

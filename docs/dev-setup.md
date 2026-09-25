@@ -45,14 +45,23 @@ tells you to build it if it's missing, but doesn't build it for you):
    runs `chextrek_dump`, takes a screenshot, and `quit`s.
 3. Launches `dhewm3.exe` with the mod mounted and that script queued via `+exec`.
 4. Kills it if it doesn't exit within the timeout (an error dialog hanging it).
-5. Copies the run's log and any screenshot into `.harness-artifacts/<run-id>/` in the repo
-   (gitignored - never committed) and reports PASS/FAIL for: `chextrek.dll` (not `base.dll`)
-   loaded, the `CHEXTREK-STATE-DUMP v1` header appeared, and the spec #28 always-on checks (no
-   `ERROR:`, no unknown event/spawnclass, no script-compile error).
+5. Copies the run's log and any screenshot into
+   `Documents\My Games\dhewm3\chextrek-harness-artifacts\<run-id>\` - next to, but never inside,
+   this repo - and reports PASS/FAIL for: `chextrek.dll` (not `base.dll`) loaded, the
+   `CHEXTREK-STATE-DUMP v1` header appeared, and the spec #28 always-on checks (no `ERROR:`, no
+   unknown event/spawnclass, no script-compile error).
 
 Right now (before #30 ports the mod's script events) this is expected to report **red**: the
 known `script\chex_events.script, line 2: Unknown event 'openDoors'` failure, reproduced from an
-unmodified `dhewm3-sdk` build. That's what proves the tracer bullet works end to end.
+unmodified `dhewm3-sdk` build. That's what proves the tracer bullet works end to end. When it's
+red like this, the game hangs on the error dialog before it ever reaches the `screenshot` command
+in the console script, so there's no screenshot artifact for a red run - that's expected, not a
+bug (screenshots are "saved as artifacts, never asserted").
+
+**Only run one harness invocation at a time on a given machine.** It kills every `dhewm3.exe`
+process by image name on timeout (not just the one it started), and concurrent runs - e.g. from
+two worktrees at once - would also race on the shared `chextrek` symlink and the shared
+`Documents\My Games\dhewm3\chextrek\` save dir.
 
 ## Why none of this lives in the repo
 

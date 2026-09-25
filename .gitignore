@@ -4,9 +4,3 @@
 /chextrek.pdb
 /chextrek.exp
 /chextrek.lib
-
-# Local copy of the bundled CMake, made because the VS Build Tools install lives outside the repo.
-/.buildtools/
-
-# Harness output: logs, screenshots and scratch save-path mirrors are artifacts, not source.
-/.harness-artifacts/

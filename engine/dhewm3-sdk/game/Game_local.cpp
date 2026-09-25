@@ -50,7 +50,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "Trigger.h"
 
 #include "Game_local.h"
-#include "ChexTrekDump.h"
+#include "ChexTrekDump.h" // chextrek
 
 const int NUM_RENDER_PORTAL_BITS	= idMath::BitsForInteger( PS_BLOCK_ALL );
 

@@ -16,8 +16,12 @@
 # repo). All configs/logs/saves/screenshots go to dhewm3's own per-mod save folder, which lives
 # under the user's Documents folder, not in this repo - see docs/dev-setup.md for why that's the
 # "scratch save path" the ACs mean (dhewm3 hardcodes it on Windows; it can't be redirected into
-# the repo even if we wanted to). Artifacts are copied from there into .harness-artifacts/ after
-# the run for convenience; that directory is gitignored.
+# the repo even if we wanted to). This run's artifacts (log + screenshot) are copied from there
+# into a folder next to that same save path - still outside the repo - for convenience.
+#
+# Only one harness run at a time per machine: it kills *all* dhewm3.exe processes on timeout, and
+# concurrent runs (e.g. from two worktrees) would race on the shared basepath symlink and the
+# shared per-mod save dir.
 set -uo pipefail
 
 TIMEOUT_SECS="${1:-60}"
@@ -117,15 +121,19 @@ RUN_EXIT=$?
 
 if [ $RUN_EXIT -eq 124 ] || [ $RUN_EXIT -eq 137 ]; then
 	echo "==> Timed out after ${TIMEOUT_SECS}s - an error dialog likely hung the game. Killed it."
-	# Belt-and-braces: `timeout` already sent the kill, but make sure nothing lingers.
+	# Belt-and-braces: `timeout` already sent the kill, but make sure nothing lingers. This kills
+	# *every* dhewm3.exe on the machine (image-name match, not PID) - see the "one run at a time"
+	# note above.
 	taskkill //F //IM dhewm3.exe >/dev/null 2>&1
 fi
 
-# --- archive this run's artifacts (log + any screenshot) into the repo's gitignored dir ---
-ARTIFACT_DIR="${REPO_ROOT}/.harness-artifacts/${RUN_ID}"
+# --- archive this run's artifacts (log + any screenshot), still outside the repo ---
+# `screenshot <name>` writes "<name>" (no extension, no subfolder) straight into the save dir -
+# confirmed by running it manually against fs_game base - not into a "screenshots/" subfolder.
+ARTIFACT_DIR="${SAVE_ROOT}/chextrek-harness-artifacts/${RUN_ID}"
 mkdir -p "$ARTIFACT_DIR"
 [ -f "$LOG_FILE" ] && cp -f "$LOG_FILE" "${ARTIFACT_DIR}/dhewm3log.txt"
-for shot in "${MOD_SAVE_DIR}/screenshots/${SHOT_NAME}"*; do
+for shot in "${MOD_SAVE_DIR}/${SHOT_NAME}"*; do
 	[ -f "$shot" ] && cp -f "$shot" "$ARTIFACT_DIR/"
 done
 cp -f "${MOD_SAVE_DIR}/${CFG_NAME}" "$ARTIFACT_DIR/" 2>/dev/null
