@@ -45,27 +45,24 @@
 #
 # guis/pda_chex.gui quirk found while writing this scenario (GUI script only, not a #37 C++ gap):
 # its "hudmap_close" window has no "notime 1" the way "hudmap_open" does, so its own onTime 400
-# fires ~400ms after the PDA gui is created even with no resetTime call - it isn't gated on
-# actually having entered the map page first. In real play, guis/pda_chex.gui's own "Data"/
-# "Stats" tab buttons (DDText1/DDText2's onAction) explicitly call resetTime "hudmap_close" "0"
-# when *leaving* the map tab while it was open (lines 747/821), which is presumably the intended
-# use - the window firing once "for free" ~400ms after PDA creation, before the player has
-# necessarily even opened the map tab, is likely harmless there since nothing else depends on
-# gui::HudMap being true until the player actually navigates to the map. Under console-driven
-# control, though, it means gui::HudMap flips back to 0 on its own once, at a fixed ~400ms after
-# the PDA gui is created, regardless of what a scenario is doing at that moment. Rather than fight
-# that GUI timing detail in C++ (out of #37's scope - #37 only ports the mapControl-setting side,
-# not the PDA gui's own page-navigation script), this scenario waits well past that one-time
-# window (60 frames, comfortably more than 400ms even accounting for frame-time jitter) right
-# after opening the PDA map and before starting any measured step, then re-sends
-# chextrek_test_pda_map_open 1 once more - since "hudmap_close" only ever fires once (nothing in
-# this script calls resetTime on it again), gui::HudMap stays true for the rest of the run once
-# that single window has passed. (An earlier version of this script re-sent
-# chextrek_test_pda_map_open 1 before every step instead, on the theory that doing so often enough
-# would always catch the flip in time - but the flip is a one-time, instantaneous edge, not a
-# recurring window, so any gap between re-asserts (even a few frames) could still, by chance, span
-# the exact moment it fired, losing that step's measured movement entirely. Waiting out the window
-# once, up front, removes the race instead of just narrowing it.)
+# sets gui::HudMap back to 0 roughly every 400ms of elapsed GUI time even with no resetTime call -
+# it isn't gated on actually having entered the map page first. A prior version of this scenario
+# assumed that onTime only ever fires once per PDA-gui lifetime (waiting 60 frames past PDA
+# creation, then re-asserting the flag a single time, on the theory that the single window had
+# then permanently passed) - reproducing the scenario repeatedly showed that assumption is wrong:
+# without "notime 1", the window's own local clock keeps re-crossing the 400 threshold, so
+# gui::HudMap keeps flipping back to 0 periodically for as long as the PDA map stays open, not
+# just once near creation. In real play this is presumably harmless, since guis/pda_chex.gui's own
+# "Data"/"Stats" tab buttons (DDText1/DDText2's onAction, lines 747/821) call
+# resetTime "hudmap_close" "0" whenever the player leaves the map tab, and a player is unlikely to
+# sit on the map tab, motionless, for many multiples of 400ms without ever touching another
+# button. Rather than fight that GUI timing detail in C++ (out of #37's scope - #37 only ports the
+# mapControl-setting side, not the PDA gui's own page-navigation script), this scenario re-sends
+# chextrek_test_pda_map_open 1 immediately before every measured step and after every 5-frame
+# chunk of every wait, keeping the gap between re-asserts well under the ~400ms period so
+# gui::HudMap can never be observed false for long enough to lose a step's movement - the
+# test-only command is documented as setting the flag directly, and re-asserting it repeatedly is
+# no different from a real player staying on the map page.
 #
 # chextrek_dump's new `map_pda: scale=<f> view_x=<f> view_y=<f> control=<N>` line (ChexTrekDump.cpp)
 # reads idPlayer::mapScale/mapView/mapControl directly, so this scenario can assert each map_*
@@ -93,65 +90,105 @@ trigger chextrek_pdamap_test
 wait 10
 
 chextrek_test_pda_map_open 1
-
-# Wait out guis/pda_chex.gui's one-time hudmap_close quirk (see the header comment above): its
-# onTime 400 fires ~400ms after PDA creation regardless of navigation, flipping gui::HudMap back
-# to 0 once. 60 frames is comfortably more than 400ms even with frame-time jitter. It only fires
-# once, so re-asserting the flag here (rather than before every step below) is enough for the rest
-# of the run.
-wait 60
+wait 5
 chextrek_test_pda_map_open 1
 wait 5
 chextrek_dump
 
+chextrek_test_pda_map_open 1
 chextrek_test_map_cmd map_zoom_in
-wait 20
+wait 5
+chextrek_test_pda_map_open 1
+wait 5
+chextrek_test_pda_map_open 1
+wait 5
+chextrek_test_pda_map_open 1
+wait 5
 chextrek_dump
 
+chextrek_test_pda_map_open 1
 chextrek_test_map_cmd map_stop
 wait 5
+chextrek_test_pda_map_open 1
 chextrek_test_map_cmd map_zoom_out
-wait 30
+wait 5
+chextrek_test_pda_map_open 1
+wait 5
+chextrek_test_pda_map_open 1
+wait 5
+chextrek_test_pda_map_open 1
+wait 5
+chextrek_test_pda_map_open 1
+wait 5
+chextrek_test_pda_map_open 1
+wait 5
 chextrek_dump
 
+chextrek_test_pda_map_open 1
 chextrek_test_map_cmd map_stop
 wait 5
+chextrek_test_pda_map_open 1
 chextrek_test_map_cmd map_scroll_right
-wait 10
+wait 5
+chextrek_test_pda_map_open 1
+wait 5
 chextrek_dump
 
+chextrek_test_pda_map_open 1
 chextrek_test_map_cmd map_stop
 wait 5
+chextrek_test_pda_map_open 1
 chextrek_test_map_cmd map_scroll_up
-wait 10
+wait 5
+chextrek_test_pda_map_open 1
+wait 5
 chextrek_dump
 
+chextrek_test_pda_map_open 1
 chextrek_test_map_cmd map_stop
 wait 5
+chextrek_test_pda_map_open 1
 chextrek_test_map_cmd map_scroll_down
-wait 10
+wait 5
+chextrek_test_pda_map_open 1
+wait 5
 chextrek_dump
 
+chextrek_test_pda_map_open 1
 chextrek_test_map_cmd map_stop
 wait 5
+chextrek_test_pda_map_open 1
 chextrek_test_map_cmd map_scroll_left
-wait 10
+wait 5
+chextrek_test_pda_map_open 1
+wait 5
 chextrek_dump
 
+chextrek_test_pda_map_open 1
 chextrek_test_map_cmd map_stop
 wait 5
+chextrek_test_pda_map_open 1
 chextrek_test_map_cmd map_scroll_center
 wait 5
 chextrek_dump
 
+chextrek_test_pda_map_open 1
 chextrek_test_map_cmd map_zoom_in
-wait 20
+wait 5
+chextrek_test_pda_map_open 1
+wait 5
+chextrek_test_pda_map_open 1
+wait 5
+chextrek_test_pda_map_open 1
+wait 5
 chextrek_dump
 
+chextrek_test_pda_map_open 1
 chextrek_test_map_cmd map_stop
 wait 5
 chextrek_dump
 
+chextrek_test_pda_map_open 1
 chextrek_test_map_cmd map_stop
 wait 5
 chextrek_dump
