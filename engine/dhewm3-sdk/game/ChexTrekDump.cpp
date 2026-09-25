@@ -322,6 +322,18 @@ Test-only, spec #36. See ChexTrek_TestImpulse_f's comment in ChexTrekDump.h for 
 command has to stand in for a real, currently-held bind key here. Reads one integer argument and
 calls idPlayer::PerformImpulse with it directly - everything downstream is the real, already-ported
 game code (Player.cpp's PerformImpulse switch), unchanged.
+
+Recorded deviation from spec #28's Implementation Decisions, which describe the state-dump command
+as "the only test code in the library": this is a third one (after chextrek_customui_cmd, spec #34,
+and chextrek_test_gui_completion, spec #35), needed because nothing in spec #28's console-only
+command list can simulate a real, currently-held bind key - the same class of gap those two close
+for a GUI button click and interactive tab-completion. CMD_FL_CHEAT plus its own CheatsOk( false )
+check matches chextrek_customui_cmd - honestly weaker than "developer-only" (spec #28 story 34,
+which the state-dump command matches): CheatsOk()/CMD_FL_CHEAT only block non-cheat multiplayer
+clients, not single-player without "developer 1". Unlike chextrek_customui_cmd (which only reaches
+idCustomUI subclasses), this one accepts any impulse number, not just 23 - kept general on purpose,
+since a future scenario for any other impulse-driven feature can reuse it rather than adding another
+single-purpose command.
 ==================
 */
 void ChexTrek_TestImpulse_f( const idCmdArgs &args ) {

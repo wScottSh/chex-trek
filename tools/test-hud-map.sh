@@ -43,15 +43,20 @@
 # `coverage` is the number of alpha-revealed texels (hudmap_alpha[level][...][3] > 0) out of the
 # level's 128x128 fog-of-war image (idPlayer::updateHudMapAlpha, called every frame from
 # idPlayer::Think via updateMap). e1m1's info_player_start_3 sits at -1032 -976 8; e1m1's own
-# worldspawn map_coords ("-1768 1840 1752 -2120") make one texel ~27.5 world units and the default
-# map_radius (12 texels) reveals a square roughly 660 world units on a side around each reveal
-# point - so each scenario setviewpos jumps by 1300+ world units in at least one axis to guarantee
-# it lands well outside the previous point's fully-revealed square (a jump too close to that could
-# land entirely inside ground already maxed out to alpha 255, showing no growth even though the
-# feature works - this was seen while writing this scenario with smaller jumps). `noclip` (stock,
-# CMD_FL_CHEAT) is set first so `setviewpos`'s teleport can't be blocked or immediately corrected
-# by collision against the level geometry - irrelevant to
+# worldspawn map_coords ("-1768 1840 1752 -2120") make one texel ~27.5 world units, and the
+# default map_radius (8 texels - e1m1's own worldspawn overrides it to 12, "map_radius" "12" in
+# maps/e1m1.map) reveals a square roughly 660 world units on a side (at e1m1's actual 12-texel
+# radius) around each reveal point - so each scenario setviewpos jumps by 1300+ world units in at
+# least one axis from the *previous* point to guarantee it lands well outside that point's
+# fully-revealed square (a jump too close to that could land entirely inside ground already maxed
+# out to alpha 255, showing no growth even though the feature works - this was seen while writing
+# this scenario with smaller jumps, and with a first move that landed back on the player's own
+# spawn point, already revealed by the time the player stood there through the earlier "wait 20"/
+# impulse waits). `noclip` (stock, CMD_FL_CHEAT) is set first so `setviewpos`'s teleport can't be
+# blocked or immediately corrected by collision against the level geometry - irrelevant to
 # fog-of-war, which only reads the player's origin, not whether the player physically fits there.
+# The baseline dump (before any setviewpos, still standing at the spawn point) is itself the first
+# comparison point, so all 3 setviewpos moves - not just the 2nd and 3rd - are checked for growth.
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -79,10 +84,6 @@ chextrek_dump
 
 chextrek_test_impulse 23
 wait 40
-chextrek_dump
-
-setviewpos -1032 -976 8 0
-wait 15
 chextrek_dump
 
 setviewpos 300 -976 8 0
@@ -129,7 +130,7 @@ else
 fi
 
 # There are 6 chextrek_dump calls total: baseline, after each of 2 impulse 23 toggles, then after
-# each of 4 setviewpos moves.
+# each of 3 setviewpos moves.
 VISIBLE_VALUES="$(grep -oE '^hud_map: level=[0-9]+ visible=[01] coverage=[0-9]+$' "$LOCAL_LOG" | grep -oE 'visible=[01]' | grep -oE '[01]$')"
 COVERAGE_VALUES="$(grep -oE '^hud_map: level=[0-9]+ visible=[01] coverage=[0-9]+$' "$LOCAL_LOG" | grep -oE 'coverage=[0-9]+' | grep -oE '[0-9]+$')"
 
@@ -160,20 +161,28 @@ else
 fi
 
 # --- AC2: setviewpos to several points; dump coverage grows after each move ---
-# Dumps 4-7 (1-indexed) are the ones taken after each setviewpos.
+# Dump 3 (1-indexed, the baseline taken right before the first setviewpos, still at the spawn
+# point) is the "before" value for the first move; dumps 4-6 are taken after each setviewpos.
+C0="$(echo "$COVERAGE_VALUES" | sed -n '3p')"
 C1="$(echo "$COVERAGE_VALUES" | sed -n '4p')"
 C2="$(echo "$COVERAGE_VALUES" | sed -n '5p')"
 C3="$(echo "$COVERAGE_VALUES" | sed -n '6p')"
-C4="$(echo "$COVERAGE_VALUES" | sed -n '7p')"
 
-if [ -n "$C1" ] && [ "$C1" -gt 0 ]; then
-	echo "PASS: coverage is nonzero after the first setviewpos (${C1} texels revealed)"
+if [ -n "$C0" ] && [ "$C0" -gt 0 ]; then
+	echo "PASS: coverage is already nonzero at the spawn-point baseline (${C0} texels revealed)"
 else
-	echo "FAIL: expected coverage > 0 after the first setviewpos, got '${C1}'"
+	echo "FAIL: expected baseline coverage > 0 (standing at the spawn point), got '${C0}'"
 	FAIL=1
 fi
 
-if [ -n "$C2" ] && [ -n "$C1" ] && [ "$C2" -ge "$C1" ] && [ "$C2" -gt "$C1" ]; then
+if [ -n "$C1" ] && [ -n "$C0" ] && [ "$C1" -gt "$C0" ]; then
+	echo "PASS: coverage grew after the first setviewpos (${C0} -> ${C1})"
+else
+	echo "FAIL: expected coverage to grow after the first setviewpos, got ${C0} -> ${C1}"
+	FAIL=1
+fi
+
+if [ -n "$C2" ] && [ -n "$C1" ] && [ "$C2" -gt "$C1" ]; then
 	echo "PASS: coverage grew after the second setviewpos (${C1} -> ${C2})"
 else
 	echo "FAIL: expected coverage to grow after the second setviewpos, got ${C1} -> ${C2}"
@@ -184,13 +193,6 @@ if [ -n "$C3" ] && [ -n "$C2" ] && [ "$C3" -gt "$C2" ]; then
 	echo "PASS: coverage grew after the third setviewpos (${C2} -> ${C3})"
 else
 	echo "FAIL: expected coverage to grow after the third setviewpos, got ${C2} -> ${C3}"
-	FAIL=1
-fi
-
-if [ -n "$C4" ] && [ -n "$C3" ] && [ "$C4" -gt "$C3" ]; then
-	echo "PASS: coverage grew after the fourth setviewpos (${C3} -> ${C4})"
-else
-	echo "FAIL: expected coverage to grow after the fourth setviewpos, got ${C3} -> ${C4}"
 	FAIL=1
 fi
 

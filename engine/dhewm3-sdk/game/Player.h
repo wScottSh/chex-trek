@@ -321,9 +321,9 @@ public:
 	// chextrek: spec #16/#36 (decomp-so/reference/hud-map.md). The player's map of the level:
 	// a corner HUD box (always centered on the player) and a PDA page (scrollable/zoomable -
 	// the PDA's map_* GUI commands that drive mapControl are #37's scope, not ported here).
-	// Fog of war (hudmap_alpha, extern below) is revealed as the player walks. Only initHudMap/
-	// updateMap/updateMapUI/updateHudMapAlpha/MapImageCoords and HudMapLevel's real body are #36;
-	// the "showMap" console command is #38, and saving/restoring this state is #39.
+	// Fog of war (hudmap_alpha, extern above, before this class) is revealed as the player walks.
+	// Only initHudMap/updateMap/updateMapUI/updateHudMapAlpha/MapImageCoords and HudMapLevel's real
+	// body are #36; the "showMap" console command is #38, and saving/restoring this state is #39.
 	void					initHudMap( void );
 	void					updateMap( void );
 	void					updateMapUI( idUserInterface *gui, int level, bool isHud );
