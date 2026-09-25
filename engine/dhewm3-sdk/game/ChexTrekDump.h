@@ -37,9 +37,14 @@ void ChexTrek_NoteFootprintProjected( void );
 // idPlayer::UpdateHud within a frame or two of being filled (it copies each entry into HUD GUI
 // state, e.g. "itemtext1", then RemoveIndex(0)s it) - so a scenario's chextrek_dump, which runs
 // after a `wait`, can't reliably see the item still sitting in the queue. This hook is the only
-// way a scenario can observe "addItemText showed this item's text" from the log, per the
-// state-dump command's purpose (state the log doesn't already show). Test-only instrumentation:
-// it counts calls and remembers the last name, it doesn't change what addItemText does.
+// way a scenario can observe "addItemText queued this item's text" from the log, per the
+// state-dump command's purpose (state the log doesn't already show). It proves addItemText ran
+// with a given name (spec #32's AC), not that UpdateHud went on to render it on screen -
+// decomp-so/reference/objectives.md's Notes flag that render path (hud.gui's "invPickup"/
+// "itemicon" wiring) as not checked. Test-only instrumentation, same pattern as
+// ChexTrek_NoteFootprintProjected above (a hook call added to already-ported game code, not to
+// this dump-only file): it counts calls and remembers the last name, it doesn't change what
+// addItemText does.
 void ChexTrek_NoteItemTextShown( const char *name );
 
 #endif /* !__CHEXTREK_DUMP_H__ */
