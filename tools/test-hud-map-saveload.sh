@@ -17,10 +17,11 @@
 # the world's spawnArgs by initHudMap() every time idPlayer::Spawn runs (a fresh map load) - never
 # by a save/load, which restores straight from the savegame's serialized objects
 # (idGameLocal::InitFromSaveGame, Game_local.cpp) and never calls Spawn/Init on the player it
-# restores into. Found while writing this scenario: without also giving these five fields sane
-# defaults in the idPlayer constructor (Player.cpp, #39), a freshly-allocated idPlayer restored
-# straight from a savegame held whatever garbage was already in that memory (Mem_Alloc doesn't
-# zero it) - confirmed live here, a garbage mapLevels[0] landing above the player's own z fired
+# restores into. Found while writing this scenario: without also giving these four fields
+# (mapControl/mapView/lastRevealOrigin/mapLevels) sane defaults in the idPlayer constructor
+# (Player.cpp, #39), a freshly-allocated idPlayer restored straight from a savegame held whatever
+# garbage was already in that memory (Mem_Alloc doesn't zero it) - confirmed live here, a garbage
+# mapLevels[0] landing above the player's own z fired
 # "Location below lowest MapLevel" warnings after every save/load round-trip this scenario ran, so
 # the scenario also asserts that warning's absence below (a scenario-revealed gap, filled here and
 # recorded in docs/harness-coverage.md, matching #36-#38's own precedent of recording gap-filling
@@ -46,11 +47,14 @@
 # between the savegame and the loadgame otherwise), so a naive "dump before save, dump after load,
 # assert they match" check on `coverage` would pass even if idPlayer::Restore's own hudmap_alpha
 # read (Player.cpp) were deleted entirely - the array would simply still hold its pre-save values,
-# untouched. `mapScale` is different (a plain per-instance member, not saved by the constructor -
-# #39's own constructor fix only defaults mapControl/mapView/lastRevealOrigin/unknown1e5c/
-# mapLevels, not mapScale, since mapScale IS saved/restored, unlike those five): the fresh object a
-# load creates never sets it itself, so it would hold whatever the freed player's memory happened
-# to still contain if idPlayer::Restore's ReadFloat were missing - not guaranteed to differ from
+# untouched. `mapScale` is different (a plain per-instance member the constructor doesn't
+# default: #39's own constructor fix defaults mapControl/mapView/lastRevealOrigin/mapLevels - the
+# four fields nothing else sets on the restore path - plus unknown1e5c defensively, even though
+# it IS saved/restored and so doesn't strictly need it; mapScale is saved/restored too, but isn't
+# given a constructor default, since Restore's own ReadFloat is the only thing that ever needs to
+# set it): the fresh object a load creates never sets it itself, so it would hold whatever the
+# freed player's memory happened to still contain if idPlayer::Restore's ReadFloat were missing -
+# not guaranteed to differ from
 # the pre-save value, but not guaranteed to match it either, so asserting a plain "still equal to
 # X" isn't a real check of Restore's own work either way. Both weaknesses get the same fix: perturb
 # the value between the savegame and the loadgame (the real "showMap" console command, #38, fills
@@ -238,9 +242,10 @@ else
 fi
 
 # --- proves hudmap_alpha and mapScale actually changed between the save and the load (see the
-# header comment above): without this, a post-load value that merely equals the pre-save value
-# would be ambiguous - both could just have sat there untouched the whole time, savegame/loadgame
-# running in the same process on the same idPlayer object. ---
+# header comment above for why a post-load value that merely equals the pre-save value would
+# otherwise be ambiguous for each of them, for two different reasons - hudmap_alpha being a
+# process-wide global untouched by the loadgame's fresh idPlayer, and mapScale not being one of
+# the constructor's own defaulted fields). ---
 FULL_COVERAGE=16384 # 128 x 128 fog-of-war texels
 S_PERTURB="$(echo "$SCALE_VALUES" | sed -n '3p')"
 

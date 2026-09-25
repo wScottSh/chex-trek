@@ -345,14 +345,17 @@ public:
 	// lastRevealOrigin/mapLevels are NOT saved (also per that lead): mapControl/mapView/
 	// lastRevealOrigin are transient PDA/reveal-tracking state, and mapLevels is normally
 	// re-read from the world's spawnArgs by initHudMap() every time idPlayer::Spawn runs (a
-	// fresh map load) - never by a save/load. All five are also given sane defaults by the
+	// fresh map load) - never by a save/load. All four are also given sane defaults by the
 	// idPlayer constructor now (Player.cpp), not just by Init()/initHudMap(): the savegame-load
 	// path (idGameLocal::InitFromSaveGame) constructs a fresh idPlayer and calls only Restore()
 	// on it, never Init() or Spawn() - so without the constructor's own defaults, these would be
 	// left holding whatever garbage was in that freshly-allocated (non-zeroed) memory after a
 	// load, confirmed live while writing #39's tools/test-hud-map-saveload.sh (a garbage
 	// mapLevels[0] above the player's actual z fired "Location below lowest MapLevel" warnings
-	// after every save/load round-trip that scenario ran).
+	// after every save/load round-trip that scenario ran). unknown1e5c (below) IS saved/
+	// restored, so it doesn't need this - the constructor defaults it too anyway, at no cost,
+	// since Restore's own read overwrites it on the load path the same way Init() does on a
+	// normal spawn.
 	int						mapControl;			// MAP_* bits, set by HandleSingleGuiCommand (#37). Not saved; defaults to 0.
 	float					mapScale;				// PDA zoom, "map_scale" (default 1), 0.1 .. 9. Saved (#39).
 	idVec2					mapView;				// world x, y at the center of the map box. Not saved; defaults to zero.

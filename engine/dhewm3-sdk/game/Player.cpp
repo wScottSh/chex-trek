@@ -1427,29 +1427,33 @@ idPlayer::idPlayer() {
 	// Spawn() runs on the idPlayer object a savegame load restores into
 	// (idGameLocal::InitFromSaveGame, Game_local.cpp, restores entities straight from the
 	// savegame's serialized objects; it never calls LoadMap's normal entity-spawn path,
-	// idGameLocal::MapPopulate/SpawnMapEntities). None of these five members are saved either
-	// (this group's own Save/Restore, below), so - unlike the binary, a deliberate, recorded
-	// departure from it here - this constructor now also sets them, so a load doesn't leave them
-	// holding whatever garbage was already in that freshly-allocated, non-zeroing memory
-	// (Mem_Alloc, gamesys/Class.cpp). Confirmed live while writing #39's
+	// idGameLocal::MapPopulate/SpawnMapEntities). mapControl/mapView/lastRevealOrigin/mapLevels
+	// are not saved either (this group's own Save/Restore, below), so - unlike the binary, a
+	// deliberate, recorded departure from it here - this constructor now also sets them, so a
+	// load doesn't leave them holding whatever garbage was already in that freshly-allocated,
+	// non-zeroing memory (Mem_Alloc, gamesys/Class.cpp). Confirmed live while writing #39's
 	// tools/test-hud-map-saveload.sh: without this, HudMapLevel's z < mapLevels[0] check fired
 	// "Location below lowest MapLevel" warnings after every savegame/loadgame round-trip that
 	// scenario's own console script ran, garbage mapLevels[0] having landed above the player's
 	// actual z. (Re-running initHudMap here isn't an option either: it needs the world's
 	// spawnArgs, and idGameLocal saves/restores entities in entity-number order - the player is
 	// entity 0, worldspawn a much later entity number - so gameLocal.world isn't restored yet at
-	// this point in a load.)
+	// this point in a load.) unknown1e5c IS saved/restored (below), so its own default here is
+	// pure belt-and-braces, not something the savegame-restore path actually needs: Restore's own
+	// ReadInt always overwrites it right after construction on that path too, the same as Init()
+	// does on a normal spawn - given the same treatment anyway since it sits in this same
+	// leftover-memory risk category and costs nothing to default alongside the other four.
 	//
 	// This constructor setting all five is a no-op on a normal spawn: idPlayer::Spawn calls
 	// initHudMap() first, overwriting mapLevels with the world's real map_level_N values, and
 	// then (via SpawnFromSpawnSpot -> SpawnToPoint, or directly for a multiplayer snapshot spawn)
 	// calls Init(), which overwrites mapControl/mapView/lastRevealOrigin/unknown1e5c again - so
-	// every one of these five gets its real value before a normal spawn ever finishes. It only
-	// changes anything on the savegame-restore path, where nothing else ever sets them. mapLevels'
-	// defaults match
-	// initHudMap's own literal defaults for "no map_level_N key set" (Player.cpp, above): level 0
-	// at MIN_WORLD_COORD, 1-4 at MAX_WORLD_COORD (sys/platform.h) - i.e. every z is on level 0,
-	// the same fallback initHudMap uses when a map sets none of those keys.
+	// every one of these five gets its real value before a normal spawn ever finishes. On the
+	// savegame-restore path, mapControl/mapView/lastRevealOrigin/mapLevels are the four that
+	// otherwise have nothing else that sets them; mapLevels' defaults match initHudMap's own
+	// literal defaults for "no map_level_N key set" (Player.cpp, above): level 0 at
+	// MIN_WORLD_COORD, 1-4 at MAX_WORLD_COORD (sys/platform.h) - i.e. every z is on level 0, the
+	// same fallback initHudMap uses when a map sets none of those keys.
 	mapControl				= 0;
 	mapView.Zero();
 	lastRevealOrigin.Zero();
@@ -2612,9 +2616,11 @@ void idPlayer::Restore( idRestoreGame *savefile ) {
 	savefile->Read( hudmap_alpha, sizeof( hudmap_alpha ) );
 	// Not re-uploaded to the render texture here, same as Cmd_ShowMap_f (above) - only
 	// updateHudMapAlpha's own reveal does that. In practice that happens on the very next frame
-	// regardless: the constructor above zeroes lastRevealOrigin, so updateHudMapAlpha's distance
-	// check (Player.cpp) passes immediately post-load and runs a real reveal (which also uploads
-	// the texture) the first time idPlayer::Think calls updateMap after this Restore.
+	// for almost any restored position: the constructor above zeroes lastRevealOrigin, so
+	// updateHudMapAlpha's distance check (Player.cpp) - the distance from world origin (0,0,0) to
+	// the player's real position - passes as long as the player isn't literally standing within
+	// one texel's width of world origin, and runs a real reveal (which also uploads the texture)
+	// the first time idPlayer::Think calls updateMap after this Restore.
 
 	// create combat collision hull for exact collision detection
 	SetCombatModel();
