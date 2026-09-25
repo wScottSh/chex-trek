@@ -94,7 +94,7 @@ typed string literal *before* doom-script's compiler ever sees it (so `script sy
 recompiles as the bareword `x`, which fails to compile), and separately treats a bare `$name`
 token as *cvar* expansion, which collides with doom-script's own `$entityName` syntax. Both are
 worked around with a handful of test-only cvars in `ChexTrekDump.cpp`
-(`chextrek_test_str1`..`str8`) whose *values* already contain the quote characters or entity/def
+(`chextrek_test_str1`..`str9`) whose *values* already contain the quote characters or entity/def
 names a scenario needs, referenced as `$chextrek_test_strN` (a cvar substitution, which survives
 verbatim) together with `sys.getEntity( $chextrek_test_strN )` (a runtime name lookup) instead of
 `$entityName`. See the comment above those cvars for the full story. They change no game behavior.

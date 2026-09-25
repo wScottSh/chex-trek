@@ -13,10 +13,9 @@
 
 // chextrek: spec #33. idTarget_EndLevelGUI's private state (displayStats/state/...) isn't
 // readable from outside the class, and it's the only idCustomUI subclass in the mod. Rather than
-// add getters to game code purely for a test dump, ChexTrek_Dump_f asks each spawned entity
-// whether it's the local player's registered idCustomUI (idPlayer::customUIEntity) and prints just
-// what idPlayer/idCustomUI already expose publicly (registered, and whether its gui is up) - see
-// the dump's "customui:" line below.
+// add getters to game code purely for a test dump, ChexTrek_Dump_f reads the local player's own
+// idPlayer::customUIEntity/customUI (already public on idPlayer/idCustomUI: registered, and the
+// GUI's own state via idUserInterface::State()) - see the dump's "customui:" lines below.
 
 // The harness greps the game log for this exact line to prove chextrek.dll (not base.dll)
 // loaded, independent of anything else the command goes on to print. Keep it stable: don't

@@ -48,4 +48,3 @@ void ChexTrek_NoteFootprintProjected( void );
 void ChexTrek_NoteItemTextShown( const char *name );
 
 #endif /* !__CHEXTREK_DUMP_H__ */
-

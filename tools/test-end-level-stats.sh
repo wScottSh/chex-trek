@@ -86,7 +86,7 @@ wait 10
 chextrek_dump
 
 trigger target_endlevelgui_1
-wait 300
+wait 80
 chextrek_dump
 
 screenshot chextrek_end_level_stats_e1m1
@@ -164,14 +164,18 @@ else
 fi
 
 # With g_statTicTime set to 1, the stats screen's counting animation (idTarget_EndLevelGUI::
-# Event_UpdateStats/updateStats) has had 300 frames to catch its shown found-counts up to the
-# actual counts idPlayer::levelStats held when the screen was triggered (dump 6, right before
-# triggering target_endlevelgui_1: MONSTERS_AFTER/ITEMS_AFTER/SECRETS_AFTER above) - well inside
-# the ~100-tic-per-line worst case the reference describes. items-found is 2, not 1: e1m1 already
-# credits the player with one item pickup before this scenario does anything (baseline
-# ITEMS_FOUND above is 1, not 0 - some other level_item spawnArg entity's Give() already succeeded
-# by the first chextrek_dump, e.g. a starting-inventory grant on spawn), so this checks against the
-# actual level_stats value rather than assuming a hardcoded 1.
+# Event_UpdateStats/updateStats) needs only a handful of tics to catch the monsters/items/secrets
+# lines (0-2) up to their actual small counts - reaching 100% for each takes at most a couple-dozen
+# tics even in the worst case, since e1m1 has a few dozen monsters/items/secrets total and this
+# scenario only raises one of each. This deliberately checks right after those first few tics
+# (the "wait 80" below), not after the full ~4-line animation (which also counts level_time, up to
+# ~100 more tics, then a fixed 3000ms pause before the screen unregisters itself and leaves via
+# ActivateTargets - waiting that long risks the dump landing after the screen has already closed
+# and gone back to "customui: none"). The baseline ITEMS_FOUND above is 1, not 0, before this
+# scenario does anything (so items-found ends up 2, not 1) - the exact cause isn't determined here
+# (not yet root-caused: possibly some other level_item-flagged entity on e1m1 is already given to
+# the player during spawn, but that's not confirmed), so this checks against the actual
+# level_stats value read from the log rather than assuming a hardcoded expected count.
 LAST_AI_KILLED="$(grep -oE '^customui_gui_ai_killed: [0-9]+$' "$LOCAL_LOG" | tail -1 | grep -oE '[0-9]+$')"
 LAST_ITEMS_FOUND="$(grep -oE '^customui_gui_items_found: [0-9]+$' "$LOCAL_LOG" | tail -1 | grep -oE '[0-9]+$')"
 LAST_SECRETS_FOUND="$(grep -oE '^customui_gui_secrets_found: [0-9]+$' "$LOCAL_LOG" | tail -1 | grep -oE '[0-9]+$')"

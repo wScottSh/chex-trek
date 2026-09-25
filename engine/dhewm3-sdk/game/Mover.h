@@ -346,6 +346,13 @@ protected:
 	bool					blocked;
 	idList< idEntityPtr<idEntity> >	guiTargets;
 
+	// chextrek: spec #16/#33 (decomp-so/reference/end-level-stats.md; edits-inside-stock-functions
+	// lead, CONFIRMED against the gamex86.so disassembly - see Use_BinaryMover, Mover.cpp). `secret`
+	// mirrors the "secret" spawnArg key (idGameLocal::GetLevelStats counts the same key into
+	// levelStats[2].total); `secretFound` guards against crediting the same mover's secret twice.
+	bool					secret;
+	bool					secretFound;
+
 	void					MatchActivateTeam( moverState_t newstate, int time );
 	void					JoinActivateTeam( idMover_Binary *master );
 

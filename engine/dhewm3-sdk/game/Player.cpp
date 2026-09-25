@@ -3133,9 +3133,15 @@ bool idPlayer::GiveItem( idItem *item ) {
 	}
 
 	// chextrek: spec #16/#33 (decomp-so/reference/end-level-stats.md; edits-inside-stock-functions
-	// lead: idPlayer::GiveItem(idItem *) increments levelStats[1].found) - only when the item was
-	// actually given.
-	if ( gave ) {
+	// lead, CONFIRMED against the gamex86.so disassembly (decomp-so/verify's capstone/pyelftools
+	// tooling: idPlayer::GiveItem @ 0x164cd0, the increment at 0x164f64) - not merely inferred:
+	// idPlayer::GiveItem(idItem *) increments levelStats[1].found only when the item was both
+	// actually given (gave) AND is itself flagged "level_item" (item->spawnArgs.GetBool, the same
+	// key idGameLocal::GetLevelStats counts into levelStats[1].total) - the rodata string the
+	// binary's FindKey call reads for this check resolves to exactly "level_item". Without the
+	// second condition, any successful pickup (e.g. a plain health item) would inflate found past
+	// total.
+	if ( gave && item->spawnArgs.GetBool( "level_item", "0" ) ) {
 		levelStats[ 1 ].found++;
 	}
 

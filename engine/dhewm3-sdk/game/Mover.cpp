@@ -2120,6 +2120,11 @@ idMover_Binary::idMover_Binary() {
 	areaPortal = 0;
 	blocked = false;
 	fl.networkSync = true;
+
+	// chextrek: spec #16/#33 (decomp-so/reference/end-level-stats.md; edits-inside-stock-functions
+	// lead, CONFIRMED against the binary - both zeroed in the constructor, 0x132f78/0x132f7f).
+	secret = false;
+	secretFound = false;
 }
 
 /*
@@ -2202,6 +2207,12 @@ void idMover_Binary::Save( idSaveGame *savefile ) const {
 	for( i = 0; i < guiTargets.Num(); i++ ) {
 		guiTargets[ i ].Save( savefile );
 	}
+
+	// chextrek: spec #16/#33 (decomp-so/reference/end-level-stats.md; edits-inside-stock-functions
+	// lead). Not confirmed whether the binary's Save/Restore persist these two - saved here anyway
+	// so a save/load round-trip can't re-credit an already-found secret.
+	savefile->WriteBool( secret );
+	savefile->WriteBool( secretFound );
 }
 
 /*
@@ -2265,6 +2276,10 @@ void idMover_Binary::Restore( idRestoreGame *savefile ) {
 	for( i = 0; i < num; i++ ) {
 		guiTargets[ i ].Restore( savefile );
 	}
+
+	// chextrek: spec #16/#33 - see the matching comment in Save above.
+	savefile->ReadBool( secret );
+	savefile->ReadBool( secretFound );
 }
 
 /*
@@ -2290,6 +2305,11 @@ void idMover_Binary::Spawn( void ) {
 	spawnArgs.GetFloat( "wait", "0", wait );
 
 	spawnArgs.GetInt( "updateStatus", "0", updateStatus );
+
+	// chextrek: spec #16/#33 (decomp-so/reference/end-level-stats.md; edits-inside-stock-functions
+	// lead, CONFIRMED against the binary - idMover_Binary::Spawn @ 0x1384e5, the FindKey/atoi
+	// sequence there resolves to the rodata string "secret").
+	secret = spawnArgs.GetBool( "secret", "0" );
 
 	const idKeyValue *kv = spawnArgs.MatchPrefix( "buddy", NULL );
 	while( kv ) {
@@ -2794,6 +2814,27 @@ idMover_Binary::Use_BinaryMover
 ================
 */
 void idMover_Binary::Use_BinaryMover( idEntity *activator ) {
+	// chextrek: spec #16/#33 (decomp-so/reference/end-level-stats.md; edits-inside-stock-functions
+	// lead). CONFIRMED against the gamex86.so disassembly (decomp-so/verify's capstone/pyelftools
+	// tooling: idMover_Binary::Use_BinaryMover @ 0x136c70) - not merely inferred. The binary checks
+	// two of its own added bool members at the very top of this function, before even the "only the
+	// master should be used" redirect below (so this runs - and can credit - at every level of a
+	// moveMaster chain, once per level via the redirect's recursion, not just on the top master),
+	// and regardless of `enabled` or `moverState`:
+	//   this+0x7bc "secret" - set from spawnArgs.GetBool("secret","0") in Spawn (0x1384e5),
+	//     initialized false in the constructor (0x132f7f).
+	//   this+0x7bd "secretFound" - initialized false in the constructor (0x132f78), set true right
+	//     after crediting so a later open/close cycle doesn't double-count.
+	// Skipped entirely in multiplayer (gameLocal.isMultiplayer, checked at 0x136ca6) - matching the
+	// binary, not an addition of this port.
+	if ( secret && !secretFound && !gameLocal.isMultiplayer ) {
+		idPlayer *secretPlayer = gameLocal.GetLocalPlayer();
+		if ( secretPlayer ) {
+			secretPlayer->incSecretsFound();
+			secretFound = true;
+		}
+	}
+
 	// only the master should be used
 	if ( moveMaster != this ) {
 		moveMaster->Use_BinaryMover( activator );
@@ -2807,23 +2848,6 @@ void idMover_Binary::Use_BinaryMover( idEntity *activator ) {
 	activatedBy = activator;
 
 	if ( moverState == MOVER_POS1 ) {
-		// chextrek: spec #16/#33 (decomp-so/reference/end-level-stats.md; edits-inside-stock-
-		// functions lead). The reference's Notes say only "idMover_Binary::Use_BinaryMover is the
-		// only caller of incSecretsFound" - the exact call site inside it isn't in the exported
-		// decompilation (no decompiler tooling was available to pin it down further here). Credits
-		// the secret the first time a mover flagged "secret" "1" starts opening (this branch, not
-		// the POS2/2TO1/1TO2 ones below) - matching the level-design convention (7 secret-flagged
-		// func_doors across e1m1/e1m1_2/sf_923.map) of a secret being "found" by opening the door/
-		// mover that guards it, counted once (the flag is cleared after crediting) rather than once
-		// per open/close cycle.
-		if ( spawnArgs.GetBool( "secret", "0" ) ) {
-			idPlayer *secretPlayer = gameLocal.GetLocalPlayer();
-			if ( secretPlayer ) {
-				secretPlayer->incSecretsFound();
-			}
-			spawnArgs.Set( "secret", "0" );
-		}
-
 		// FIXME: start moving USERCMD_MSEC later, because if this was player
 		// triggered, gameLocal.time hasn't been advanced yet
 		MatchActivateTeam( MOVER_1TO2, gameLocal.time + USERCMD_MSEC );
