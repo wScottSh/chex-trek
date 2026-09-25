@@ -287,7 +287,7 @@ void idThread::Event_SpawnDict( const char *defName ) {
 	dict.Copy( *defDict );
 	// spawnArgs is the stock member (+0x1b40, as in stock) that setSpawnArg fills.
 	dict.Copy( spawnArgs );
-	// Third argument false (binary: 0 pushed at 0x23dd55). Stock names it setDefaults (default true) and
+	// Third argument false (binary: 0 stored to the argument slot at 0x23dd57). Stock names it setDefaults (default true) and
 	// never reads it. UNCERTAIN: whether this build's SpawnEntityDef reads it (not checked).
 	// The stock spawn event passes the default.
 	gameLocal.SpawnEntityDef( dict, &ent, false );
