@@ -13,9 +13,17 @@
 # byte, same bytes in the same order, matching the SDK's own existing convention for byte-array
 # members, e.g. Target.cpp's idTarget_EndLevelGUI::Save/Restore of displayStats). Per that same
 # lead, mapControl/mapView/lastRevealOrigin/mapLevels are NOT saved: mapControl/mapView/
-# lastRevealOrigin are transient PDA/reveal-tracking state idPlayer::Init re-zeroes, and mapLevels
-# is re-read from the world's spawnArgs by initHudMap() every time idPlayer::Spawn runs (a fresh
-# map load) - never by a save/load, which doesn't call Spawn.
+# lastRevealOrigin are transient PDA/reveal-tracking state, and mapLevels is normally re-read from
+# the world's spawnArgs by initHudMap() every time idPlayer::Spawn runs (a fresh map load) - never
+# by a save/load, which restores straight from the savegame's serialized objects
+# (idGameLocal::InitFromSaveGame, Game_local.cpp) and never calls Spawn/Init on the player it
+# restores into. Found while writing this scenario: without also giving these five fields sane
+# defaults in the idPlayer constructor (Player.cpp, #39), a freshly-allocated idPlayer restored
+# straight from a savegame held whatever garbage was already in that memory (Mem_Alloc doesn't
+# zero it) - confirmed live here, a garbage mapLevels[0] landing above the player's own z fired
+# "Location below lowest MapLevel" warnings after every save/load round-trip this scenario ran, so
+# the scenario also asserts that warning's absence below (a scenario-revealed gap, filled and
+# recorded next to this same lead per spec #28's gap-filling process).
 #
 # This scenario proves two of the newly-saved fields survive a real save/load round-trip:
 # - `hud_map`'s `coverage` (chextrek_dump, #36): the fog-of-war global itself, revealed by walking
@@ -133,6 +141,16 @@ C0="$(echo "$COVERAGE_VALUES" | sed -n '1p')"
 C1="$(echo "$COVERAGE_VALUES" | sed -n '2p')"
 C2="$(echo "$COVERAGE_VALUES" | sed -n '3p')"
 
+# hud_map: level=<N> visible=<0|1> coverage=<N> - "level" (idPlayer::HudMapLevel( NULL )) is
+# asserted too, matching the same pre-save value, even though on e1m1 (all level 0) it would
+# happen to read 0 either way (HudMapLevel falls back to 0 and warns when z lands below
+# mapLevels[0] - see the FAIL: below for the assertion that actually would have caught a garbage
+# mapLevels[0], since the "level" value alone can't distinguish a correct level 0 from that
+# fallback).
+LEVEL_VALUES="$(grep -oE '^hud_map: level=[0-9]+' "$LOCAL_LOG" | grep -oE '[0-9]+$')"
+L1="$(echo "$LEVEL_VALUES" | sed -n '2p')"
+L2="$(echo "$LEVEL_VALUES" | sed -n '3p')"
+
 # map_pda: scale=<f> view_x=<f> view_y=<f> control=<N> - only "scale" is asserted here (saved by
 # #39); view_x/view_y/control are NOT saved (idPlayer::mapView/mapControl - see the header comment
 # above), so they're not expected to match after a load and aren't checked.
@@ -185,6 +203,29 @@ if [ -n "$S2" ] && [ -n "$S1" ] && [ "$S1" = "$S2" ]; then
 else
 	echo "FAIL: expected mapScale to still be ${S1} after save/load, got '${S2}'"
 	FAIL=1
+fi
+
+if [ -n "$L2" ] && [ -n "$L1" ] && [ "$L1" = "$L2" ]; then
+	echo "PASS: hud_map's level after save/load matches the pre-save value (${L1} == ${L2})"
+else
+	echo "FAIL: expected hud_map's level to still be ${L1} after save/load, got '${L2}'"
+	FAIL=1
+fi
+
+# --- the gap this scenario found and #39's idPlayer constructor edit closes: without sane
+# defaults for mapLevels (and mapControl/mapView/lastRevealOrigin/unknown1e5c), a savegame-load
+# restores into a freshly-allocated idPlayer that never runs Init()/Spawn()'s initHudMap, leaving
+# mapLevels[0] as leftover memory - HudMapLevel then warns and falls back to level 0 whenever the
+# player's z lands below that garbage value. "level" alone (checked above) can't tell a real level
+# 0 apart from that fallback, so this checks the warning's absence directly instead - the assertion
+# that actually would have failed before the constructor fix, since e1m1's own level is 0 either
+# way.
+if grep -qF "Location below lowest MapLevel" "$LOCAL_LOG"; then
+	echo "FAIL: 'Location below lowest MapLevel' warning seen in the log - mapLevels held garbage after the save/load round-trip"
+	grep -nF "Location below lowest MapLevel" "$LOCAL_LOG"
+	FAIL=1
+else
+	echo "PASS: no 'Location below lowest MapLevel' warning - mapLevels came back sane after the save/load round-trip"
 fi
 
 echo

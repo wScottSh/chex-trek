@@ -1417,11 +1417,41 @@ idPlayer::idPlayer() {
 	customUIEntity			= NULL;
 	customUI				= NULL;
 
-	// chextrek: spec #16/#36 (decomp-so/reference/hud-map.md; edits-inside-stock-functions lead:
-	// both idPlayer constructors construct mapMaterial - idStr's own default constructor already
-	// does this, nothing to add here besides the comment). mapControl/mapView/lastRevealOrigin/
-	// unknown1e5c are zeroed by Init() (the binary's constructors don't set them either - only
-	// Init and Spawn's initHudMap do).
+	// chextrek: spec #16/#36/#39 (decomp-so/reference/hud-map.md; edits-inside-stock-functions
+	// lead: both idPlayer constructors construct mapMaterial - idStr's own default constructor
+	// already does this, nothing to add here besides the comment). mapControl/mapView/
+	// lastRevealOrigin/unknown1e5c are also zeroed by Init(), and mapLevels is also set by
+	// Spawn's initHudMap - but neither Init() nor Spawn() runs on the idPlayer object a
+	// savegame load restores into (idGameLocal::InitFromSaveGame, Game_local.cpp, restores
+	// entities straight from the savegame's serialized objects; it never calls LoadMap's normal
+	// entity-spawn path, idGameLocal::MapPopulate/SpawnMapEntities). Left unset here (matching
+	// only Mem_Alloc's own, non-zeroing allocation, gamesys/Class.cpp), these five members would
+	// hold whatever garbage was in that freshly-allocated memory after a load - not merely
+	// "stale", since these fields are also never restored (mapLevels is deliberately not saved
+	// either, per this same lead: it's re-read from the world's spawnArgs by initHudMap every
+	// map load, and idGameLocal::InitFromSaveGame's own LoadMap call happens before this player
+	// object is restored, not after, so re-running initHudMap here isn't an option). Confirmed
+	// live while writing #39's tools/test-hud-map-saveload.sh: without this, HudMapLevel's
+	// z < mapLevels[0] check fired "Location below lowest MapLevel" warnings after every
+	// savegame/loadgame round-trip that scenario's own console script ran, garbage mapLevels[0]
+	// having landed above the player's actual z. So this constructor now sets all five to the
+	// same defaults Init()/initHudMap would otherwise set them to on a normal spawn (this is a
+	// no-op there: Init() unconditionally overwrites mapControl/mapView/lastRevealOrigin/
+	// unknown1e5c again right after construction, and Spawn's initHudMap overwrites mapLevels
+	// again after that) - it only changes anything on the savegame-restore path, where nothing
+	// else ever sets them. mapLevels' defaults are initHudMap's own literal defaults for "no
+	// map_level_N key set" (Player.cpp, above): level 0 at -131072 (MIN_WORLD_COORD), 1-4 at
+	// 131072 (MAX_WORLD_COORD) - i.e. every z is on level 0, the same fallback initHudMap uses
+	// when a map sets none of those keys.
+	mapControl				= 0;
+	mapView.Zero();
+	lastRevealOrigin.Zero();
+	unknown1e5c				= -1;
+	mapLevels[ 0 ]			= -131072.0f;
+	mapLevels[ 1 ]			= 131072.0f;
+	mapLevels[ 2 ]			= 131072.0f;
+	mapLevels[ 3 ]			= 131072.0f;
+	mapLevels[ 4 ]			= 131072.0f;
 
 	heartRate				= BASE_HEARTRATE;
 	heartInfo.Init( 0, 0, 0, 0 );
@@ -2572,6 +2602,8 @@ void idPlayer::Restore( idRestoreGame *savefile ) {
 	savefile->ReadVec4( mapCoords );
 	savefile->ReadString( mapMaterial );
 	savefile->Read( hudmap_alpha, sizeof( hudmap_alpha ) );
+	// Not re-uploaded to the render texture here, same as Cmd_ShowMap_f (above): the restored fog
+	// of war shows on screen at the next updateHudMapAlpha reveal, not immediately on load.
 
 	// create combat collision hull for exact collision detection
 	SetCombatModel();
