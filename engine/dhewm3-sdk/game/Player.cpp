@@ -859,7 +859,7 @@ idPlayer::updateMapUI
 chextrek: spec #16/#36/#37 (decomp-so/reference/hud-map.md). Sets one GUI's map variables. The map
 box is 640 x 480 GUI units (each GUI scales them to its box). The HUD map is always centered on the
 player; the PDA map follows mapControl, wired from the PDA's map_* GUI commands by the edited stock
-idPlayer::HandleSingleGuiCommand (#37, Player.cpp).
+idPlayer::HandleSingleGuiCommand (#37, below).
 ==============
 */
 void idPlayer::updateMapUI( idUserInterface *gui, int level, bool isHud ) {

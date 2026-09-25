@@ -108,8 +108,10 @@ void ChexTrek_TestMapCmd_f( const idCmdArgs &args );
 // PDA tab, not anything idPlayer's C++ (this sub-issue's scope) drives, and out of the console-only
 // harness's reach the same way #34/#35/#36's real inputs were. Since this variable is purely a GUI
 // state flag (not a member of idPlayer, and not read or written by any #37 C++), setting it
-// directly through idUserInterface::SetStateBool - the exact call the real click's script action
-// ultimately makes - reproduces its real effect without any new C++ decision logic. Takes one
+// directly through idUserInterface::SetStateBool - the same underlying engine call the GUI
+// script's own `set "gui::HudMap" "1"` resolves to (not literally the same call site: the real
+// click goes through the window-script interpreter, this calls SetStateBool directly) -
+// reproducing its real effect with no new C++ decision logic. Takes one
 // "0"/"1" argument; requires the local player to have a registered objectiveSystem gui (spec #35's
 // idPlayer::GivePDA/TogglePDA path opens one - see tools/test-pda.sh for how a scenario gives the
 // player a PDA without mouse/impulse input).

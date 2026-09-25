@@ -220,7 +220,7 @@ void ChexTrek_Dump_f( const idCmdArgs &args ) {
 			level, player->hud->GetStateBool( "HudMap", "0" ) ? "1" : "0", coverage );
 	}
 
-	// chextrek: spec #37 (decomp-so/reference/hud-map.md). idPlayer::mapScale/mapView/mapControl:
+	// chextrek: spec #16/#37 (decomp-so/reference/hud-map.md). idPlayer::mapScale/mapView/mapControl:
 	// the PDA map's zoom/scroll/center state, set by the edited stock
 	// idPlayer::HandleSingleGuiCommand from the PDA map's map_* GUI commands and consumed every
 	// frame by updateMapUI. Printed so a scenario can assert a map_* command actually changed the
@@ -415,6 +415,12 @@ void ChexTrek_TestMapCmd_f( const idCmdArgs &args ) {
 		return;
 	}
 
+	// Note: idEntity::HandleGuiCommands' own return value doesn't reflect whether
+	// HandleSingleGuiCommand actually consumed a given token inside a multi-command string (stock
+	// behavior, Entity.cpp) - for the map_* commands (each sent here as a single-token string) it
+	// prints "not handled" even though the command demonstrably ran (mapControl changes, see the
+	// scenario's chextrek_dump-based assertions in tools/test-pda-map.sh). This log line is purely
+	// informational; nothing depends on it.
 	const char *cmd = args.Argv( 1 );
 	bool handled = player->HandleGuiCommands( player, cmd );
 	gameLocal.Printf( "chextrek_test_map_cmd: '%s' %s\n", cmd, handled ? "handled" : "not handled" );
@@ -428,7 +434,9 @@ Test-only, spec #37. See ChexTrek_TestPdaMapOpen_f's comment in ChexTrekDump.h: 
 only routes mapControl's scroll/zoom/center bits to the PDA map page while the PDA gui's own
 "HudMap" state variable is true - a variable only a mouse click on guis/pda_chex.gui's "Data" tab
 sets in the real game, out of the console-only harness's reach. Sets it directly through
-idUserInterface::SetStateBool, the same call that click's script action makes.
+idUserInterface::SetStateBool - the same underlying engine call the GUI script's own
+`set "gui::HudMap" "1"` resolves to (not literally the same call site: the real click goes through
+the window-script interpreter, this calls SetStateBool directly).
 
 Recorded deviation from spec #28's Implementation Decisions (which describe the state-dump command
 as "the only test code in the library"): this is another one, alongside chextrek_test_map_cmd above
