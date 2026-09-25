@@ -38,6 +38,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "WorldSpawn.h"
 #include "Player.h"
 #include "Camera.h"
+#include "ChexTrekDump.h"		// chextrek: spec #32, ChexTrek_NoteItemTextShown
 #include "Fx.h"
 #include "Misc.h"
 
@@ -788,6 +789,10 @@ chextrek: spec #16/#31 (decomp-so/reference/objectives.md). Queues a text (and i
 pickup list, the way stock item pickups are shown, and shows the icon on the HUD at once. Appends
 straight to pickupItemNames rather than going through AddPickupName, matching the binary (no
 dedup, no #str_ language-table lookup).
+
+chextrek: spec #32, test-only. ChexTrek_NoteItemTextShown records that this ran (and with what
+name) for the AFK harness - see its comment in ChexTrekDump.h for why the queue itself isn't
+reliably observable from a scenario. Changes no game behavior.
 ==============
 */
 void idPlayer::addItemText( const idItemInfo &info ) {
@@ -796,6 +801,7 @@ void idPlayer::addItemText( const idItemInfo &info ) {
 		hud->SetStateString( "itemicon", info.icon );
 		hud->HandleNamedEvent( "invPickup" );
 	}
+	ChexTrek_NoteItemTextShown( info.name );
 }
 
 /*

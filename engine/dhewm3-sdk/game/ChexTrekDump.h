@@ -31,4 +31,15 @@ void ChexTrek_PrintHeader( void );
 // instrumentation: it counts calls, it doesn't change what Event_FootPrint does.
 void ChexTrek_NoteFootprintProjected( void );
 
+// chextrek: spec #32. idPlayer::addItemText (decomp-so/reference/objectives.md, ported #31) calls
+// this right after it queues the item's text, passing the same idItemInfo::name it just queued.
+// addItemText's queue (idPlayer::inventory.pickupItemNames) is drained by the stock
+// idPlayer::UpdateHud within a frame or two of being filled (it copies each entry into HUD GUI
+// state, e.g. "itemtext1", then RemoveIndex(0)s it) - so a scenario's chextrek_dump, which runs
+// after a `wait`, can't reliably see the item still sitting in the queue. This hook is the only
+// way a scenario can observe "addItemText showed this item's text" from the log, per the
+// state-dump command's purpose (state the log doesn't already show). Test-only instrumentation:
+// it counts calls and remembers the last name, it doesn't change what addItemText does.
+void ChexTrek_NoteItemTextShown( const char *name );
+
 #endif /* !__CHEXTREK_DUMP_H__ */

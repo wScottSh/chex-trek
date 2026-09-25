@@ -19,6 +19,10 @@ static const char *CHEXTREK_DUMP_HEADER = "CHEXTREK-STATE-DUMP v1";
 // chextrek: spec #30. See ChexTrek_NoteFootprintProjected in ChexTrekDump.h.
 static int chextrekFootprintCount = 0;
 
+// chextrek: spec #32. See ChexTrek_NoteItemTextShown in ChexTrekDump.h.
+static int chextrekItemTextCount = 0;
+static idStr chextrekItemTextLast;
+
 // chextrek: spec #30, test-only. The AFK harness drives the game only through console commands
 // (spec #28), including the "script" command to call scriptEvents like setProj/spawnDict that
 // need a string literal argument. The console's own tokenizer (idCmdArgs::TokenizeString,
@@ -69,6 +73,16 @@ void ChexTrek_NoteFootprintProjected( void ) {
 
 /*
 ==================
+ChexTrek_NoteItemTextShown
+==================
+*/
+void ChexTrek_NoteItemTextShown( const char *name ) {
+	chextrekItemTextCount++;
+	chextrekItemTextLast = name;
+}
+
+/*
+==================
 ChexTrek_Dump_f
 
 Prints the mod's custom state to the game log for the AFK test harness. #29 lands only the
@@ -84,12 +98,19 @@ and `footprints: <N>` (see ChexTrek_NoteFootprintProjected).
 (MAX_OBJS, decomp-so/reference/objectives.md) - "empty" when the slot is NULL, else that slot's
 mkObjective's title, so a scenario can assert a trigger_objective's slot filling/emptying without
 depending on PDA/HUD GUI state.
+
+#32 adds 2 more: `item_text_count` (how many times idPlayer::addItemText has run, via
+ChexTrek_NoteItemTextShown) and `item_text_last` (the name it queued the last time, or "none" if
+it has never run), so a scenario can assert that picking up an item showed its item text without
+depending on HUD GUI state or racing the queue idPlayer::UpdateHud drains within a frame or two.
 ==================
 */
 void ChexTrek_Dump_f( const idCmdArgs &args ) {
 	ChexTrek_PrintHeader();
 	gameLocal.Printf( "entities: %d\n", gameLocal.spawnedEntities.Num() );
 	gameLocal.Printf( "footprints: %d\n", chextrekFootprintCount );
+	gameLocal.Printf( "item_text_count: %d\n", chextrekItemTextCount );
+	gameLocal.Printf( "item_text_last: %s\n", chextrekItemTextCount > 0 ? chextrekItemTextLast.c_str() : "none" );
 
 	// chextrek: spec #31. One line per objective slot (idPlayer::objectives[], MAX_OBJS = 5, see
 	// decomp-so/reference/objectives.md), so a scenario can assert a slot filled/emptied by a
