@@ -1,0 +1,24 @@
+// chextrek: developer-only state-dump console command (spec #28/#29).
+//
+// Prints the mod's custom state to the game log in a stable, line-based format meant for the
+// AFK test harness to parse. It's the only test-only code in the library and never changes game
+// behavior. See decomp-so/reference/coverage.md and the spec #28 issue body for the full list of
+// state the finished command will report (objective slots, level stats, map/fog-of-war coverage,
+// trail/anchor counts, the active custom UI and its GUI state). Each feature sub-issue adds its
+// own section under the stable header as that feature lands; #29 only lands the header itself, so
+// the harness can prove chextrek.dll (not base.dll) loaded before the game gets past script
+// compilation.
+#ifndef __CHEXTREK_DUMP_H__
+#define __CHEXTREK_DUMP_H__
+
+// Registered as the "chextrek_dump" console command by idGameLocal::InitConsoleCommands.
+void ChexTrek_Dump_f( const idCmdArgs &args );
+
+// Prints just the stable header line, with no console-command wrapper. idGameLocal::Init calls
+// this once, right after idLib/cvars are up, so the header always reaches the log even when game
+// init later aborts (e.g. the known script-compile failure #29's harness proves is still red) -
+// before Common::Init ever gets to run queued console commands. The "chextrek_dump" command
+// above calls this too, so later scenarios can re-dump on demand once maps are loading.
+void ChexTrek_PrintHeader( void );
+
+#endif /* !__CHEXTREK_DUMP_H__ */
