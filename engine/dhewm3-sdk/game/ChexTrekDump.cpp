@@ -224,9 +224,10 @@ void ChexTrek_Dump_f( const idCmdArgs &args ) {
 	// the PDA map's zoom/scroll/center state, set by the edited stock
 	// idPlayer::HandleSingleGuiCommand from the PDA map's map_* GUI commands and consumed every
 	// frame by updateMapUI. Printed so a scenario can assert a map_* command actually changed the
-	// scale ("map_scale") or the view center ("map_view_x"/"map_view_y") shown here, independent of
-	// GUI rendering. "map_control" is the raw mapControl bitmask (see the MAP_* enum, Player.h) for
-	// scenarios that want to check which bit(s) are currently set.
+	// scale ("scale=") or the view center ("view_x="/"view_y=") shown here, independent of GUI
+	// rendering. "control=" is the raw mapControl bitmask (see the MAP_* enum, Player.h) for
+	// scenarios that want to check which bit(s) are currently set. "none" when there's no local
+	// player (mirrors the other per-player lines above, e.g. pda_gui/hud_map).
 	if ( !player ) {
 		gameLocal.Printf( "map_pda: none\n" );
 	} else {
@@ -387,6 +388,15 @@ argument and calls the local player's own idEntity::HandleGuiCommands( player, c
 stock entry point a real GUI onAction reaches - so everything downstream (idPlayer::
 HandleSingleGuiCommand's token dispatch, the #37 edit itself) is the real, already-ported game code,
 unchanged.
+
+Recorded deviation from spec #28's Implementation Decisions (which describe the state-dump command
+as "the only test code in the library"): this is another one, after chextrek_customui_cmd (#34),
+chextrek_test_gui_completion (#35) and chextrek_test_impulse (#36), needed because nothing in spec
+#28's console-only command list can simulate a real click on the PDA map's buttons. CMD_FL_CHEAT
+plus its own CheatsOk( false ) check matches chextrek_customui_cmd/chextrek_test_impulse - honestly
+weaker than "developer-only" (spec #28 story 34, which the state-dump command matches):
+CheatsOk()/CMD_FL_CHEAT only block non-cheat multiplayer clients, not single-player without
+"developer 1".
 ==================
 */
 void ChexTrek_TestMapCmd_f( const idCmdArgs &args ) {
@@ -419,6 +429,11 @@ only routes mapControl's scroll/zoom/center bits to the PDA map page while the P
 "HudMap" state variable is true - a variable only a mouse click on guis/pda_chex.gui's "Data" tab
 sets in the real game, out of the console-only harness's reach. Sets it directly through
 idUserInterface::SetStateBool, the same call that click's script action makes.
+
+Recorded deviation from spec #28's Implementation Decisions (which describe the state-dump command
+as "the only test code in the library"): this is another one, alongside chextrek_test_map_cmd above
+- see that command's comment for the fuller "deviation" note this one shares. CMD_FL_CHEAT plus its
+own CheatsOk( false ) check matches chextrek_customui_cmd/chextrek_test_impulse/chextrek_test_map_cmd.
 ==================
 */
 void ChexTrek_TestPdaMapOpen_f( const idCmdArgs &args ) {

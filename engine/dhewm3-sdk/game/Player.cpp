@@ -856,10 +856,10 @@ void idPlayer::updateMap( void ) {
 ==============
 idPlayer::updateMapUI
 
-chextrek: spec #16/#36 (decomp-so/reference/hud-map.md). Sets one GUI's map variables. The map box
-is 640 x 480 GUI units (each GUI scales them to its box). The HUD map is always centered on the
-player; the PDA map follows mapControl (#37 wires mapControl from the PDA's GUI commands - it stays
-0, so the PDA map neither scrolls nor zooms, until that lands).
+chextrek: spec #16/#36/#37 (decomp-so/reference/hud-map.md). Sets one GUI's map variables. The map
+box is 640 x 480 GUI units (each GUI scales them to its box). The HUD map is always centered on the
+player; the PDA map follows mapControl, wired from the PDA's map_* GUI commands by the edited stock
+idPlayer::HandleSingleGuiCommand (#37, Player.cpp).
 ==============
 */
 void idPlayer::updateMapUI( idUserInterface *gui, int level, bool isHud ) {
@@ -4749,7 +4749,7 @@ bool idPlayer::HandleSingleGuiCommand( idEntity *entityGui, idLexer *src ) {
 
 	// chextrek: spec #16/#37 (decomp-so/reference/hud-map.md; edits-inside-stock-functions lead).
 	// The PDA map page's arrow/center/zoom buttons (guis/pda.gui, guis/pda_chex.gui) send these as
-	// GUI commands on release; updateMapUI (Player.cpp) reads mapControl every frame to drive the
+	// GUI commands on release; updateMapUI (above) reads mapControl every frame to drive the
 	// PDA map's scroll/zoom/center. "map_stop" keeps only MAP_CENTER, and only when a zoom bit was
 	// also set alongside it (Notes: "Scrolling ... stops while a zoom or center bit is set;
 	// map_stop keeps only MAP_CENTER, and only when a zoom bit was set with it"); zoom and center
