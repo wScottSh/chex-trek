@@ -2307,6 +2307,8 @@ so it can perform tab completion
 void idGameLocal::InitConsoleCommands( void ) {
 	// chextrek: developer-only state-dump command for the AFK test harness (spec #28/#29).
 	cmdSystem->AddCommand( "chextrek_dump",			ChexTrek_Dump_f,				CMD_FL_GAME,				"chextrek: dumps mod state for the test harness" );
+	// chextrek: spec #34, test-only. See ChexTrekDump.h/ChexTrek_CustomUICmd_f.
+	cmdSystem->AddCommand( "chextrek_customui_cmd",	ChexTrek_CustomUICmd_f,		CMD_FL_GAME,				"chextrek: sends a command to the local player's registered idCustomUI (test harness only)" );
 	cmdSystem->AddCommand( "listTypeInfo",			ListTypeInfo_f,				CMD_FL_GAME,				"list type info" );
 	cmdSystem->AddCommand( "writeGameState",		WriteGameState_f,			CMD_FL_GAME,				"write game state" );
 	cmdSystem->AddCommand( "testSaveGame",			TestSaveGame_f,				CMD_FL_GAME|CMD_FL_CHEAT,	"test a save game for a level" );

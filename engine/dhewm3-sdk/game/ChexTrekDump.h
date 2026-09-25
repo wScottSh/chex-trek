@@ -47,4 +47,11 @@ void ChexTrek_NoteFootprintProjected( void );
 // addItemText does.
 void ChexTrek_NoteItemTextShown( const char *name );
 
+// chextrek: spec #34, test-only. Registered as the "chextrek_customui_cmd" console command by
+// idGameLocal::InitConsoleCommands. Sends its one argument to the local player's registered
+// idCustomUI (idTarget_EndLevelGUI::HandleCustomGUICommand) exactly as idPlayer::
+// HandleSingleGuiCommand would - see ChexTrek_CustomUICmd_f in ChexTrekDump.cpp for why a console
+// command has to stand in for what a real mouse click on the stats screen produces.
+void ChexTrek_CustomUICmd_f( const idCmdArgs &args );
+
 #endif /* !__CHEXTREK_DUMP_H__ */

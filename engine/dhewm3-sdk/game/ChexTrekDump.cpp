@@ -2,6 +2,8 @@
 
 #include "sys/platform.h"
 #include "idlib/LangDict.h"
+#include "idlib/Lexer.h"
+#include "idlib/Token.h"
 #include "framework/async/NetworkSystem.h"
 
 #include "gamesys/SysCvar.h"
@@ -180,4 +182,58 @@ void ChexTrek_Dump_f( const idCmdArgs &args ) {
 			}
 		}
 	}
+}
+
+/*
+==================
+ChexTrek_CustomUICmd_f
+
+Test-only, spec #34. AC1/AC2 need the stats screen's "skip" and "nextmap" GUI commands
+(decomp-so/reference/end-level-stats.md: idTarget_EndLevelGUI::HandleCustomGUICommand) run from a
+scenario, but those commands only ever reach the game in the real game through a real mouse click:
+guis/chex/stats.gui's "skip"/"nextmap" windowDefs fire on onAction, idPlayer::Weapon_GUI turns a
+BUTTON_ATTACK edge into a mouse-button sysEvent_t, and idUserInterface::HandleEvent (engine-side,
+not part of this SDK) turns that, plus its own tracked cursor position, into the "skip"/"nextmap"
+command string that reaches idPlayer::HandleSingleGuiCommand -> HandleCustomGUICommand. Positioning
+that cursor over a specific button needs real mouse-delta input (idPlayer::Think reads it from
+usercmd_t::mx/my, Player.cpp) - not reachable from the console-only commands (map, script,
+setviewpos, trigger, spawn, impulse, wait) spec #28's harness is limited to driving the game
+through.
+
+So this command supplies the one part a console script can't: the command string itself. It reads
+a single token from its argument the same way idPlayer::HandleSingleGuiCommand would (idLexer over
+the raw text, same as idEntity::HandleGuiCommands does for a real GUI command string), and passes
+it to the local player's registered idCustomUI through the exact same virtual call
+HandleSingleGuiCommand makes - HandleCustomGUICommand( entityGui, &token ) - with the customUI
+entity itself standing in for entityGui (the reference's Notes say idTarget_EndLevelGUI's override
+never reads that parameter). Everything downstream of that call is the real, already-ported game
+code; this command changes no game behavior of its own, the same as chextrek_dump. Not a stand-in
+for "any GUI command" generally - it only reaches idCustomUI subclasses (the only kind of GUI this
+mod routes through a single, always-reachable idPlayer member, customUIEntity), which is exactly
+the "nextmap"/"skip"/"unregister" screen spec #34 is about.
+==================
+*/
+void ChexTrek_CustomUICmd_f( const idCmdArgs &args ) {
+	if ( args.Argc() != 2 ) {
+		gameLocal.Printf( "usage: chextrek_customui_cmd <command>\n" );
+		return;
+	}
+
+	idPlayer *player = gameLocal.GetLocalPlayer();
+	if ( !player || !player->customUIEntity ) {
+		gameLocal.Printf( "chextrek_customui_cmd: no idCustomUI registered on the local player\n" );
+		return;
+	}
+
+	const char *cmd = args.Argv( 1 );
+	idLexer src( LEXFL_ALLOWMULTICHARLITERALS | LEXFL_NOFATALERRORS );
+	idToken token;
+	src.LoadMemory( cmd, idStr::Length( cmd ), "chextrek_customui_cmd" );
+	if ( !src.ReadToken( &token ) ) {
+		gameLocal.Printf( "chextrek_customui_cmd: no command token in '%s'\n", cmd );
+		return;
+	}
+
+	bool handled = player->customUIEntity->HandleCustomGUICommand( player->customUIEntity, &token );
+	gameLocal.Printf( "chextrek_customui_cmd: '%s' %s\n", token.c_str(), handled ? "handled" : "not handled" );
 }
