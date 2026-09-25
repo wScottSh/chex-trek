@@ -24,11 +24,14 @@ fi
 # Triggering _1 fills objective_slot_1 (addObjective hands out slots in order, starting at
 # nextObjective); triggering _2 next fills objective_slot_2. Triggering _1 again removes it
 # (Event_Activate's "on the list" branch): freeObjective empties its slot without disturbing _2's.
-# A save/load round-trip after that must show the same active objective(s) still present
-# (mkObjective::Restore re-attaches anything left `active` half a second after load; `wait 150`
-# gives that PostEventMS( ..., 500, this ) plenty of real frames to fire - 500ms of *game* time
-# comfortably fits inside 150 frames at the engine's fixed 16ms game tick). See the comment above
-# the slot-value assertion below for why this checks the objective's *slot*, not just its presence.
+# A save/load round-trip after that must leave the still-active objective (trigger_objective_2)
+# re-attached (mkObjective::Restore re-attaches anything left `active` half a second after load;
+# `wait 150` gives that PostEventMS( ..., 500, this ) plenty of real frames to fire - 500ms of
+# *game* time comfortably fits inside 150 frames at the engine's fixed 16ms game tick). See the
+# comment above the slot-value assertion below for why this checks its exact post-load slot, not
+# just that it's present somewhere. A second save/load immediately after (taken from that
+# already-loaded state) checks the literal wording of AC2 ("the same objective slots"): with the
+# objective already sitting in its first-free slot, that round-trip cannot move it.
 CONSOLE_SCRIPT="${SCRATCH_DIR}/objectives.cfg"
 cat > "$CONSOLE_SCRIPT" <<'EOF'
 developer 1
@@ -51,6 +54,12 @@ chextrek_dump
 savegame chextrek_objectives_test
 wait 20
 loadgame chextrek_objectives_test
+wait 150
+chextrek_dump
+
+savegame chextrek_objectives_test2
+wait 20
+loadgame chextrek_objectives_test2
 wait 150
 chextrek_dump
 
@@ -88,8 +97,9 @@ else
 	FAIL=1
 fi
 
-# There are 5 chextrek_dump calls (see the console script above): baseline, after triggering _1,
-# after triggering _2, after triggering _1 again (the removal), and after the save/load round-trip.
+# There are 6 chextrek_dump calls (see the console script above): baseline, after triggering _1,
+# after triggering _2, after triggering _1 again (the removal), after the first save/load
+# round-trip, and after a second save/load round-trip taken from that already-loaded state.
 SLOT1_VALUES="$(grep -oE '^objective_slot_1: .*$' "$LOCAL_LOG" | sed 's/^objective_slot_1: //')"
 SLOT2_VALUES="$(grep -oE '^objective_slot_2: .*$' "$LOCAL_LOG" | sed 's/^objective_slot_2: //')"
 S1_BASELINE="$(echo "$SLOT1_VALUES" | sed -n '1p')"
@@ -97,10 +107,12 @@ S1_AFTER_TRIGGER1="$(echo "$SLOT1_VALUES" | sed -n '2p')"
 S1_AFTER_TRIGGER2="$(echo "$SLOT1_VALUES" | sed -n '3p')"
 S1_AFTER_REMOVE="$(echo "$SLOT1_VALUES" | sed -n '4p')"
 S1_AFTER_LOAD="$(echo "$SLOT1_VALUES" | sed -n '5p')"
+S1_AFTER_LOAD2="$(echo "$SLOT1_VALUES" | sed -n '6p')"
 S2_BASELINE="$(echo "$SLOT2_VALUES" | sed -n '1p')"
 S2_AFTER_TRIGGER2="$(echo "$SLOT2_VALUES" | sed -n '3p')"
 S2_AFTER_REMOVE="$(echo "$SLOT2_VALUES" | sed -n '4p')"
 S2_AFTER_LOAD="$(echo "$SLOT2_VALUES" | sed -n '5p')"
+S2_AFTER_LOAD2="$(echo "$SLOT2_VALUES" | sed -n '6p')"
 
 # --- triggering an objective shows it in the dump's slots (spec #31 AC1, part 1) ---
 if [ "$S1_BASELINE" = "empty" ] && [ "$S1_AFTER_TRIGGER1" = "Acquire a weapon" ]; then
@@ -143,6 +155,22 @@ if [ "$S1_AFTER_LOAD" = "Investigate" ] && [ "$S2_AFTER_LOAD" = "empty" ]; then
 	echo "PASS: save/load round-trip - trigger_objective_2 ('Investigate') is still active after loading, re-attached to objective_slot_1 (the reconstructed mod's documented, non-slot-stable reattachment order - decomp-so/reference/objectives.md's Notes)"
 else
 	echo "FAIL: expected objective_slot_1='Investigate' and objective_slot_2='empty' after the save/load round-trip, got objective_slot_1='${S1_AFTER_LOAD}' and objective_slot_2='${S2_AFTER_LOAD}'"
+	FAIL=1
+fi
+
+# --- save, load again, from a state where the objective is already in the slot it will land in
+# (spec #31 AC2, checked literally: "the dump shows the SAME objective slots") ---
+# The renumbering above only bites when an objective moves slot *because it wasn't already in the
+# first free one* (trigger_objective_2 was in slot_2, but the reset nextObjective search starts at
+# slot 0). Saving and loading again from the now-loaded state, where it's already sitting in
+# slot_1 (the first free slot), has nowhere lower to fall to: it must come back in the very same
+# slot. This is the same mechanism as the first round-trip, just exercised from a starting state
+# where "same slot" and "first free slot" happen to coincide - so this is a faithful port check,
+# not a different one.
+if [ "$S1_AFTER_LOAD2" = "$S1_AFTER_LOAD" ] && [ "$S2_AFTER_LOAD2" = "$S2_AFTER_LOAD" ]; then
+	echo "PASS: a second save/load from that already-in-slot-1 state left objective_slot_1 ('${S1_AFTER_LOAD2}') and objective_slot_2 ('${S2_AFTER_LOAD2}') unchanged - the literal 'same objective slots' case"
+else
+	echo "FAIL: expected the second save/load to leave objective_slot_1/2 unchanged ('${S1_AFTER_LOAD}'/'${S2_AFTER_LOAD}'), got '${S1_AFTER_LOAD2}'/'${S2_AFTER_LOAD2}'"
 	FAIL=1
 fi
 
