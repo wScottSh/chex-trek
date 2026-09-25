@@ -250,9 +250,8 @@ extern idCVar	si_spectators;
 extern idCVar	net_clientSelfSmoothing;
 extern idCVar	net_clientLagOMeter;
 
-							// chextrek: spec #16/#40, decomp-so/reference/door-opening.md. Trace
-							// distance (units) idPlayer::tryOpen casts along the view direction to
-							// find a door to open.
+// chextrek: spec #16/#40, decomp-so/reference/door-opening.md. Trace distance (units)
+// idPlayer::tryOpen casts along the view direction to find a door to open.
 extern idCVar	g_doorTraceDist;
 
 extern const char *si_gameTypeArgs[];

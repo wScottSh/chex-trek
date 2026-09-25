@@ -40,7 +40,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "Mover.h"				// chextrek: spec #16/#40, decomp-so/reference/door-opening.md (idPlayer::tryOpen needs idDoor)
 #include "Target.h"				// chextrek: spec #16/#33, idCustomUI::HandleCustomGUICommand
 #include "Camera.h"
-#include "ChexTrekDump.h"		// chextrek: spec #32, ChexTrek_NoteItemTextShown
+#include "ChexTrekDump.h"		// chextrek: spec #32/#40, ChexTrek_NoteItemTextShown/ChexTrek_NoteTryOpenDoor
 #include "Fx.h"
 #include "Misc.h"
 
