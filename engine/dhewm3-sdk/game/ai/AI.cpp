@@ -32,6 +32,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "gamesys/SysCvar.h"
 #include "Moveable.h"
 #include "SmokeParticles.h"
+#include "Mover.h"		// chextrek: spec #30, decomp-so/reference/door-opening.md (idAI::OpenDoors needs idDoor)
 
 #include "ai/AI.h"
 
@@ -3599,6 +3600,25 @@ idAI::TouchedByFlashlight
 void idAI::TouchedByFlashlight( idActor *flashlight_owner ) {
 	if ( wakeOnFlashlight ) {
 		Activate( flashlight_owner );
+	}
+}
+
+/*
+=====================
+idAI::OpenDoors
+
+chextrek: spec #30, ported from decomp-so/reference/door-opening.md. Uses ent if it is an
+unlocked idDoor that is not moving. The AI is the activator.
+=====================
+*/
+void idAI::OpenDoors( idEntity *ent ) {
+	if ( ent && ent->IsType( idDoor::Type ) ) {
+		idDoor *door = static_cast<idDoor *>( ent );
+		if ( !door->IsLocked() && door->IsAtRest() ) {
+			// `other` is the door itself (reference: the binary passes the same register as
+			// `this` and as `other`).
+			door->Use( ent, this );
+		}
 	}
 }
 

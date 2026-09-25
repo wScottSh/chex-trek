@@ -152,7 +152,15 @@ typedef enum {
 	FC_ENABLE_LEG_IK,
 	FC_DISABLE_LEG_IK,
 	FC_RECORDDEMO,
-	FC_AVIGAME
+	FC_AVIGAME,
+	// chextrek: spec #30, decomp-so/reference/script-events.md (idAnim::CallFrameCommands lead:
+	// "ent->ProcessEvent( &EV_FootPrint, <string>, modelDef->GetJointName( <index> ) )"). The
+	// anim frame command "footprint <joint> <l|r>" (def/monster_chex_biped.def). UNCERTAIN in the
+	// reference which frameCommand_t fields hold which argument; this port stores the joint's
+	// index like FC_FIREMISSILEATTARGET (in `index`, resolved back to a name at call time) and the
+	// side string like the other single-string commands (in `string`), matching the reference's
+	// own call-site note.
+	FC_FOOTPRINT
 } frameCommandType_t;
 
 typedef struct {

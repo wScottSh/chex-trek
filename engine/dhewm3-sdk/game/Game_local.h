@@ -419,6 +419,11 @@ public:
 	void					RadiusPushClipModel( const idVec3 &origin, const float push, const idClipModel *clipModel );
 
 	void					ProjectDecal( const idVec3 &origin, const idVec3 &dir, float depth, bool parallel, float size, const char *material, float angle = 0 );
+	// chextrek: spec #30, decomp-so/reference/script-events.md. The stock overload above with the
+	// decal's four corner directions passed in (decalWinding) instead of read from a function-
+	// static default. Only idActor::Event_FootPrint calls it (footprint_scale_x/_y-scaled
+	// corners); every stock caller still uses the 7-argument overload above.
+	void					ProjectDecal( const idVec3 &origin, const idVec3 &dir, float depth, bool parallel, float size, const char *material, const idVec3 *decalWinding, float angle );
 	void					BloodSplat( const idVec3 &origin, const idVec3 &dir, float size, const char *material );
 
 	void					CallFrameCommand( idEntity *ent, const function_t *frameCommand );

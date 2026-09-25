@@ -151,6 +151,10 @@ const idEventDef AI_WakeOnFlashlight( "wakeOnFlashlight", "d" );
 const idEventDef AI_LocateEnemy( "locateEnemy" );
 const idEventDef AI_KickObstacles( "kickObstacles", "Ef" );
 const idEventDef AI_GetObstacle( "getObstacle", NULL, 'e' );
+// chextrek: spec #30, decomp-so/reference/door-opening.md. script/chex_events.script:
+// "scriptEvent void openDoors( entity doorEnt );", called from ai_monster_base.script's
+// "blocked by object" branch.
+const idEventDef AI_OpenDoors( "openDoors", "E" );
 const idEventDef AI_PushPointIntoAAS( "pushPointIntoAAS", "v", 'v' );
 const idEventDef AI_GetTurnRate( "getTurnRate", NULL, 'f' );
 const idEventDef AI_SetTurnRate( "setTurnRate", "f" );
@@ -280,6 +284,10 @@ CLASS_DECLARATION( idActor, idAI )
 	EVENT( AI_WakeOnFlashlight,					idAI::Event_WakeOnFlashlight )
 	EVENT( AI_LocateEnemy,						idAI::Event_LocateEnemy )
 	EVENT( AI_KickObstacles,					idAI::Event_KickObstacles )
+	// chextrek: spec #30, decomp-so/reference/door-opening.md. Reference: entry 116 of
+	// idAI::eventCallbacks in gamex86.so, between the stock AI_KickObstacles and AI_GetObstacle
+	// entries.
+	EVENT( AI_OpenDoors,						idAI::Event_OpenDoors )
 	EVENT( AI_GetObstacle,						idAI::Event_GetObstacle )
 	EVENT( AI_PushPointIntoAAS,					idAI::Event_PushPointIntoAAS )
 	EVENT( AI_GetTurnRate,						idAI::Event_GetTurnRate )
@@ -2467,6 +2475,17 @@ idAI::Event_GetObstacle
 */
 void idAI::Event_GetObstacle( void ) {
 	idThread::ReturnEntity( move.obstacle.GetEntity() );
+}
+
+/*
+================
+idAI::Event_OpenDoors
+
+chextrek: spec #30, ported from decomp-so/reference/door-opening.md.
+================
+*/
+void idAI::Event_OpenDoors( idEntity *ent ) {
+	OpenDoors( ent );
 }
 
 /*

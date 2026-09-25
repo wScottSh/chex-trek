@@ -353,6 +353,11 @@ private:
 	void					Event_NetReload( void );
 	void					Event_IsInvisible( void );
 	void					Event_NetEndReload( void );
+
+	// chextrek: spec #30, decomp-so/reference/script-events.md. script/chex_events.script:
+	// "scriptEvent void setProj( string def );". Swaps projectileDict for the given entityDef's
+	// dict; unknown names are ignored, silently.
+	void					Event_SetProj( const char *projName );
 };
 
 ID_INLINE bool idWeapon::IsLinked( void ) {

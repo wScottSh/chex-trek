@@ -51,17 +51,49 @@ tells you to build it if it's missing, but doesn't build it for you):
    `CHEXTREK-STATE-DUMP v1` header appeared, and the spec #28 always-on checks (no `ERROR:`, no
    unknown event/spawnclass, no script-compile error).
 
-Right now (before #30 ports the mod's script events) this is expected to report **red**: the
-known `script\chex_events.script, line 2: Unknown event 'openDoors'` failure, reproduced from an
-unmodified `dhewm3-sdk` build. That's what proves the tracer bullet works end to end. When it's
-red like this, the game hangs on the error dialog before it ever reaches the `screenshot` command
-in the console script, so there's no screenshot artifact for a red run - that's expected, not a
-bug (screenshots are "saved as artifacts, never asserted").
+Before #30 ported the mod's script events, this reported **red**: the known
+`script\chex_events.script, line 2: Unknown event 'openDoors'` failure, reproduced from an
+unmodified `dhewm3-sdk` build - that's what proved the tracer bullet worked end to end. When it was
+red like that, the game hung on the error dialog before it ever reached the `screenshot` command in
+the console script, so there was no screenshot artifact for a red run - expected, not a bug
+(screenshots are "saved as artifacts, never asserted").
+
+As of #30, the default run is green (script compile passes and the main menu loads), which
+exercised the screenshot-artifact path for the first time and corrected an assumption: `screenshot
+<name>` does **not** write `<name>` straight into the save dir. It ignores the given name and
+writes an auto-numbered `shot00001.tga` under a `screenshots\` subfolder instead
+(`Documents\My Games\dhewm3\chextrek\screenshots\shot00001.tga`). `tools/run-harness.sh` now
+checks both locations when archiving a run's screenshot.
 
 **Only run one harness invocation at a time on a given machine.** It kills every `dhewm3.exe`
 process by image name on timeout (not just the one it started), and concurrent runs - e.g. from
 two worktrees at once - would also race on the shared `chextrek` symlink and the shared
 `Documents\My Games\dhewm3\chextrek\` save dir.
+
+## Running a feature scenario
+
+`tools/run-harness.sh` always runs the same fixed smoke-check script (menu + `chextrek_dump` +
+`screenshot` + `quit`). Feature scenarios (spec #30 onward) need to `map` into a real level and
+drive it with `spawn`/`script`/`wait`/`chextrek_dump` commands beyond that fixed script, so they
+share the same mount/save-path/timeout/archiving plumbing through `tools/lib-harness.sh` instead,
+via:
+
+```
+tools/run-scenario.sh <scenario-name> <console-script-file> [timeout-seconds]
+```
+
+`<console-script-file>` is the *complete* console script (including `developer 1` and a trailing
+`quit`). See `tools/test-script-events.sh` for a full example (spec #30's `openDoors`/`setProj`/
+`spawnDict`/`footPrint`/`remove` scenario, run against `e1m1`) - including a workaround worth
+knowing about before writing another one: the engine's own console tokenizer strips quotes from a
+typed string literal *before* doom-script's compiler ever sees it (so `script sys.println( "x" )`
+recompiles as the bareword `x`, which fails to compile), and separately treats a bare `$name`
+token as *cvar* expansion, which collides with doom-script's own `$entityName` syntax. Both are
+worked around with a handful of test-only cvars in `ChexTrekDump.cpp`
+(`chextrek_test_str1`..`str8`) whose *values* already contain the quote characters or entity/def
+names a scenario needs, referenced as `$chextrek_test_strN` (a cvar substitution, which survives
+verbatim) together with `sys.getEntity( $chextrek_test_strN )` (a runtime name lookup) instead of
+`$entityName`. See the comment above those cvars for the full story. They change no game behavior.
 
 ## Why none of this lives in the repo
 

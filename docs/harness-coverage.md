@@ -19,14 +19,14 @@ one tracks spec #28 features against harness scenarios).
 | AFK harness launches dhewm3 1.5.5 win32 with the mod mounted, drives it via a console script ending in `quit`, kills a hung run after a timeout | `tools/run-harness.sh` | covered |
 | Developer-only state-dump console command (`chextrek_dump`), stable header line | `tools/run-harness.sh` asserts `CHEXTREK-STATE-DUMP v1` in the log | covered (header only - #29 lands the skeleton; later sub-issues add state under it as their features land) |
 | Harness proves *chextrek.dll* (not `base.dll`) loaded | `tools/run-harness.sh` asserts `loaded game library '...chextrek.dll'` and the state-dump header | covered |
-| Harness reproduces the known script-compile failure (`script\chex_events.script, line 2: Unknown event 'openDoors'`) as red, with the offending line | `tools/run-harness.sh` (run against current data, before #30 ports the script events) | covered - expected red until #30 |
-| Always-on checks: no `ERROR`, no unknown event/spawnclass, no script-compile error, map finishes loading | `tools/run-harness.sh` | covered for the error checks; "map finishes loading" has no scenario yet - blocked on #30 (nothing loads a map until script compile passes) |
+| Harness run to the main menu is green (script compile passes, menu loads) | `tools/run-harness.sh`, `tools/test-menu-smoke.sh` | covered - flipped green by #30 (was expected red under #29; `tools/test-menu-smoke.sh` replaces the old `tools/test-tracer-bullet.sh`, which asserted the opposite) |
+| Always-on checks: no `ERROR`, no unknown event/spawnclass, no script-compile error, map finishes loading | `tools/run-harness.sh`, `tools/test-script-events.sh` (loads `e1m1`) | covered |
 
 ## Per-feature (spec #28 order; #30 onward)
 
 | Feature | Scenario | Status |
 |---|---|---|
-| Script events (`openDoors`, `setProj`, `spawnDict`, `footPrint`), `idActor` `EV_Remove`, `ProjectDecal` overload; menu/`e1m1`/`sf_923` load | - | pending (#30) |
+| Script events `openDoors` (`idAI::OpenDoors`/`Event_OpenDoors`), `setProj`, `spawnDict`, `footPrint` (anim frame command + `PlayFootStepSound` lead); `idActor` extra `EV_Remove` entry; `ProjectDecal` 8-arg overload | `tools/test-script-events.sh` | covered - each event's observable effect: `openDoors` opens `e1m1`'s `func_door_17`, `setProj` changes the weapon's `createProjectile()` classname, `spawnDict` spawns an entity from a def, `footPrint`/`ProjectDecal` show up in `chextrek_dump`'s `footprints:` counter, and a script's `remove()` shrinks `chextrek_dump`'s `entities:` counter. `idActor`'s extra `EV_Remove` entry is ported for fidelity to the reconstruction but is behaviorally a no-op (routes to the same `idClass::Event_Remove` already inherited) - not separately observable, see `decomp-so/reference/script-events.md` Notes. |
 | Objectives (`mkObjective`) + item text (`addItemText`) | - | pending (#31+) |
 | Custom UI + end-level stats (incl. stat counting) | - | pending |
 | HUD map | - | pending |

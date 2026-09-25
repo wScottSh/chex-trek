@@ -129,6 +129,11 @@ private:
 	void						Event_KillThread( const char *name );
 	void						Event_GetEntity( const char *name );
 	void						Event_Spawn( const char *classname );
+	// chextrek: spec #30, decomp-so/reference/script-events.md. script/chex_events.script:
+	// "scriptEvent entity spawnDict( string def );". Like Event_Spawn, but starts from the
+	// entityDef's own dict with setSpawnArg's keys copied on top, instead of spawning spawnArgs
+	// directly.
+	void						Event_SpawnDict( const char *defName );
 	void						Event_CopySpawnArgs( idEntity *ent );
 	void						Event_SetSpawnArg( const char *key, const char *value );
 	void						Event_SpawnString( const char *key, const char *defaultvalue );

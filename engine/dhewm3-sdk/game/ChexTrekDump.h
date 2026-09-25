@@ -21,4 +21,11 @@ void ChexTrek_Dump_f( const idCmdArgs &args );
 // above calls this too, so later scenarios can re-dump on demand once maps are loading.
 void ChexTrek_PrintHeader( void );
 
+// chextrek: spec #30. idActor::Event_FootPrint calls this right after each decal it actually
+// projects (mtr non-empty). Decal projection itself is a renderer call with no log line, so this
+// is the only way a harness scenario can observe "a footprint decal was projected" from the log,
+// per the state-dump command's purpose (state the log doesn't already show). Test-only
+// instrumentation: it counts calls, it doesn't change what Event_FootPrint does.
+void ChexTrek_NoteFootprintProjected( void );
+
 #endif /* !__CHEXTREK_DUMP_H__ */

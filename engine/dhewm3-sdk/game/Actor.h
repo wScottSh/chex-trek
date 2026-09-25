@@ -57,6 +57,11 @@ extern const idEventDef AI_AnimDone;
 extern const idEventDef AI_SetBlendFrames;
 extern const idEventDef AI_GetBlendFrames;
 
+// chextrek: the "footprint" anim frame command / PlayFootStepSound handler (spec #30,
+// decomp-so/reference/script-events.md). STB_GLOBAL in gamex86.so and read through the GOT by
+// idAnim::CallFrameCommands (Anim_Blend.cpp), so declared extern like the stock EV_Footstep above.
+extern const idEventDef EV_FootPrint;
+
 class idDeclParticle;
 
 class idAnimState {
@@ -264,6 +269,16 @@ protected:
 
 	idList<idAttachInfo>	attachments;
 
+	// chextrek: footprint state (spec #30, decomp-so/reference/script-events.md). Reference:
+	// footprintRight alternates plain footstep prints between feet; footprintSurfaceType /
+	// footprintEndTime track a timed "footprint_time_<surftype>" override after stepping on a
+	// matching surface. Not saved/restored: the reference found no Save/Restore write for them
+	// (binary scan) and no other function reads them, so a loaded save just starts printing
+	// plain footsteps again with the left foot.
+	bool					footprintRight;
+	int						footprintEndTime;
+	int						footprintSurfaceType;
+
 	virtual void			Gib( const idVec3 &dir, const char *damageDefName );
 
 							// removes attachments with "remove" set for when character dies
@@ -318,6 +333,12 @@ private:
 	void					Event_SetState( const char *name );
 	void					Event_GetState( void );
 	void					Event_GetHead( void );
+
+	// chextrek: spec #30. Called by PlayFootStepSound (stock-function lead, see script-events.md
+	// Notes) with (NULL, NULL) when "footprint_on_sound" is set, and by idAnim::CallFrameCommands
+	// with the frame command's side/joint through the extra FC_FOOTPRINT frame command (a further
+	// stock-function lead in Anim_Blend.cpp; the reference names this call site explicitly).
+	void					Event_FootPrint( const char *side, const char *jointName );
 };
 
 #endif /* !__GAME_ACTOR_H__ */

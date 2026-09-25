@@ -263,6 +263,12 @@ public:
 
 	void					TouchedByFlashlight( idActor *flashlight_owner );
 
+							// chextrek: spec #30, decomp-so/reference/door-opening.md. Uses ent if
+							// it's an unlocked, at-rest idDoor: the AI is the activator. Called by
+							// Event_OpenDoors (script/chex_events.script's "openDoors" event, used
+							// by ai_monster_base.script when blocked and "canopendoors" is set).
+	void					OpenDoors( idEntity *ent );
+
 							// Outputs a list of all monsters to the console.
 	static void				List_f( const idCmdArgs &args );
 
@@ -653,6 +659,8 @@ protected:
 	void					Event_LocateEnemy( void );
 	void					Event_KickObstacles( idEntity *kickEnt, float force );
 	void					Event_GetObstacle( void );
+	// chextrek: spec #30, decomp-so/reference/door-opening.md.
+	void					Event_OpenDoors( idEntity *ent );
 	void					Event_PushPointIntoAAS( const idVec3 &pos );
 	void					Event_GetTurnRate( void );
 	void					Event_SetTurnRate( float rate );

@@ -3887,6 +3887,53 @@ void idGameLocal::ProjectDecal( const idVec3 &origin, const idVec3 &dir, float d
 }
 
 /*
+===============
+idGameLocal::ProjectDecal
+
+chextrek: spec #30, ported from decomp-so/reference/script-events.md. Instruction-for-instruction
+the same as the stock 7-argument overload above, except the four corner directions come from the
+caller (decalWinding) instead of a function-static default - so a caller (idActor::Event_FootPrint)
+can scale them per axis before projecting.
+===============
+*/
+void idGameLocal::ProjectDecal( const idVec3 &origin, const idVec3 &dir, float depth, bool parallel, float size, const char *material, const idVec3 *decalWinding, float angle ) {
+	float s, c;
+	idMat3 axis, axistemp;
+	idFixedWinding winding;
+	idVec3 windingOrigin, projectionOrigin;
+
+	if ( !g_decals.GetBool() ) {
+		return;
+	}
+
+	// randomly rotate the decal winding, unless an angle is given
+	idMath::SinCos16( ( angle ) ? angle : random.RandomFloat() * idMath::TWO_PI, s, c );
+
+	// winding orientation
+	axis[2] = dir;
+	axis[2].Normalize();
+	axis[2].NormalVectors( axistemp[0], axistemp[1] );
+	axis[0] = axistemp[ 0 ] * c + axistemp[ 1 ] * -s;
+	axis[1] = axistemp[ 0 ] * -s + axistemp[ 1 ] * -c;
+
+	windingOrigin = origin + depth * axis[2];
+	if ( parallel ) {
+		projectionOrigin = origin - depth * axis[2];
+	} else {
+		projectionOrigin = origin;
+	}
+
+	size *= 0.5f;
+
+	winding.Clear();
+	winding += idVec5( windingOrigin + ( axis * decalWinding[0] ) * size, idVec2( 1.0f, 1.0f ) );
+	winding += idVec5( windingOrigin + ( axis * decalWinding[1] ) * size, idVec2( 0.0f, 1.0f ) );
+	winding += idVec5( windingOrigin + ( axis * decalWinding[2] ) * size, idVec2( 0.0f, 0.0f ) );
+	winding += idVec5( windingOrigin + ( axis * decalWinding[3] ) * size, idVec2( 1.0f, 0.0f ) );
+	gameRenderWorld->ProjectDecalOntoWorld( winding, projectionOrigin, parallel, depth * 0.5f, declManager->FindMaterial( material ), time );
+}
+
+/*
 ==============
 idGameLocal::BloodSplat
 ==============

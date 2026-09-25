@@ -114,6 +114,9 @@ const idEventDef EV_Thread_DebugBounds( "debugBounds", "vvvf" );
 const idEventDef EV_Thread_DrawText( "drawText", "svfvdf" );
 const idEventDef EV_Thread_InfluenceActive( "influenceActive", NULL, 'd' );
 
+// chextrek: spec #30, decomp-so/reference/script-events.md.
+const idEventDef EV_Thread_SpawnDict( "spawnDict", "s", 'e' );
+
 CLASS_DECLARATION( idClass, idThread )
 	EVENT( EV_Thread_Execute,				idThread::Event_Execute )
 	EVENT( EV_Thread_TerminateThread,		idThread::Event_TerminateThread )
@@ -193,6 +196,8 @@ CLASS_DECLARATION( idClass, idThread )
 	EVENT( EV_Thread_DebugBounds,			idThread::Event_DebugBounds )
 	EVENT( EV_Thread_DrawText,				idThread::Event_DrawText )
 	EVENT( EV_Thread_InfluenceActive,		idThread::Event_InfluenceActive )
+	// chextrek: spec #30, decomp-so/reference/script-events.md.
+	EVENT( EV_Thread_SpawnDict,				idThread::Event_SpawnDict )
 END_CLASS
 
 idThread			*idThread::currentThread = NULL;
@@ -1122,6 +1127,35 @@ void idThread::Event_Spawn( const char *classname ) {
 	spawnArgs.Set( "classname", classname );
 	gameLocal.SpawnEntityDef( spawnArgs, &ent );
 	ReturnEntity( ent );
+	spawnArgs.Clear();
+}
+
+/*
+================
+idThread::Event_SpawnDict
+
+chextrek: spec #30, ported from decomp-so/reference/script-events.md. Like Event_Spawn above, but
+starts from the entityDef defName's own keys, then overrides them with whatever setSpawnArg has
+already staged in the thread's spawnArgs (see Notes: corvette_notes.txt 1/3/06, "spawnDict added
+to script system, allows spawning dicts by name, stuff set by setSpawnArg overrides defaults").
+No script, map or def in this repo calls it (idThread event; a script would call it as
+sys.spawnDict(...)) - "1" argument to SpawnEntityDef's setDefaults matches the stock spawn event
+above, which passes the same default.
+================
+*/
+void idThread::Event_SpawnDict( const char *defName ) {
+	idEntity *ent;
+
+	// No NULL check (reference): an unknown defName makes Copy read through a NULL reference,
+	// matching the binary.
+	const idDict *defDict = gameLocal.FindEntityDefDict( defName, false );
+
+	idDict dict;
+	dict.Copy( *defDict );
+	dict.Copy( spawnArgs );
+	gameLocal.SpawnEntityDef( dict, &ent, false );
+	ReturnEntity( ent );
+	dict.Clear();
 	spawnArgs.Clear();
 }
 

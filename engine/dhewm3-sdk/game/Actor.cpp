@@ -33,6 +33,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "Light.h"
 #include "Projectile.h"
 #include "WorldSpawn.h"
+#include "ChexTrekDump.h"		// chextrek: spec #30, ChexTrek_NoteFootprintProjected
 
 #include "Actor.h"
 
@@ -366,6 +367,11 @@ const idEventDef AI_SetState( "setState", "s" );
 const idEventDef AI_GetState( "getState", NULL, 's' );
 const idEventDef AI_GetHead( "getHead", NULL, 'e' );
 
+// chextrek: spec #30, decomp-so/reference/script-events.md. Not a scriptEvent (no scriptEvent
+// declaration in any .script file - the mod's only callers are C++: the "footprint" anim frame
+// command and PlayFootStepSound's "footprint_on_sound" lead).
+const idEventDef EV_FootPrint( "footprint", "ss" );
+
 CLASS_DECLARATION( idAFEntity_Gibbable, idActor )
 	EVENT( AI_EnableEyeFocus,			idActor::Event_EnableEyeFocus )
 	EVENT( AI_DisableEyeFocus,			idActor::Event_DisableEyeFocus )
@@ -408,6 +414,14 @@ CLASS_DECLARATION( idAFEntity_Gibbable, idActor )
 	EVENT( AI_SetState,					idActor::Event_SetState )
 	EVENT( AI_GetState,					idActor::Event_GetState )
 	EVENT( AI_GetHead,					idActor::Event_GetHead )
+	// chextrek: spec #30, decomp-so/reference/script-events.md.
+	EVENT( EV_FootPrint,				idActor::Event_FootPrint )
+	// chextrek: spec #30. The reference (script-events.md, Notes) records this exact extra entry
+	// (idActor::eventCallbacks entry 42 in gamex86.so) as a lead with an open question ("why
+	// EV_Remove was added" - not resolved). It routes to the same idClass::Event_Remove that
+	// idActor already inherits undeclared, so it changes no observable behavior; it is ported
+	// here only for fidelity to the reconstruction.
+	EVENT( EV_Remove,					idClass::Event_Remove )
 END_CLASS
 
 /*
@@ -453,6 +467,14 @@ idActor::idActor( void ) {
 	blink_max			= 0;
 
 	finalBoss			= false;
+
+	// chextrek: spec #30, decomp-so/reference/script-events.md. Binary sets these two on
+	// construction; it does not set footprintRight (open question in the reference - the first
+	// footstep's side may be arbitrary in the original. Zero-initializing here, rather than
+	// leaving it uninitialized, is a deliberate deviation for determinism, not a behavior port).
+	footprintRight		= false;
+	footprintEndTime	= 0;
+	footprintSurfaceType = -1;
 
 	attachments.SetGranularity( 1 );
 
@@ -2419,6 +2441,15 @@ void idActor::PlayFootStepSound( void ) {
 	if ( *sound != '\0' ) {
 		StartSoundShader( declManager->FindSound( sound ), SND_CHANNEL_BODY, 0, false, NULL );
 	}
+
+	// chextrek: spec #30, decomp-so/reference/script-events.md Notes ("edits inside stock
+	// functions" lead): idActor::PlayFootStepSound (0xb6cf5-0xb6d4b in gamex86.so), right after the
+	// stock StartSoundShader call above. "footprint_on_sound" makes every footstep also leave a
+	// footprint, with no joint (NULL, NULL alternates feet from the physics origin). def/player.def
+	// sets this key; def/monster_chex_biped.def does not (it uses the anim frame command instead).
+	if ( spawnArgs.GetBool( "footprint_on_sound" ) ) {
+		Event_FootPrint( NULL, NULL );
+	}
 }
 
 /*
@@ -3275,4 +3306,113 @@ idActor::Event_GetHead
 */
 void idActor::Event_GetHead( void ) {
 	idThread::ReturnEntity( head.GetEntity() );
+}
+
+/*
+================
+idActor::Event_FootPrint
+
+chextrek: spec #30, ported from decomp-so/reference/script-events.md. Leaves a footprint decal
+under the actor. Called with a joint by the anim frame command "footprint <joint> <l|r>", and with
+no joint by PlayFootStepSound when "footprint_on_sound" is set.
+
+A surface type with a "footprint_time_<type>" key makes the actor leave "mtr_footprint_<type>"
+prints for that many seconds after stepping on it. Otherwise "mtr_footprint" is used, and nothing
+is printed when that is empty. The material name gets "_<side>" (frame command) or "_l" / "_r"
+(footsteps, alternating) appended.
+================
+*/
+void idActor::Event_FootPrint( const char *side, const char *jointName ) {
+	modelTrace_t	result;
+	float			time;
+	const char		*mtr;
+	idVec3			winding[ 4 ];
+	idVec3			offset;
+	idVec3			origin;
+	idMat3			axis;
+
+	if ( !GetPhysics()->HasGroundContacts() ) {
+		return;
+	}
+
+	// What is under the actor: trace from the physics origin raised by footprint_s_z to the origin
+	// raised by footprint_e_z (defaults 0 and -8: from the origin to 8 below).
+	idVec3 start = GetPhysics()->GetOrigin();
+	idVec3 end = start;
+	start.z += spawnArgs.GetFloat( "footprint_s_z", "0" );
+	end.z += spawnArgs.GetFloat( "footprint_e_z", "-8" );
+	if ( gameRenderWorld->Trace( result, start, end, 8.0f, false, true ) && result.material ) {
+		if ( spawnArgs.GetFloat( va( "footprint_time_%s", gameLocal.sufaceTypeNames[ result.material->GetSurfaceType() ] ), "0", time ) ) {
+			footprintSurfaceType = result.material->GetSurfaceType();
+			footprintEndTime = gameLocal.time + SEC2MS( time );
+		}
+	}
+
+	// UNCERTAIN (reference): the binary sets footprintSurfaceType to -1 on the fallback path
+	// only, and falls back to "mtr_footprint" when the type's lookup gives a NULL pointer.
+	// GetString never returns NULL, so a missing "mtr_footprint_<type>" key gives "" and no
+	// print, not the fallback.
+	mtr = NULL;
+	if ( footprintSurfaceType != -1 && gameLocal.time < footprintEndTime ) {
+		mtr = spawnArgs.GetString( va( "mtr_footprint_%s", gameLocal.sufaceTypeNames[ footprintSurfaceType ] ), "" );
+	} else {
+		footprintSurfaceType = -1;
+	}
+	if ( !mtr ) {
+		mtr = spawnArgs.GetString( "mtr_footprint", "" );
+	}
+	if ( !mtr[ 0 ] ) {
+		return;
+	}
+
+	float scaleX = spawnArgs.GetFloat( "footprint_scale_x", "1" );
+	float scaleY = spawnArgs.GetFloat( "footprint_scale_y", "1" );
+	float size = spawnArgs.GetFloat( "footprint_size", "16" );
+
+	// The decal's corners: the stock decalWinding, scaled per axis.
+	winding[ 0 ].Set( scaleX, scaleY, 0.0f );
+	winding[ 1 ].Set( -scaleX, scaleY, 0.0f );
+	winding[ 2 ].Set( -scaleX, -scaleY, 0.0f );
+	winding[ 3 ].Set( scaleX, -scaleY, 0.0f );
+
+	// viewAxis: only yaw is used, to turn the print to face along the view.
+	idAngles angles = viewAxis.ToAngles();
+
+	if ( jointName && jointName[ 0 ] ) {
+		// Frame command: print at the joint, moved by footprint_offset_<side> in the actor's
+		// ground-plane frame. GetVector( key, NULL, out ) leaves out at 0 0 0 when missing.
+		spawnArgs.GetVector( va( "footprint_offset_%s", side ), NULL, offset );
+		GetJointWorldTransform( animator.GetJointHandle( jointName ), gameLocal.time, origin, axis );
+
+		// The joint's axis is not used: the same slots are filled with viewAxis flattened onto
+		// the ground plane.
+		axis[ 2 ].Set( 0.0f, 0.0f, 1.0f );
+		axis[ 0 ] = viewAxis[ 0 ];
+		axis[ 0 ].ProjectOntoPlane( axis[ 2 ] );
+		axis[ 0 ].Normalize();
+		axis[ 1 ] = viewAxis[ 1 ];
+		axis[ 1 ].ProjectOntoPlane( axis[ 2 ] );
+		axis[ 1 ].Normalize();
+		offset *= axis;
+
+		// Straight down, 8 deep, parallel projection.
+		gameLocal.ProjectDecal( origin + offset, idVec3( 0.0f, 0.0f, -1.0f ), 8.0f, true, size, va( "%s_%s", mtr, side ), winding, idMath::HALF_PI - DEG2RAD( angles.yaw ) );
+		ChexTrek_NoteFootprintProjected();
+		return;
+	}
+
+	// Footstep: no joint. Alternate feet, 12 units to either side of the physics origin
+	// (viewAxis[ 1 ] points left).
+	idVec3 sideOffset;
+	const char *suffix;
+	if ( footprintRight ) {
+		sideOffset = viewAxis[ 1 ] * -12.0f;
+		suffix = "_r";
+	} else {
+		sideOffset = viewAxis[ 1 ] * 12.0f;
+		suffix = "_l";
+	}
+	gameLocal.ProjectDecal( GetPhysics()->GetOrigin() + sideOffset, idVec3( 0.0f, 0.0f, -1.0f ), 8.0f, true, size, va( "%s%s", mtr, suffix ), winding, idMath::HALF_PI - DEG2RAD( angles.yaw ) );
+	ChexTrek_NoteFootprintProjected();
+	footprintRight = !footprintRight;
 }

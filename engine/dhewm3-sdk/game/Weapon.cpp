@@ -76,6 +76,9 @@ const idEventDef EV_Weapon_NetReload( "netReload" );
 const idEventDef EV_Weapon_IsInvisible( "isInvisible", NULL, 'f' );
 const idEventDef EV_Weapon_NetEndReload( "netEndReload" );
 
+// chextrek: spec #30, decomp-so/reference/script-events.md.
+const idEventDef EV_Weapon_SetProj( "setProj", "s" );
+
 //
 // class def
 //
@@ -116,6 +119,8 @@ CLASS_DECLARATION( idAnimatedEntity, idWeapon )
 	EVENT( EV_Weapon_NetReload,					idWeapon::Event_NetReload )
 	EVENT( EV_Weapon_IsInvisible,				idWeapon::Event_IsInvisible )
 	EVENT( EV_Weapon_NetEndReload,				idWeapon::Event_NetEndReload )
+	// chextrek: spec #30, decomp-so/reference/script-events.md.
+	EVENT( EV_Weapon_SetProj,					idWeapon::Event_SetProj )
 END_CLASS
 
 /***********************************************************************
@@ -2589,6 +2594,23 @@ void idWeapon::Event_NetEndReload( void ) {
 	assert( owner );
 	if ( gameLocal.isServer ) {
 		ServerSendEvent( EVENT_ENDRELOAD, NULL, false, -1 );
+	}
+}
+
+/*
+===============
+idWeapon::Event_SetProj
+
+chextrek: spec #30, ported from decomp-so/reference/script-events.md. Swaps the projectile this
+weapon fires for the entityDef projName. Unknown names are ignored, without a warning - script/
+map_storage_facility.script's weap_disable() relies on this to silently no-op the "_nodamage"
+variant lookup when a weapon has none.
+===============
+*/
+void idWeapon::Event_SetProj( const char *projName ) {
+	const idDeclEntityDef *projectileDef = gameLocal.FindEntityDef( projName, false );
+	if ( projectileDef ) {
+		projectileDict = projectileDef->dict;
 	}
 }
 

@@ -571,6 +571,22 @@ const char *idAnim::AddFrameCommand( const idDeclModelDef *modelDef, int framenu
 		fc.type = FC_FIREMISSILEATTARGET;
 		fc.string = new idStr( token );
 		fc.index = jointInfo->num;
+	} else if ( token == "footprint" ) {
+		// chextrek: spec #30, decomp-so/reference/script-events.md. "footprint <joint> <l|r>",
+		// e.g. def/monster_chex_biped.def:11-12 "frame 12 footprint Lfoot l".
+		if( !src.ReadTokenOnLine( &token ) ) {
+			return "Unexpected end of line";
+		}
+		jointInfo = modelDef->FindJoint( token );
+		if ( !jointInfo ) {
+			return va( "Joint '%s' not found", token.c_str() );
+		}
+		fc.index = jointInfo->num;
+		if( !src.ReadTokenOnLine( &token ) ) {
+			return "Unexpected end of line";
+		}
+		fc.type = FC_FOOTPRINT;
+		fc.string = new idStr( token );
 	} else if ( token == "footstep" ) {
 		fc.type = FC_FOOTSTEP;
 	} else if ( token == "leftfoot" ) {
@@ -864,6 +880,14 @@ void idAnim::CallFrameCommands( idEntity *ent, int from, int to ) const {
 				}
 				case FC_FIREMISSILEATTARGET: {
 					ent->ProcessEvent( &AI_FireMissileAtTarget, modelDef->GetJointName( command.index ), command.string->c_str() );
+					break;
+				}
+				case FC_FOOTPRINT : {
+					// chextrek: spec #30, decomp-so/reference/script-events.md. Reference names
+					// this exact call site: ent->ProcessEvent( &EV_FootPrint, <string>,
+					// modelDef->GetJointName( <index> ) ). ProcessEvent no-ops if ent's class
+					// doesn't have EV_FootPrint (only idActor and its subclasses do).
+					ent->ProcessEvent( &EV_FootPrint, command.string->c_str(), modelDef->GetJointName( command.index ) );
 					break;
 				}
 				case FC_FOOTSTEP : {
