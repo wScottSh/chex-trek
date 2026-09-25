@@ -217,9 +217,14 @@ class Binary:
 
     def callees(self, func: Function) -> list[Callee]:
         """Distinct direct callees (calls, and tail-jumps leaving the function), in first-seen order."""
+        return list(dict.fromkeys(self.call_sites(func)))
+
+    def call_sites(self, func: Function) -> list[Callee]:
+        """The callee of every direct call (and tail-jump leaving the function), in code order,
+        repeats kept."""
         code = self._bytes(func.vaddr, func.size)
         end = func.vaddr + func.size
-        seen: dict[str, Callee] = {}
+        out: list[Callee] = []
         for ins in self._md.disasm(code, func.vaddr):
             if ins.mnemonic not in ("call", "jmp"):
                 continue
@@ -232,8 +237,8 @@ class Binary:
             if ins.mnemonic == "call" and target == ins.address + ins.size:
                 continue  # `call next; pop %ebx` PIC idiom
             raw = self._name_for(target)
-            seen.setdefault(raw, Callee(raw, demangle(raw)))
-        return list(seen.values())
+            out.append(Callee(raw, demangle(raw)))
+        return out
 
     @cached_property
     def _rodata(self) -> tuple[int, bytes]:

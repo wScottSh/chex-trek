@@ -15,7 +15,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 import verify  # noqa: E402
-from binary import GHIDRA_IMAGE_BASE, Binary, demangle, source_name  # noqa: E402
+from binary import GHIDRA_IMAGE_BASE, Binary, source_name  # noqa: E402
 
 BINARY = Binary(verify.BINARY_PATH)
 ROWS = verify.load_coverage()
@@ -93,6 +93,9 @@ class CalleeCoverage(unittest.TestCase):
         body = verify.find_static_init_body("CLASS_DECLARATION( idClass, mkTrail )\nEND_CLASS\n", name)
         self.assertIn("__static_initialization_and_destruction_0( 1, 0xffff )", body)
         self.assertIsNone(verify.find_static_init_body("CLASS_DECLARATION( idClass, mkTrailX )", name))
+        abstract = verify.find_static_init_body("ABSTRACT_DECLARATION( idEntity, idCustomUI )",
+                                                "_GLOBAL__I__ZN10idCustomUI4TypeE")
+        self.assertIn("ABSTRACT_DECLARATION( idEntity, idCustomUI ) defines idCustomUI::Type", abstract)
         self.assertIsNone(verify.find_static_init_body("CLASS_DECLARATION( idClass, mkTrail )", "mkTrail::Think"))
         self.assertIsNone(verify.find_static_init_body("CLASS_DECLARATION( idClass, mkTrail )",
                                                        "_GLOBAL__I__ZN7mkTrail12SnapshotNameE"))
@@ -207,21 +210,6 @@ def synthetic(function: str, group: str = "synthetic") -> list[verify.CoverageRo
     functions whose group is not reconstructed yet."""
     f = BINARY.find(function)[0]
     return [verify.CoverageRow(function, f.raw, f.vaddr, "", group, "covered")]
-
-
-def call_sites(func) -> list[str]:
-    """Demangled names of the functions `func` calls directly, one per call instruction, in order."""
-    code = BINARY._bytes(func.vaddr, func.size)
-    out = []
-    for ins in BINARY._md.disasm(code, func.vaddr):
-        if ins.mnemonic == "call":
-            try:
-                target = int(ins.op_str, 16)
-            except ValueError:
-                continue  # indirect
-            if target != ins.address + ins.size:  # not the `call next; pop` PIC idiom
-                out.append(demangle(BINARY._name_for(target)))
-    return out
 
 
 def synthetic_reference(body: str) -> str:
@@ -611,8 +599,8 @@ class Records(unittest.TestCase):
                             ("_ZN7mkTrail7RestoreEP13idRestoreGame", "idRestoreGame")):
             func = BINARY.by_raw[symbol]
             with self.subTest(function=func.name):
-                binary_calls = [verify.split_qualified(name)[1] for name in call_sites(func)
-                                if name.startswith(cls + "::")]
+                binary_calls = [verify.split_qualified(c.name)[1] for c in BINARY.call_sites(func)
+                                if c.name.startswith(cls + "::")]
                 body = verify.code_only(verify.find_definition(impl, source_name(func.name)))
                 source_calls = re.findall(r"\bsavefile\s*->\s*(\w+)", body)
                 self.assertEqual(source_calls, binary_calls)

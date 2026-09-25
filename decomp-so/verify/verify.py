@@ -451,7 +451,8 @@ def find_static_init_body(impl: str, name: str) -> str | None:
     cls, member = split_qualified(first_global)
     if member != "Type" or not cls:
         return None
-    decl = re.search(r"\b(?:CLASS|ABSTRACT)_DECLARATION\s*\(\s*\w+\s*,\s*" + re.escape(cls) + r"\s*\)", impl)
+    macros = "|".join(MACRO_BODIES)  # the declaration macros that define cls::Type
+    decl = re.search(r"\b(?:" + macros + r")\s*\(\s*\w+\s*,\s*" + re.escape(cls) + r"\s*\)", impl)
     if not decl:
         return None
     return (f"void {name}( void ) {{ /* {decl.group(0)} defines {first_global}; the file's static "
