@@ -227,9 +227,9 @@ reverted after it broke the harness scenario for a reason not tracked down (the 
 with "developer 1" set, both via the launch command line and this command's own console script -
 tools/test-end-level-nextmap.sh - so the cvar not reading true where other game code's own
 developer.GetBool() calls, e.g. Light.cpp, presumably do work needs more investigation before
-relying on it). Single-player-only is still a real, if narrower, restriction: this command can only
-ever change anything meaningful when a player-triggered idCustomUI (only idTarget_EndLevelGUI in
-this mod) is already registered.
+relying on it). Narrower in practice, though not in principle (multiplayer with net_allowCheats 1
+still passes this gate): this command can only ever change anything meaningful when a
+player-triggered idCustomUI (only idTarget_EndLevelGUI in this mod) is already registered.
 ==================
 */
 void ChexTrek_CustomUICmd_f( const idCmdArgs &args ) {

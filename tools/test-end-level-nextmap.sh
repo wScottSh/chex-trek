@@ -270,7 +270,7 @@ fi
 # (Event_Activate's own initial value, still showing in dump #3's occurrence). There's no separate
 # dump line exposing stats[3].total in raw milliseconds to compare against exactly, so this checks
 # the format and a sanity range instead of an exact value: given the console script's own `wait`
-# budget up to this point (well under 2 real-time seconds of sim time), a real elapsed time here
+# budget up to this point (well under 2 seconds of sim time), a real elapsed time here
 # is on the order of 1-2 seconds, comfortably inside a generous [1ms, 30000ms) bound - the initial
 # "00:00:000" (0ms) and any absurdly large value (e.g. a units bug) both fall outside it.
 LEVEL_TIME_AFTER_SKIP="$(echo "$LEVEL_TIME_VALUES" | sed -n '5p')"
