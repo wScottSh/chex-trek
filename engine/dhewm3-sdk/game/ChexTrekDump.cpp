@@ -415,12 +415,13 @@ void ChexTrek_TestMapCmd_f( const idCmdArgs &args ) {
 		return;
 	}
 
-	// Note: idEntity::HandleGuiCommands' own return value doesn't reflect whether
-	// HandleSingleGuiCommand actually consumed a given token inside a multi-command string (stock
-	// behavior, Entity.cpp) - for the map_* commands (each sent here as a single-token string) it
-	// prints "not handled" even though the command demonstrably ran (mapControl changes, see the
-	// scenario's chextrek_dump-based assertions in tools/test-pda-map.sh). This log line is purely
-	// informational; nothing depends on it.
+	// Note: idEntity::HandleGuiCommands' own return value (stock behavior, Entity.cpp) never
+	// reflects whether HandleSingleGuiCommand consumed a token at all - its local "ret" is only
+	// ever set true by the literal "close" token; every other token, handled or not, falls through
+	// without touching it. So for the map_* commands (each sent here as a single-token string)
+	// this always prints "not handled" even though the command demonstrably ran (mapControl
+	// changes, see the scenario's chextrek_dump-based assertions in tools/test-pda-map.sh). This
+	// log line is purely informational; nothing depends on it.
 	const char *cmd = args.Argv( 1 );
 	bool handled = player->HandleGuiCommands( player, cmd );
 	gameLocal.Printf( "chextrek_test_map_cmd: '%s' %s\n", cmd, handled ? "handled" : "not handled" );
