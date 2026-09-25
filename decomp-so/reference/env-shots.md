@@ -16,8 +16,8 @@ Scope (spec #16, issue #25): the `matt_func_envshot` class, its `EV_envShot` eve
 //
 // Base class: idEntity. Evidence (binary):
 //   1. matt_func_envshot::Type is built with superclass name "idEntity": func_envshot.cpp's
-//      static initializer (0x2a6cb0) passes "idEntity" (0x2a6df5) and "matt_func_envshot"
-//      (0x2a6dff) to idTypeInfo::idTypeInfo @ 0x2a6e12, with matt_func_envshot::Spawn,
+//      static initializer (0x2a6cb0) loads "idEntity" (lea at 0x2a6df5) and "matt_func_envshot"
+//      (lea at 0x2a6dff) as arguments to idTypeInfo::idTypeInfo @ 0x2a6e12, with matt_func_envshot::Spawn,
 //      idEntity::Save and idEntity::Restore (so the class has no Save / Restore of its own).
 //   2. RTTI: _ZTI17matt_func_envshot (0x3cedec) is a __si_class_type_info whose base is _ZTI8idEntity.
 //   3. CreateInstance calls idEntity's base constructor (C2), then stores this class's vtable.
@@ -134,8 +134,8 @@ void matt_func_envshot::Event_envShot( void ) {
 	// Identity(), which would read the global mat3_identity from memory.
 	view->viewaxis = idMat3( 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f );
 	view->vieworg = GetPhysics()->GetOrigin();		// idPhysics vtable +0x84, id 0
-	// 73.74 is the fov_y that gameLocal.CalcFov gives for a fov_x of 90 at 4:3; written here as a
-	// constant (binary: immediate 0x42937ae1).
+	// 73.74 is the fov_y that gameLocal.CalcFov gives for a fov_x of 90 at 4:3 (73.7398...),
+	// rounded and written as a constant (binary: immediate 0x42937ae1 = 73.74f).
 	view->fov_x = 90.0f;
 	view->fov_y = 73.74f;
 
@@ -220,7 +220,7 @@ void idGameLocal::InitConsoleCommands( void ) {
 - **Stock-inline callees (check 1 allow-list, `stock-inline`).** `Spawn`: `idDict::FindKey` and `__strtol_internal` inside `spawnArgs.GetBool`. `Event_envShot`: `idDict::FindKey`, `idStr::ReAllocate` and `memcpy` inside `spawnArgs.GetString( key, default, idStr & )`; `idStr::ReAllocate` and `strcpy` inside the inline `idStr` `operator+` (the copy constructor and `Append`); `idStr::FreeData` inside `~idStr()`. `idStr::operator=( const char * )` (GetString's `out = defaultString`, not inline: `idlib/Str.cpp`) needs no entry: check 1 matches an operator callee by its operator (`=`) in the code. Each is on `verify/allowlist.tsv` for the exact function, with the stock function named. `memset`, `operator new`, `GetGlobalMaterial` and `GetPhysics` are named in the code. `Hide`, `GetOrigin`, `RenderScene`, `BufferCommandText`, `GetType` (inside `IsType`) and `Printf` are vtable calls, which check 1 does not see.
 - **Literals (check 2).** Every string and float the group's functions read appears with its value: `"atSpawn"`, `"0"` (`Spawn`); `"name"`, `"size"`, `"blends"`, `""`, `" "` and the immediates 1.0, 90.0, 73.74 (`Event_envShot`); `"%i envShots taken\n"` (`takeEnvShots_f`). `"envShot "` is not in `.rodata`: the inline `idStr( const char * )` stores it (NUL included) as `mov` immediates, and check 2 accepts it from there. The event name `"<envshot>"` and the registration strings are read by static initializers and a stock function, which are not covered functions (see above).
 - **Compile (check 3).** The header and implementation compile with g++ 12 `-m32` against stock DOOM-3 GPL a9c49da. Nothing is spliced into a stock class. The `idGameLocal::InitConsoleCommands` excerpt compiles as a definition in this translation unit only; the stock body is not repeated.
-- **Offsets.** `idCmdSystem` vtable: `AddCommand` +0x10, `BufferCommandText` +0x24; `idCommon::Printf` +0x44; `idRenderWorld::RenderScene` +0x48 (counted in the stock headers, as above). `gameLocal`: `entities` +0xf44, `num_entities` +0x8f48, `globalShaderParms` +0x8fc0, `time` +0x251884 (binary; not compared with a stock build). `renderView_t` (0x88 bytes) is the stock layout: `shaderParms` +0x54, `globalMaterial` +0x84, `time` +0x50, `viewaxis` +0x28, `vieworg` +0x1c, `fov_x` / `fov_y` +0x14 / +0x18.
+- **Offsets.** `idCmdSystem` vtable: `AddCommand` +0x10, `BufferCommandText` +0x24; `idCommon::Printf` +0x44; `idRenderWorld::RenderScene` +0x48 (counted in the stock headers, as above). `gameLocal`: `entities` +0xf44, `num_entities` +0x8f48, `globalShaderParms` +0x8fc0, `time` +0x251884 (binary). Each is 0x10 bytes past its offset in a GCC 12 `-m32` build of the stock headers (0xf34, 0x8f38, 0x8fb0, 0x251874, from `offsetof`), the same shift `hud-map.md` found for `world` and `isMultiplayer`. So this build's `idGameLocal` differs from stock before `entities`. Not examined (edits inside stock declarations are out of scope). `renderView_t` (0x88 bytes, as in the GCC 12 stock build) is the stock layout: `shaderParms` +0x54, `globalMaterial` +0x84, `time` +0x50, `viewaxis` +0x28, `vieworg` +0x1c, `fov_x` / `fov_y` +0x14 / +0x18.
 - **Ghidra artifacts.**
   - `CreateInstance` types the new object `idEntity *` and passes a stray `in_stack_ffffffd8` to `operator_new` (really `idClass::operator new( 0x27c )`). Its exception path (`operator delete`, `__cxa_begin_catch`) is CLASS_DECLARATION's `try` / `catch`, not shown.
   - The D0 destructor passes a stray `unaff_EBX` to `operator_delete` (really `idClass::operator delete( this )`).

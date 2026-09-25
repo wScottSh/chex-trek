@@ -710,7 +710,9 @@ class Records(unittest.TestCase):
         # def/func_envshot.def spawns the class and lists exactly the keys the binary reads
         edef = (verify.REPO_ROOT / "def" / "func_envshot.def").read_text(encoding="utf-8")
         self.assertIn('"spawnclass"\t\t\t"matt_func_envshot"', edef)
-        block = edef[edef.index("entityDef func_envshot"):edef.index("entityDef trigger_objective")]
+        start = edef.index("entityDef func_envshot")
+        end = edef.find("entityDef ", start + 1)
+        block = edef[start:end if end >= 0 else len(edef)]
         self.assertEqual(set(re.findall(r'"editor_var (\w+)"', block)), {"size", "name", "blends", "atSpawn"})
 
     def test_idplayer_additions_have_unique_offsets(self):
