@@ -18,8 +18,11 @@
 # "developer 1" and a trailing "quit" - callers own the whole script, not just a snippet, since
 # scenarios need to interleave "wait"s with their own commands).
 #
-# On return: CHEXTREK_ARTIFACT_DIR, CHEXTREK_LOCAL_LOG and CHEXTREK_RUN_STATUS are set. Does not
-# exit the shell - callers decide what to do with a non-zero CHEXTREK_RUN_STATUS.
+# On return: CHEXTREK_RUN_STATUS is always set (0 pass, 1 fail). CHEXTREK_ARTIFACT_DIR and
+# CHEXTREK_LOCAL_LOG are set once the run actually launches dhewm3; on an early-return failure
+# (missing dhewm3.exe/chextrek.dll, can't create the mount symlink) they're left unset, so callers
+# that echo them should use "${CHEXTREK_LOCAL_LOG:-}" under `set -u`. Does not exit the shell -
+# callers decide what to do with a non-zero CHEXTREK_RUN_STATUS.
 chextrek_run_console_script() {
 	local REPO_ROOT="$1"
 	local CONSOLE_SCRIPT_BODY="$2"
@@ -125,10 +128,11 @@ chextrek_run_console_script() {
 	# --- archive this run's artifacts (log + any screenshot), still outside the repo ---
 	# `screenshot <name>` writes a plain, extensionless file named exactly <name> straight into
 	# MOD_SAVE_DIR (confirmed on #30's scenario runs: "screenshot chextrek_script_events" writes
-	# "chextrek_script_events"; see docs/dev-setup.md - this corrects #29's guess that the name is
-	# ignored in favor of an auto-numbered "screenshots/shot00001.tga", which isn't what this
-	# engine build actually does). Rather than hardcode a name pattern here - which would have to
-	# track whatever name each caller's console script happens to pick - archive everything: since
+	# "chextrek_script_events" - this is what #29 originally found too; see docs/dev-setup.md for
+	# where a stale claim to the contrary, that the name is ignored in favor of an auto-numbered
+	# "screenshots/shot00001.tga", briefly crept in and was corrected). Rather than hardcode a name
+	# pattern here - which would have to track whatever name each caller's console script happens
+	# to pick - archive everything: since
 	# MOD_SAVE_DIR is wiped to empty before every run (above), anything left in it (or under a
 	# screenshots/ subfolder, just in case) afterward, other than our own cfg, is this run's own
 	# output. Never asserted on (spec #28: "saved as artifacts, never asserted"), so this stays

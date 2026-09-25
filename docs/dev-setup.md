@@ -62,12 +62,12 @@ As of #30, the default run is green (script compile passes and the main menu loa
 exercised the screenshot-artifact path for the first time. `screenshot <name>` writes a plain,
 extensionless file named exactly `<name>` straight into the save dir
 (`Documents\My Games\dhewm3\chextrek\<name>`) - confirmed on repeated runs of both
-`tools/run-harness.sh` and `tools/test-script-events.sh`'s scenario. (An early one-off run before
-the harness's own screenshot name was fixed to a plain string appeared to show a different
-`screenshots\shot00001.tga` path instead; that hasn't reproduced since and is no longer treated as
-this engine build's actual behavior.) Rather than rely on that name pattern, `tools/lib-harness.sh`
-archives everything the run leaves behind in the scratch save dir (it's wiped clean beforehand),
-so a screenshot is captured regardless of what name a given console script happens to use.
+`tools/run-harness.sh` and `tools/test-script-events.sh`'s scenario. This is what #29 originally
+found too; a stale claim to the contrary (that the name is ignored in favor of an auto-numbered
+`screenshots\shot00001.tga`) briefly crept into this doc during #30 and has been corrected. Rather
+than rely on the name pattern at all, `tools/lib-harness.sh` archives everything the run leaves
+behind in the scratch save dir (it's wiped clean beforehand), so a screenshot is captured
+regardless of what name a given console script happens to use.
 
 **Only run one harness invocation at a time on a given machine.** It kills every `dhewm3.exe`
 process by image name on timeout (not just the one it started), and concurrent runs - e.g. from

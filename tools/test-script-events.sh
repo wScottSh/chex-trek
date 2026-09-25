@@ -61,7 +61,6 @@ spawn monster_chex_biped name chextrek_footprint_actor footprint_on_sound 1
 wait 30
 chextrek_dump
 script sys.getEntity( $chextrek_test_str5 ).leftFoot()
-wait 10
 chextrek_dump
 
 script sys.getEntity( $chextrek_test_str4 ).remove()
@@ -135,19 +134,24 @@ else
 	FAIL=1
 fi
 
-# --- footPrint: the footprints counter (ChexTrekDump.cpp) rises across the trigger, not just
-# "ends up above zero" (which the AI's own idle behavior - e.g. its own walk anim's footprint
-# frame commands - could satisfy on its own without proving our leftFoot() call did anything).
-# There are 6 chextrek_dump calls total (see the console script above); the 4th is taken right
-# after chextrek_footprint_actor is spawned and settles (wait 30) but *before* leftFoot() is
-# called - as late as possible while still being a true baseline - and the 5th right after.
+# --- footPrint: the footprints counter (ChexTrekDump.cpp) rises by exactly one across the
+# trigger, not just "ends up above zero" (which the AI's own idle behavior - e.g. its own walk
+# anim's footprint frame commands - could satisfy on its own without proving our leftFoot() call
+# did anything). There are 6 chextrek_dump calls total (see the console script above); the 4th is
+# taken right after chextrek_footprint_actor is spawned and settles (wait 30) but *before*
+# leftFoot() is called - as late as possible while still being a true baseline - and the 5th
+# right after, with no `wait` between leftFoot() and that 5th dump: `script` runs synchronously
+# (Cmd_Script_f starts the thread and runs it to completion before the next queued console
+# command), so back-to-back console lines with no `wait` leave the AI's own think loop no frames
+# to run in between, leaving leftFoot() -> PlayFootStepSound -> one Event_FootPrint(NULL, NULL)
+# call as the only thing that can have happened - hence asserting +1 exactly, not just a rise.
 FOOTPRINTS_COUNTS="$(grep -oE '^footprints: [0-9]+' "$LOCAL_LOG" | grep -oE '[0-9]+$')"
 FOOTPRINTS_BASELINE="$(echo "$FOOTPRINTS_COUNTS" | sed -n '4p')"
 FOOTPRINTS_AFTER="$(echo "$FOOTPRINTS_COUNTS" | sed -n '5p')"
-if [ -n "$FOOTPRINTS_BASELINE" ] && [ -n "$FOOTPRINTS_AFTER" ] && [ "$FOOTPRINTS_AFTER" -gt "$FOOTPRINTS_BASELINE" ]; then
+if [ -n "$FOOTPRINTS_BASELINE" ] && [ -n "$FOOTPRINTS_AFTER" ] && [ "$FOOTPRINTS_AFTER" -eq $(( FOOTPRINTS_BASELINE + 1 )) ]; then
 	echo "PASS: footPrint - a decal was projected (chextrek_dump's footprints counter went from ${FOOTPRINTS_BASELINE} to ${FOOTPRINTS_AFTER})"
 else
-	echo "FAIL: footPrint - expected chextrek_dump's footprints counter to rise across the trigger, got '${FOOTPRINTS_BASELINE}' then '${FOOTPRINTS_AFTER}'"
+	echo "FAIL: footPrint - expected chextrek_dump's footprints counter to rise by exactly 1 across the trigger, got '${FOOTPRINTS_BASELINE}' then '${FOOTPRINTS_AFTER}'"
 	FAIL=1
 fi
 
