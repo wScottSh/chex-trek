@@ -21,8 +21,8 @@
 # (mapControl/mapView/lastRevealOrigin/mapLevels) sane defaults in the idPlayer constructor
 # (Player.cpp, #39), a freshly-allocated idPlayer restored straight from a savegame held whatever
 # garbage was already in that memory (Mem_Alloc doesn't zero it) - confirmed live here, a garbage
-# mapLevels[0] landing above the player's own z fired
-# "Location below lowest MapLevel" warnings after every save/load round-trip this scenario ran, so
+# mapLevels[0] landing above the player's own z fired "Location below lowest MapLevel" warnings
+# after every save/load round-trip this scenario ran, so
 # the scenario also asserts that warning's absence below (a scenario-revealed gap, filled here and
 # recorded in docs/harness-coverage.md, matching #36-#38's own precedent of recording gap-filling
 # edits there rather than in the frozen, formally-checked decomp-so/reference/hud-map.md itself -
@@ -54,9 +54,9 @@
 # given a constructor default, since Restore's own ReadFloat is the only thing that ever needs to
 # set it): the fresh object a load creates never sets it itself, so it would hold whatever the
 # freed player's memory happened to still contain if idPlayer::Restore's ReadFloat were missing -
-# not guaranteed to differ from
-# the pre-save value, but not guaranteed to match it either, so asserting a plain "still equal to
-# X" isn't a real check of Restore's own work either way. Both weaknesses get the same fix: perturb
+# not guaranteed to differ from the pre-save value, but not guaranteed to match it either, so
+# asserting a plain "still equal to X" isn't a real check of Restore's own work either way. Both
+# weaknesses get the same fix: perturb
 # the value between the savegame and the loadgame (the real "showMap" console command, #38, fills
 # every level's hudmap_alpha with 0xff, coverage=16384; another map_zoom_in grows mapScale further
 # past its already-zoomed pre-save value), assert the perturbation actually landed (its own dump,
@@ -287,7 +287,7 @@ else
 fi
 
 # --- the gap this scenario found and #39's idPlayer constructor edit closes: without sane
-# defaults for mapLevels (and mapControl/mapView/lastRevealOrigin/unknown1e5c), a savegame-load
+# defaults for mapLevels (and mapControl/mapView/lastRevealOrigin), a savegame-load
 # restores into a freshly-allocated idPlayer that never runs Init()/Spawn()'s initHudMap, leaving
 # mapLevels[0] as leftover memory - HudMapLevel then warns and falls back to level 0 whenever the
 # player's z lands below that garbage value. "level" alone (checked above) can't tell a real level
