@@ -1,0 +1,28 @@
+# Literals check 2 accepts without the value appearing in the reconstruction.
+# One entry per line, 4 TAB-separated fields:
+#   function-pattern  literal-pattern  kind  reason
+# function-pattern: fnmatch glob on the binary function's demangled name, parameters stripped.
+# literal-pattern: fnmatch glob on the literal as the harness prints it,
+#   e.g. `float 1.5`, `double 0.001`, `string "0"` (see `verify.py --literals <group>`).
+# Kinds:
+#   stock-inline  the constant is inside an inlined stock SDK function the reconstruction
+#                 calls by name (e.g. the 0.5 / 1.5 of idMath::InvSqrt's Newton step);
+#                 name the stock function and file in the reason
+idPlayer::updateHudMapAlpha	float [01].5	stock-inline	the Newton step ( 1.5f - r * r * ( x * 0.5f ) ) of idMath::RSqrt (in idVec3::LengthFast) and idMath::InvSqrt (in idMath::Sqrt, idVec2::Length); ID_INLINE in idlib/math/Math.h
+idPlayer::Cmd_ShowMap_f	string ""	stock-inline	args.Argv( 1 ) in the "bad level" message: idCmdArgs::Argv returns "" for an out-of-range index; inline in idlib/CmdArgs.h
+mkTrail::Think	float [01].5	stock-inline	the Newton step ( 1.5f - r * r * ( x * 0.5f ) ) of idMath::RSqrt in idVec3::LengthFast; ID_INLINE in idlib/math/Math.h and idlib/math/Vector.h
+mkTrail::UpdateRenderEntity	float 1.5	stock-inline	the Newton step ( 1.5f - r * r * ( x * 0.5f ) ) of idMath::RSqrt in idVec3::LengthFast; ID_INLINE in idlib/math/Math.h and idlib/math/Vector.h
+mkTrail::addNewAnchor	float 1.5	stock-inline	the Newton steps ( 1.5f - r * r * ( x * 0.5f ) ) of idMath::RSqrt in idVec3::LengthFast and of idMath::InvSqrt in idVec3::Normalize; ID_INLINE in idlib/math/Math.h and idlib/math/Vector.h
+idActor::Event_FootPrint	float [01].5	stock-inline	the Newton steps ( 1.5f - r * r * ( x * 0.5f ) ) of idMath::InvSqrt in the two idVec3::Normalize calls; ID_INLINE in idlib/math/Math.h and idlib/math/Vector.h
+idGameLocal::ProjectDecal	float 3.0517578e-05	stock-inline	the 1 / ( MAX_RAND + 1 ) of idRandom::RandomFloat ( RandomInt() / ( float )( idRandom::MAX_RAND + 1 ) ), in random.RandomFloat(); ID_INLINE in idlib/math/Random.h
+idGameLocal::ProjectDecal	float 1.5	stock-inline	the Newton steps ( 1.5f - r * r * ( x * 0.5f ) ) of idMath::InvSqrt in idVec3::Normalize and idVec3::NormalVectors; ID_INLINE in idlib/math/Math.h and idlib/math/Vector.h
+idGameLocal::ProjectDecal	float -1.0	stock-inline	d = -1.0f, the sign idMath::SinCos16 gives the cosine in the second and third quadrants; ID_INLINE in idlib/math/Math.h
+idGameLocal::ProjectDecal	float -2.605e-07	stock-inline	a coefficient of idMath::SinCos16's sine / cosine polynomial; ID_INLINE in idlib/math/Math.h
+idGameLocal::ProjectDecal	float 2.47609e-05	stock-inline	a coefficient of idMath::SinCos16's sine / cosine polynomial; ID_INLINE in idlib/math/Math.h
+idGameLocal::ProjectDecal	float 0.0013888397	stock-inline	a coefficient of idMath::SinCos16's sine / cosine polynomial; ID_INLINE in idlib/math/Math.h
+idGameLocal::ProjectDecal	float 0.04166664	stock-inline	a coefficient of idMath::SinCos16's sine / cosine polynomial; ID_INLINE in idlib/math/Math.h
+idGameLocal::ProjectDecal	float -2.39e-08	stock-inline	a coefficient of idMath::SinCos16's sine / cosine polynomial; ID_INLINE in idlib/math/Math.h
+idGameLocal::ProjectDecal	float 2.7526e-06	stock-inline	a coefficient of idMath::SinCos16's sine / cosine polynomial; ID_INLINE in idlib/math/Math.h
+idGameLocal::ProjectDecal	float 0.000198409	stock-inline	a coefficient of idMath::SinCos16's sine / cosine polynomial; ID_INLINE in idlib/math/Math.h
+idGameLocal::ProjectDecal	float 0.008333332	stock-inline	a coefficient of idMath::SinCos16's sine / cosine polynomial; ID_INLINE in idlib/math/Math.h
+idGameLocal::ProjectDecal	float 0.16666667	stock-inline	a coefficient of idMath::SinCos16's sine / cosine polynomial; ID_INLINE in idlib/math/Math.h

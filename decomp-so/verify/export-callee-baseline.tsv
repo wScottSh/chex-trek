@@ -1,0 +1,92 @@
+# Callee coverage of the first full Ghidra export (bf8196f, before the issue #18 enrichment); the last
+# rows, for functions that export lacked, are from the later export that added them (see below).
+# export	found	total	callees that export did not name. test_verify.py requires the current
+# export to name at least as many of each function's direct callees (no truncation regression).
+idActor_Event_FootPrint_000c6210.c	10	10	
+idGameLocal_RemoveTrail_000fe7f0.c	0	0	
+idGameLocal_GetLevelStats_00100800.c	2	2	
+idGameLocal_BabySitTrail_00102a10.c	2	2	
+idPlayer_incSecretsFound_0015d2e0.c	0	0	
+idPlayer_getLevelStats_0015d2f0.c	0	0	
+idPlayer_useCustomUI_0015d300.c	0	0	
+idPlayer_clearCustomUI_0015d320.c	0	0	
+idPlayer_MapImageCoords_0015d340.c	0	0	
+idPlayer_freeObjective_0015d390.c	0	0	
+idPlayer_HudMapLevel_0015e450.c	2	2	
+idPlayer_addObjective_0015e520.c	2	2	
+idPlayer_Cmd_ShowMap_f_00160c00.c	3	3	
+idPlayer_updateMapUI_00160eb0.c	3	3	
+idPlayer_updateHudMapAlpha_00164380.c	3	3	
+idPlayer_updateMap_00164720.c	3	3	
+idPlayer_initHudMap_0016bd00.c	11	11	
+idPlayer_tryOpen_0017c420.c	13	13	
+idPlayer_addItemText_0017f990.c	3	3	
+idCmdSystem_ArgCompletion_GuiName_00183a40.c	0	0	
+idCustomUI_GetType_0019d3b0.c	0	0	
+idCustomUI_setGUI_0019d3d0.c	0	0	
+idTarget_EndLevelGUI_GetType_0019d4a0.c	0	0	
+idTarget_EndLevelGUI_updateStats_0019d4c0.c	0	0	
+mkObjective_GetType_0019d640.c	0	0	
+mkObjective_CreateInstance_0019dc60.c	3	4	idClass::operator delete(void*)
+idCustomUI_idCustomUI_0019dd60.c	1	1	
+idCustomUI_idCustomUI_0019ddb0.c	1	1	
+idTarget_EndLevelGUI_CreateInstance_0019de00.c	3	4	idClass::operator delete(void*)
+idTarget_EndLevelGUI_Spawn_0019dfc0.c	1	1	
+idTarget_EndLevelGUI_Save_0019e020.c	2	2	
+idCustomUI_UnregisterGUI_0019e0b0.c	2	2	
+idCustomUI_HandleCustomGUICommand_0019e130.c	2	2	
+idCustomUI_Event_Hide_0019e180.c	2	2	
+idCustomUI_RegisterGUI_0019e1c0.c	2	2	
+idCustomUI_Restore_0019e230.c	3	3	
+idCustomUI_Save_0019e2a0.c	2	2	
+idCustomUI_CreateInstance_0019e300.c	1	1	
+mkObjective_Save_0019e8f0.c	2	2	
+mkObjective_Restore_0019ede0.c	3	3	
+idTarget_EndLevelGUI_Restore_0019eeb0.c	4	4	
+idTarget_EndLevelGUI_HandleCustomGUICommand_001a13c0.c	7	7	
+mkObjective_AttachToLocalPlayer_001a36b0.c	10	10	
+mkObjective_RemoveFromLocalPlayer_001a3a10.c	9	9	
+idTarget_EndLevelGUI_Event_Activate_001a3ee0.c	10	10	
+mkObjective_Spawn_001a4390.c	4	4	
+mkObjective_Event_Activate_001a56a0.c	5	5	
+idTarget_EndLevelGUI_Event_UpdateStats_001a5760.c	14	14	
+idCustomUI_idCustomUI_001a9100.c	2	2	
+idCustomUI_idCustomUI_001a9150.c	1	1	
+idTarget_EndLevelGUI_idTarget_EndLevelGUI_001a9180.c	1	1	
+mkObjective_mkObjective_001a9280.c	3	3	
+mkObjective_mkObjective_001a9330.c	2	2	
+idTarget_EndLevelGUI_idTarget_EndLevelGUI_001a93e0.c	2	2	
+idWeapon_Event_SetProj_001af990.c	2	2	
+idAI_OpenDoors_001ce950.c	2	2	
+idAI_Event_OpenDoors_001dc9a0.c	1	1	
+idThread_Event_SpawnDict_0024dc00.c	9	9	
+mkTrail_GetType_002b3e60.c	0	0	
+mkTrail_Save_002b3eb0.c	9	9	
+mkTrail__GLOBAL__I_Type_002b4250.c	1	1	
+mkTrail_Think_002b4260.c	2	2	
+mkTrail_UpdateRenderEntity_002b4420.c	1	1	
+mkTrail_ModelCallback_002b4c70.c	1	1	
+mkTrail_Restore_002b4cb0.c	13	13	
+mkTrail_mkTrail_002b51e0.c	4	5	idClass::{base dtor}()
+mkTrail_CreateInstance_002b53f0.c	3	4	idClass::operator delete(void*)
+mkTrail_FadeTrail_002b5470.c	2	2	
+mkTrail_Spawn_002b5540.c	6	6	
+mkTrail_addNewAnchor_002b59d0.c	5	5	
+mkTrail_Present_002b6140.c	3	3	
+mkTrail_mkTrail_002b6450.c	7	7	
+mkTrail_mkTrail_002b65f0.c	4	5	idClass::{base dtor}()
+mkTrail_mkTrail_002b6800.c	6	6	
+mkTrail_mkTrail_002b69a0.c	6	6	
+matt_func_envshot_GetType_002b6b40.c	0	0	
+matt_func_envshot_Spawn_002b6b90.c	3	3	
+matt_func_envshot_CreateInstance_002b6c20.c	3	4	idClass::operator delete(void*)
+matt_func_envshot__GLOBAL__I_Type_002b6e50.c	1	1	
+matt_func_envshot_Event_envShot_002b6e60.c	10	10	
+matt_func_envshot_takeEnvShots_f_002b7890.c	1	1	
+matt_func_envshot_matt_func_envshot_002b7940.c	2	2	
+matt_func_envshot_matt_func_envshot_002b7990.c	1	1	
+idStr_FormatTime_00354230.c	5	5	
+# Not in the first export: exported in PR #27's final review, rows from that export.
+idGameLocal_ProjectDecal_00101c80.c	0	0	
+idWorldspawn_Think_001bbe40.c	6	6	
+idWorldspawn_Save_001bb5e0.c	0	0	

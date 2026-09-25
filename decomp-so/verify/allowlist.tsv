@@ -1,0 +1,103 @@
+# Callees check 1 accepts without a mention in the reconstruction.
+# One entry per line, 4 TAB-separated fields:
+#   function-pattern  callee-pattern  kind  reason
+# Patterns are fnmatch globs on demangled names with parameters stripped
+# (e.g. `idCustomUI::CreateInstance`, `idClass::operator delete`).
+# Kinds:
+#   exception-only  reached only from an exception landing pad; no source statement makes the call
+#   abi-implicit    emitted by the GCC C++ ABI itself; no source statement makes the call
+#   stock-inline    made inside stock ID_INLINE SDK code that the reconstruction calls by its SDK name
+#                   (or inside a stock type's implicit destructor); the reason names the stock
+#                   function and its file. One entry per function: never a wildcard function pattern
+#   libc-inline     made inside a C library function the system headers define inline (glibc's atoi
+#                   is strtol, which becomes __strtol_internal); the reason names the libc function.
+#                   One entry per function: never a wildcard function pattern
+# Always ignored (never listed here): _Unwind_Resume, __cxa_*, __i686.get_pc_thunk.*
+*::CreateInstance	*::operator delete	exception-only	CLASS_DECLARATION's `new nameofclass` frees the storage only if the constructor throws (seen in stock idTarget::CreateInstance @ 0x18de90: operator delete sits in the landing pad before _Unwind_Resume)
+*::{deleting dtor}	*::operator delete	abi-implicit	D0 "deleting destructor" clone runs the D1 body then frees `this`; the source destructor has no delete statement
+idGameLocal::GetLevelStats	idDict::FindKey	stock-inline	spawnArgs.GetBool( key, "0" ): idDict::GetBool -> idDict::GetString( key, default ) -> FindKey, all ID_INLINE in idlib/Dict.h
+idGameLocal::GetLevelStats	__strtol_internal	stock-inline	atoi() inside idDict::GetBool (idlib/Dict.h): glibc's inline atoi is strtol( s, NULL, 10 ), which its headers turn into __strtol_internal( s, NULL, 10, 0 )
+idTarget_EndLevelGUI::Event_Activate	idDict::FindKey	stock-inline	spawnArgs.GetString( key, default, idStr & ) and GetString( key ) call FindKey; ID_INLINE in idlib/Dict.h
+idTarget_EndLevelGUI::Event_Activate	idStr::ReAllocate	stock-inline	out = kv->GetValue() in idDict::GetString( key, default, idStr & ): idStr::operator=( const idStr & ) -> EnsureAlloc, ID_INLINE in idlib/Str.h
+idTarget_EndLevelGUI::Event_Activate	memcpy	stock-inline	idStr::operator=( const idStr & ) (ID_INLINE, idlib/Str.h) copies the text with memcpy, reached from idDict::GetString( key, default, idStr & )
+idTarget_EndLevelGUI::Event_Activate	idStr::FreeData	stock-inline	~idStr() of the local idStr objects: ID_INLINE in idlib/Str.h, calls FreeData
+idTarget_EndLevelGUI::Event_UpdateStats	idDict::FindKey	stock-inline	spawnArgs.GetBool( key, "0" ) and GetString( key, default, idStr & ): ID_INLINE in idlib/Dict.h, both call FindKey
+idTarget_EndLevelGUI::Event_UpdateStats	__strtol_internal	stock-inline	atoi() inside idDict::GetBool (idlib/Dict.h): glibc's inline atoi is strtol( s, NULL, 10 ), which its headers turn into __strtol_internal( s, NULL, 10, 0 )
+idTarget_EndLevelGUI::Event_UpdateStats	idStr::ReAllocate	stock-inline	idStr::operator=( const idStr & ) in idDict::GetString( key, default, idStr & ) and idStr::operator+=( const idStr & ) -> Append: EnsureAlloc, ID_INLINE in idlib/Str.h
+idTarget_EndLevelGUI::Event_UpdateStats	memcpy	stock-inline	idStr::operator=( const idStr & ) (ID_INLINE, idlib/Str.h) copies the text with memcpy, reached from idDict::GetString( key, default, idStr & )
+idTarget_EndLevelGUI::Event_UpdateStats	idStr::FreeData	stock-inline	~idStr() of the local nextMap and of idStr::FormatTime's returned temporary: ID_INLINE in idlib/Str.h, calls FreeData
+idTarget_EndLevelGUI::HandleCustomGUICommand	idStr::FreeData	stock-inline	~idStr() of idStr::FormatTime's returned temporary: ID_INLINE in idlib/Str.h, calls FreeData
+idStr::FormatTime	idStr::ReAllocate	stock-inline	idStr::operator+=( const char * ) / operator+=( char ) -> Append -> EnsureAlloc, ID_INLINE in idlib/Str.h
+idStr::FormatTime	strlen	stock-inline	idStr::operator+=( const char * ) -> Append( const char * ) calls strlen; ID_INLINE in idlib/Str.h
+mkObjective::Spawn	idDict::FindKey	stock-inline	spawnArgs.GetString( key, default, idStr & ): ID_INLINE in idlib/Dict.h, calls FindKey
+mkObjective::Spawn	idStr::ReAllocate	stock-inline	out = kv->GetValue() in idDict::GetString( key, default, idStr & ): idStr::operator=( const idStr & ) -> EnsureAlloc, ID_INLINE in idlib/Str.h
+mkObjective::Spawn	memcpy	stock-inline	idStr::operator=( const idStr & ) (ID_INLINE, idlib/Str.h) copies the text with memcpy, reached from idDict::GetString( key, default, idStr & )
+mkObjective::AttachToLocalPlayer	idDict::FindKey	stock-inline	spawnArgs.GetString( key, default, idStr & ): ID_INLINE in idlib/Dict.h, calls FindKey
+mkObjective::AttachToLocalPlayer	idStr::ReAllocate	stock-inline	out = kv->GetValue() in idDict::GetString( key, default, idStr & ): idStr::operator=( const idStr & ) -> EnsureAlloc, ID_INLINE in idlib/Str.h
+mkObjective::AttachToLocalPlayer	memcpy	stock-inline	idStr::operator=( const idStr & ) (ID_INLINE, idlib/Str.h) copies the text with memcpy, reached from idDict::GetString( key, default, idStr & )
+mkObjective::AttachToLocalPlayer	idStr::FreeData	stock-inline	implicit ~idItemInfo() of the local info (stock struct in game/Player.h): ~idStr() of name and icon, ID_INLINE in idlib/Str.h, calls FreeData
+mkObjective::RemoveFromLocalPlayer	idDict::FindKey	stock-inline	spawnArgs.GetString( key, default, idStr & ): ID_INLINE in idlib/Dict.h, calls FindKey
+mkObjective::RemoveFromLocalPlayer	idStr::ReAllocate	stock-inline	out = kv->GetValue() in idDict::GetString( key, default, idStr & ): idStr::operator=( const idStr & ) -> EnsureAlloc, ID_INLINE in idlib/Str.h
+mkObjective::RemoveFromLocalPlayer	memcpy	stock-inline	idStr::operator=( const idStr & ) (ID_INLINE, idlib/Str.h) copies the text with memcpy, reached from idDict::GetString( key, default, idStr & )
+mkObjective::RemoveFromLocalPlayer	idStr::FreeData	stock-inline	implicit ~idItemInfo() of the local info (stock struct in game/Player.h): ~idStr() of name and icon, ID_INLINE in idlib/Str.h, calls FreeData
+mkObjective::Event_Activate	idDict::FindKey	stock-inline	spawnArgs.GetBool( key, "0" ): idDict::GetBool -> idDict::GetString( key, default ) -> FindKey, all ID_INLINE in idlib/Dict.h
+mkObjective::Event_Activate	__strtol_internal	stock-inline	atoi() inside idDict::GetBool (idlib/Dict.h): glibc's inline atoi is strtol( s, NULL, 10 ), which its headers turn into __strtol_internal( s, NULL, 10, 0 )
+mkObjective::{dtor}	idStr::FreeData	stock-inline	~idStr() of the members description, title and image, which the (implicit) destructor runs: ID_INLINE in idlib/Str.h, calls FreeData
+mkObjective::{deleting dtor}	idStr::FreeData	stock-inline	~idStr() of the members description, title and image, which the (implicit) destructor runs: ID_INLINE in idlib/Str.h, calls FreeData
+idPlayer::addItemText	idList<idItemInfo>::Resize	stock-inline	inventory.pickupItemNames.Append( info ): idList<type>::Append (ID_INLINE template, idlib/containers/List.h) calls Resize when the list is unallocated or full
+idPlayer::addItemText	idStr::ReAllocate	stock-inline	list[ num ] = obj in idList::Append: idItemInfo's implicit operator= -> idStr::operator=( const idStr & ) for name and icon -> EnsureAlloc, ID_INLINE in idlib/Str.h
+idPlayer::addItemText	memcpy	stock-inline	idStr::operator=( const idStr & ) (ID_INLINE, idlib/Str.h) copies the text with memcpy, reached from idItemInfo's implicit operator= in idList::Append
+idPlayer::initHudMap	strlen	stock-inline	idStr mapName = gameLocal.GetMapName(): idStr::idStr( const char * ) calls strlen; ID_INLINE in idlib/Str.h
+idPlayer::initHudMap	strcpy	stock-inline	idStr::idStr( const char * ) copies the text with strcpy (mapName, and idStr::Right's copy of *this); ID_INLINE in idlib/Str.h
+idPlayer::initHudMap	idStr::ReAllocate	stock-inline	EnsureAlloc in idStr::idStr( const char * ), idStr::operator=( const idStr & ) and operator+=( const idStr & ) -> Append; ID_INLINE in idlib/Str.h
+idPlayer::initHudMap	idStr::Mid	stock-inline	mapName.Right( len ) returns Mid( Length() - len, len ); idStr::Right is ID_INLINE in idlib/Str.h
+idPlayer::initHudMap	idStr::FreeData	stock-inline	~idStr() of the local mapName and of the idStr( "guis/hud_maps/" ) and Right() temporaries: ID_INLINE in idlib/Str.h, calls FreeData
+idPlayer::Cmd_ShowMap_f	__strtol_internal	libc-inline	atoi( args.Argv( 1 ) ): glibc's <stdlib.h> defines atoi inline as strtol( s, NULL, 10 ), which its headers turn into __strtol_internal( s, NULL, 10, 0 )
+mkTrail::{*ctor}	idClass::{base dtor}	exception-only	only in the constructors' exception landing pad (C1 0x2a53d6, before _Unwind_Resume): if a member constructor throws, the already-built idClass base is destroyed during unwinding; no source statement calls ~idClass
+mkTrail::{ctor}	idHashIndex::Init	stock-inline	spawnArgs' constructor: idDict::idDict() constructs argHash with idHashIndex::idHashIndex(), which calls Init( DEFAULT_HASH_SIZE, DEFAULT_HASH_SIZE ); ID_INLINE in idlib/Dict.h and idlib/containers/HashIndex.h
+mkTrail::{ctor}	idHashIndex::Free	stock-inline	spawnArgs' constructor: idDict::idDict() calls argHash.Clear( 128, 16 ), which calls Free(); ID_INLINE in idlib/Dict.h and idlib/containers/HashIndex.h
+mkTrail::{ctor}	operator new[]	stock-inline	spawnArgs' constructor: idDict::idDict() calls args.SetGranularity( 16 ), whose idList::Resize allocates with new[]; ID_INLINE in idlib/Dict.h and idlib/containers/List.h
+mkTrail::{ctor}	operator delete[]	stock-inline	spawnArgs' constructor: idDict::idDict() calls args.SetGranularity( 16 ), whose idList::Resize frees the old array with delete[]; ID_INLINE in idlib/Dict.h and idlib/containers/List.h
+mkTrail::{base ctor}	idHashIndex::Init	stock-inline	spawnArgs' constructor: idDict::idDict() constructs argHash with idHashIndex::idHashIndex(), which calls Init( DEFAULT_HASH_SIZE, DEFAULT_HASH_SIZE ); ID_INLINE in idlib/Dict.h and idlib/containers/HashIndex.h
+mkTrail::{base ctor}	idHashIndex::Free	stock-inline	spawnArgs' constructor: idDict::idDict() calls argHash.Clear( 128, 16 ), which calls Free(); ID_INLINE in idlib/Dict.h and idlib/containers/HashIndex.h
+mkTrail::{base ctor}	operator new[]	stock-inline	spawnArgs' constructor: idDict::idDict() calls args.SetGranularity( 16 ), whose idList::Resize allocates with new[]; ID_INLINE in idlib/Dict.h and idlib/containers/List.h
+mkTrail::{base ctor}	operator delete[]	stock-inline	spawnArgs' constructor: idDict::idDict() calls args.SetGranularity( 16 ), whose idList::Resize frees the old array with delete[]; ID_INLINE in idlib/Dict.h and idlib/containers/List.h
+mkTrail::{dtor}	idDict::Clear	stock-inline	~idDict() of the member spawnArgs, which the destructor runs: ID_INLINE in idlib/Dict.h, calls Clear
+mkTrail::{dtor}	idHashIndex::Free	stock-inline	~idHashIndex() of spawnArgs.argHash (inside ~idDict): ID_INLINE in idlib/containers/HashIndex.h, calls Free
+mkTrail::{dtor}	operator delete[]	stock-inline	~idList() of the members anchors and spawnArgs.args: idList::Clear frees the array with delete[]; ID_INLINE in idlib/containers/List.h
+mkTrail::{base dtor}	idDict::Clear	stock-inline	~idDict() of the member spawnArgs, which the destructor runs: ID_INLINE in idlib/Dict.h, calls Clear
+mkTrail::{base dtor}	idHashIndex::Free	stock-inline	~idHashIndex() of spawnArgs.argHash (inside ~idDict): ID_INLINE in idlib/containers/HashIndex.h, calls Free
+mkTrail::{base dtor}	operator delete[]	stock-inline	~idList() of the members anchors and spawnArgs.args: idList::Clear frees the array with delete[]; ID_INLINE in idlib/containers/List.h
+mkTrail::{deleting dtor}	idDict::Clear	stock-inline	~idDict() of the member spawnArgs, which the destructor runs: ID_INLINE in idlib/Dict.h, calls Clear
+mkTrail::{deleting dtor}	idHashIndex::Free	stock-inline	~idHashIndex() of spawnArgs.argHash (inside ~idDict): ID_INLINE in idlib/containers/HashIndex.h, calls Free
+mkTrail::{deleting dtor}	operator delete[]	stock-inline	~idList() of the members anchors and spawnArgs.args: idList::Clear frees the array with delete[]; ID_INLINE in idlib/containers/List.h
+mkTrail::Spawn	idDict::FindKey	stock-inline	spawnArgs.GetString / GetFloat / GetInt( key, default ): each reaches idDict::GetString( key, default ) -> FindKey, all ID_INLINE in idlib/Dict.h
+mkTrail::Spawn	__strtod_internal	stock-inline	atof() inside idDict::GetFloat (idlib/Dict.h): glibc's inline atof is strtod( s, NULL ), which its headers turn into __strtod_internal( s, NULL, 0 )
+mkTrail::Spawn	__strtol_internal	stock-inline	atoi() inside idDict::GetInt (idlib/Dict.h): glibc's inline atoi is strtol( s, NULL, 10 ), which its headers turn into __strtol_internal( s, NULL, 10, 0 )
+mkTrail::FadeTrail	idDict::FindKey	stock-inline	spawnArgs.GetFloat( key, default ): idDict::GetFloat -> idDict::GetString( key, default ) -> FindKey, all ID_INLINE in idlib/Dict.h
+mkTrail::FadeTrail	__strtod_internal	stock-inline	atof() inside idDict::GetFloat (idlib/Dict.h): glibc's inline atof is strtod( s, NULL ), which its headers turn into __strtod_internal( s, NULL, 0 )
+mkTrail::addNewAnchor	operator new[]	stock-inline	anchors.Append( anchor ): idList::Append calls Resize, which allocates the array with new[]; ID_INLINE in idlib/containers/List.h
+mkTrail::addNewAnchor	operator delete[]	stock-inline	anchors.Append( anchor ): the Resize in idList::Append frees the old array with delete[]; ID_INLINE in idlib/containers/List.h
+mkTrail::Restore	operator new[]	stock-inline	anchors.Clear() and anchors.Append( anchor ): idList::Append calls Resize, which allocates the array with new[]; ID_INLINE in idlib/containers/List.h
+mkTrail::Restore	operator delete[]	stock-inline	anchors.Clear() and anchors.Append( anchor ): idList::Clear and the Resize in idList::Append free the array with delete[]; ID_INLINE in idlib/containers/List.h
+idGameLocal::BabySitTrail	operator new[]	stock-inline	trails.Append( trail ): idList::Append calls Resize, which allocates the array with new[]; ID_INLINE in idlib/containers/List.h
+idGameLocal::BabySitTrail	operator delete[]	stock-inline	trails.Append( trail ): the Resize in idList::Append frees the old array with delete[]; ID_INLINE in idlib/containers/List.h
+idPlayer::tryOpen	idDict::FindKey	stock-inline	door->spawnArgs.GetString( "requires", "", requires ) and GetString( "lockedtext", ..., lockedText ): idDict::GetString( key, default, idStr & ) calls FindKey; ID_INLINE in idlib/Dict.h
+idPlayer::tryOpen	memcpy	stock-inline	idStr::operator=( const idStr & ) (ID_INLINE, idlib/Str.h) copies the text with memcpy, reached from idDict::GetString( key, default, idStr & )
+idPlayer::tryOpen	idStr::ReAllocate	stock-inline	EnsureAlloc in idStr::operator=( const idStr & ) (from idDict::GetString), idStr::Insert( const char *, int ) and operator+=( const char * ) -> Append; ID_INLINE in idlib/Str.h
+idPlayer::tryOpen	idStr::FreeData	stock-inline	~idStr() of the locals requires and lockedText: ID_INLINE in idlib/Str.h, calls FreeData
+matt_func_envshot::Spawn	idDict::FindKey	stock-inline	spawnArgs.GetBool( "atSpawn", "0" ): idDict::GetBool -> idDict::GetString( key, default ) -> FindKey, all ID_INLINE in idlib/Dict.h
+matt_func_envshot::Spawn	__strtol_internal	stock-inline	atoi() inside idDict::GetBool (idlib/Dict.h): glibc's inline atoi is strtol( s, NULL, 10 ), which its headers turn into __strtol_internal( s, NULL, 10, 0 )
+matt_func_envshot::Event_envShot	idDict::FindKey	stock-inline	spawnArgs.GetString( key, default, idStr & ) for "name", "size" and "blends": ID_INLINE in idlib/Dict.h, calls FindKey
+matt_func_envshot::Event_envShot	memcpy	stock-inline	idStr::operator=( const idStr & ) (ID_INLINE, idlib/Str.h) copies the text with memcpy, reached from idDict::GetString( key, default, idStr & )
+matt_func_envshot::Event_envShot	idStr::ReAllocate	stock-inline	EnsureAlloc in idStr::operator=( const idStr & ) (from idDict::GetString), and in the idStr( const char * ) / idStr( const idStr & ) constructors and Append calls of the idStr operator+ chain; ID_INLINE in idlib/Str.h
+matt_func_envshot::Event_envShot	strcpy	stock-inline	idStr::idStr( const idStr & ) copies the text with strcpy: operator+( const idStr &, const char * ) and operator+( const idStr &, const idStr & ) start with idStr result( a ); ID_INLINE in idlib/Str.h
+matt_func_envshot::Event_envShot	idStr::FreeData	stock-inline	~idStr() of the locals name, size, blends and of the five operator+ temporaries: ID_INLINE in idlib/Str.h, calls FreeData
+idActor::Event_FootPrint	idDict::FindKey	stock-inline	spawnArgs.GetFloat( key, default ) -> idDict::GetString( key, default ), and spawnArgs.GetString( key, default ): ID_INLINE in idlib/Dict.h, call FindKey
+idActor::Event_FootPrint	__strtod_internal	stock-inline	atof() inside idDict::GetFloat( key, default ) (idlib/Dict.h): glibc's inline atof is strtod( s, NULL ), which its headers turn into __strtod_internal( s, NULL, 0 )
+idThread::Event_SpawnDict	idHashIndex::Init	stock-inline	the local dict's constructor: idDict::idDict() constructs argHash with idHashIndex::idHashIndex(), which calls Init( DEFAULT_HASH_SIZE, DEFAULT_HASH_SIZE ); ID_INLINE in idlib/Dict.h and idlib/containers/HashIndex.h
+idThread::Event_SpawnDict	idHashIndex::Free	stock-inline	the local dict: idDict::idDict() calls argHash.Clear( 128, 16 ), which calls Free(), and ~idHashIndex() inside ~idDict calls Free(); ID_INLINE in idlib/Dict.h and idlib/containers/HashIndex.h
+idThread::Event_SpawnDict	operator new[]	stock-inline	the local dict's constructor: idDict::idDict() calls args.SetGranularity( 16 ), whose idList::Resize allocates with new[]; ID_INLINE in idlib/Dict.h and idlib/containers/List.h
+idThread::Event_SpawnDict	operator delete[]	stock-inline	the local dict: idList::Resize in idDict::idDict()'s args.SetGranularity( 16 ) frees the old array, and ~idList() of args frees the array at the end; ID_INLINE in idlib/Dict.h and idlib/containers/List.h
+idWorldspawn::Think	idDict::FindKey	stock-inline	spawnArgs.GetFloat( key, default ): idDict::GetFloat -> idDict::GetString( key, default ) -> FindKey, all ID_INLINE in idlib/Dict.h
+idWorldspawn::Think	__strtod_internal	stock-inline	atof() inside idDict::GetFloat (idlib/Dict.h): glibc's inline atof is strtod( s, NULL ), which its headers turn into __strtod_internal( s, NULL, 0 )
