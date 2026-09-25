@@ -86,6 +86,11 @@ class CalleeCoverage(unittest.TestCase):
         )
         self.assertEqual(len([r for r in ROWS if r.group == "trails"]), 19)
 
+    def test_door_opening_covers_its_scope(self):
+        names = {r.function for r in ROWS if r.group == "door-opening" and r.status == "covered"}
+        self.assertEqual(names, {"idPlayer::tryOpen", "idAI::OpenDoors", "idAI::Event_OpenDoors"})
+        self.assertEqual(len([r for r in ROWS if r.group == "door-opening"]), 3)
+
     def test_static_init_entry_needs_the_class_declaration(self):
         """_GLOBAL__I__ZN7mkTrail4TypeE only calls the file's __static_initialization_and_destruction_0;
         the CLASS_DECLARATION that defines mkTrail::Type accounts for it."""
@@ -289,6 +294,20 @@ class ConstantsAndStrings(unittest.TestCase):
                 results = verify.check_group("hud-map", BINARY, ROWS, ALLOW, mutated)
                 self.assertEqual(literal_problems(results), {("idPlayer::initHudMap", "mismatched " + wrong)})
 
+    def test_a_string_inserted_by_byte_stores_is_accepted_and_checked(self):
+        """tryOpen's "You need a " is copied by the inline idStr::Insert: 11 byte stores, no NUL."""
+        text = reference("door-opening")
+        results = verify.check_group("door-opening", BINARY, ROWS, ALLOW, text)
+        hit = [r for r in results if r.row.function == "idPlayer::tryOpen"][0]
+        self.assertEqual(hit.immediate_strings, ["You need a "])
+        self.assertTrue(hit.ok)
+        # changed, cut short at either end, extended into the next immediate (the ' ' in dl)
+        for wrong in ("You need b ", "You need a", "ou need a ", "You need a  "):
+            with self.subTest(wrong=wrong):
+                mutated = text.replace('requires.Insert( "You need a ", 0 )', f'requires.Insert( "{wrong}", 0 )')
+                results = verify.check_group("door-opening", BINARY, ROWS, ALLOW, mutated)
+                self.assertEqual(literal_problems(results), {("idPlayer::tryOpen", "mismatched " + wrong)})
+
     def test_every_checked_literal_is_load_bearing(self):
         """Mutation sweep: alter each binary string literal in its function's definition -> reported."""
         for group in COVERED_GROUPS:
@@ -381,6 +400,13 @@ class BinaryLiterals(unittest.TestCase):
         self.assertAlmostEqual(float_immediate(0x42937AE1), 73.74, places=4)
         for integer in (0x14, 0x21080, 0x2B5549, 0x5F3759DF, 0x4A90BE59, 0x45E7B273, 0xFFFFFFFF):
             self.assertIsNone(float_immediate(integer), hex(integer))
+
+    def test_immediate_byte_runs(self):
+        runs = BINARY.immediate_byte_runs(BINARY.by_raw["_ZN8idPlayer7tryOpenEv"])
+        # the inserted text (the `mov dl, 0x20` after it is a register, not a store), and the NUL
+        # byte stores of the inline idStr copies
+        self.assertEqual(runs, [b"\x00", b"\x00", b"You need a ", b"\x00"])
+        self.assertEqual(BINARY.immediate_byte_runs(BINARY.by_raw["_ZN4idAI9OpenDoorsEP8idEntity"]), [])
 
     def test_double_argument_high_word_is_a_double(self):
         # initHudMap: `xor eax,eax; mov [esp+4],eax; mov eax,0xc1000000; mov [esp+8],eax` -> va( "%f", -131072.0 )
@@ -628,6 +654,32 @@ class Records(unittest.TestCase):
             self.assertEqual(entry.kind, "exception-only")
             self.assertIn("landing pad", entry.reason)
 
+    def test_open_doors_event_is_shown_and_matches_the_mod_scripts(self):
+        """AI_OpenDoors = idEventDef( "openDoors", "E" ), bound to idAI::Event_OpenDoors in idAI's
+        event table; the mod's script declares the same name with one entity argument, void."""
+        text = reference("door-opening")
+        impl = verify.implementation_block(text)
+        self.assertIn('const idEventDef AI_OpenDoors( "openDoors", "E" );', impl)
+        self.assertIn("EVENT( AI_OpenDoors,", impl)
+        # binary: an idAI::eventCallbacks entry is { &AI_OpenDoors, &idAI::Event_OpenDoors, 0 }
+        symtab = {s.name: s for s in BINARY.elf.get_section_by_name(".symtab").iter_symbols()}
+        table = symtab["_ZN4idAI14eventCallbacksE"]
+        words = list(struct.unpack(f"<{table['st_size'] // 4}I", BINARY._bytes(table["st_value"], table["st_size"])))
+        dynsym = BINARY.elf.get_section_by_name(".dynsym")
+        for rel in BINARY.elf.get_section_by_name(".rel.dyn").iter_relocations():  # R_386_32 against a symbol
+            k = (rel["r_offset"] - table["st_value"]) // 4
+            if rel["r_info_sym"] and 0 <= k < len(words):
+                words[k] += dynsym.get_symbol(rel["r_info_sym"])["st_value"]
+        entries = [tuple(words[i:i + 3]) for i in range(0, len(words), 3)]
+        handler = BINARY.by_raw["_ZN4idAI15Event_OpenDoorsEP8idEntity"].vaddr
+        self.assertIn((symtab["AI_OpenDoors"]["st_value"], handler, 0), entries)
+        # the event's name is in .rodata, and the mod's scripts declare it with one entity argument
+        ro_addr, ro = BINARY._rodata
+        self.assertIn(b"\0openDoors\0", ro)
+        script = (verify.REPO_ROOT / "script" / "chex_events.script").read_text(encoding="utf-8")
+        self.assertRegex(script, r"(?m)^scriptEvent\s+void\s+openDoors\(\s*entity\s+\w+\s*\);")
+        self.assertIn("script/chex_events.script", text)
+
     def test_idplayer_additions_have_unique_offsets(self):
         text = (verify.REFERENCE_DIR / "idPlayer-additions.md").read_text(encoding="utf-8")
         offsets = re.findall(r"^\| `\+(0x[0-9a-f]+)` \|", text, re.M)
@@ -807,6 +859,7 @@ class Compile(unittest.TestCase):
         jobs.append(dict(verify.compile_job("end-level-stats", mutated), group="els_spliced_member"))
         cls.els_line = md_line(mutated, "playerStat_s\t")
         jobs.append(verify.compile_job("hud-map", reference("hud-map")))
+        jobs.append(verify.compile_job("door-opening", reference("door-opening")))
         cls.toolchain, results = verify.run_compile(jobs)
         cls.results = {r.group: r for r in results}
 
@@ -846,6 +899,13 @@ class Compile(unittest.TestCase):
         self.assertEqual({(s["class"], s["file"], s.get("from")) for s in res.splices},
                          {("idPlayer", "game/Player.h", "decomp-so/reference/objectives.md"),
                           ("idPlayer", "game/Player.h", None)})
+
+    def test_door_opening_compiles_with_idplayer_and_idai_splices(self):
+        res = self.results["door-opening"]
+        self.assertEqual(res.errors, [])
+        self.assertTrue(res.ok)
+        self.assertEqual({(s["class"], s["file"], s.get("from")) for s in res.splices},
+                         {("idPlayer", "game/Player.h", None), ("idAI", "game/ai/AI.h", None)})
 
     def test_a_syntax_error_fails_and_is_reported_at_its_markdown_line(self):
         for name in self.MUTATIONS:

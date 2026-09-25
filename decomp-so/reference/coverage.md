@@ -49,7 +49,7 @@ Edits inside stock function bodies are out of scope for spec #16.
 | `idPlayer::updateHudMapAlpha` | `_ZN8idPlayer17updateHudMapAlphaEi` | 0x154380 | idPlayer_updateHudMapAlpha_00164380.c | hud-map | covered |
 | `idPlayer::updateMap` | `_ZN8idPlayer9updateMapEv` | 0x154720 | idPlayer_updateMap_00164720.c | hud-map | covered |
 | `idPlayer::initHudMap` | `_ZN8idPlayer10initHudMapEv` | 0x15bd00 | idPlayer_initHudMap_0016bd00.c | hud-map | covered |
-| `idPlayer::tryOpen` | `_ZN8idPlayer7tryOpenEv` | 0x16c420 | idPlayer_tryOpen_0017c420.c | door-opening | pending |
+| `idPlayer::tryOpen` | `_ZN8idPlayer7tryOpenEv` | 0x16c420 | idPlayer_tryOpen_0017c420.c | door-opening | covered |
 | `idPlayer::addItemText` | `_ZN8idPlayer11addItemTextERK10idItemInfo` | 0x16f990 | idPlayer_addItemText_0017f990.c | objectives | covered |
 | `idCmdSystem::ArgCompletion_GuiName` | `_ZN11idCmdSystem21ArgCompletion_GuiNameERK9idCmdArgsPFvPKcE` | 0x173a40 | idCmdSystem_ArgCompletion_GuiName_00183a40.c | custom-ui | covered |
 | `idCustomUI::GetType` | `_ZNK10idCustomUI7GetTypeEv` | 0x18d3b0 | idCustomUI_GetType_0019d3b0.c | custom-ui | covered |
@@ -87,8 +87,8 @@ Edits inside stock function bodies are out of scope for spec #16.
 | `mkObjective::~mkObjective` | `_ZN11mkObjectiveD1Ev` | 0x199330 | mkObjective_mkObjective_001a9330.c | objectives | covered |
 | `idTarget_EndLevelGUI::~idTarget_EndLevelGUI` | `_ZN20idTarget_EndLevelGUID0Ev` | 0x1993e0 | idTarget_EndLevelGUI_idTarget_EndLevelGUI_001a93e0.c | end-level-stats | covered |
 | `idWeapon::Event_SetProj` | `_ZN8idWeapon13Event_SetProjEPKc` | 0x19f990 | idWeapon_Event_SetProj_001af990.c | script-events | pending |
-| `idAI::OpenDoors` | `_ZN4idAI9OpenDoorsEP8idEntity` | 0x1be950 | idAI_OpenDoors_001ce950.c | door-opening | pending |
-| `idAI::Event_OpenDoors` | `_ZN4idAI15Event_OpenDoorsEP8idEntity` | 0x1cc9a0 | idAI_Event_OpenDoors_001dc9a0.c | door-opening | pending |
+| `idAI::OpenDoors` | `_ZN4idAI9OpenDoorsEP8idEntity` | 0x1be950 | idAI_OpenDoors_001ce950.c | door-opening | covered |
+| `idAI::Event_OpenDoors` | `_ZN4idAI15Event_OpenDoorsEP8idEntity` | 0x1cc9a0 | idAI_Event_OpenDoors_001dc9a0.c | door-opening | covered |
 | `idThread::Event_SpawnDict` | `_ZN8idThread15Event_SpawnDictEPKc` | 0x23dc00 | idThread_Event_SpawnDict_0024dc00.c | script-events | pending |
 | `mkTrail::GetType` | `_ZNK7mkTrail7GetTypeEv` | 0x2a3e60 | mkTrail_GetType_002b3e60.c | trails | covered |
 | `mkTrail::Save` | `_ZNK7mkTrail4SaveEP10idSaveGame` | 0x2a3eb0 | mkTrail_Save_002b3eb0.c | trails | covered |

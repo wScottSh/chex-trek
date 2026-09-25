@@ -402,6 +402,32 @@ class Binary:
                 out += (src.imm & ((1 << (8 * dest.size)) - 1)).to_bytes(dest.size, "little")
         return bytes(out)
 
+    def immediate_byte_runs(self, func: Function) -> list[bytes]:
+        """Each maximal run of the function's single-byte stores of an immediate to memory
+        (`mov byte ptr [x], 0x59`), as the bytes stored, in instruction order.
+
+        The inline `idStr::Insert( text, index )` (idlib/Str.h) copies its text, without the NUL,
+        one byte store per character, so the text is a whole run. A run continues across `mov`s
+        that store or load no immediate (GCC reloads `data` between the stores) and ends at any
+        other instruction, or at a `mov` of an immediate that is not a byte store to memory."""
+        from capstone import x86
+
+        runs, run = [], bytearray()
+        for ins in self._md_detail.disasm(self._bytes(func.vaddr, func.size), func.vaddr):
+            if ins.mnemonic == "mov" and len(ins.operands) == 2:
+                dest, src = ins.operands
+                if src.type != x86.X86_OP_IMM:
+                    continue
+                if dest.type == x86.X86_OP_MEM and dest.size == 1:
+                    run.append(src.imm & 0xFF)
+                    continue
+            if run:
+                runs.append(bytes(run))
+                run = bytearray()
+        if run:
+            runs.append(bytes(run))
+        return runs
+
     DOUBLE_WINDOW = 6
 
     def _double_high_word(self, insns: list, k: int) -> float | None:

@@ -82,3 +82,7 @@ mkTrail::Restore	operator new[]	stock-inline	anchors.Clear() and anchors.Append(
 mkTrail::Restore	operator delete[]	stock-inline	anchors.Clear() and anchors.Append( anchor ): idList::Clear and the Resize in idList::Append free the array with delete[]; ID_INLINE in idlib/containers/List.h
 idGameLocal::BabySitTrail	operator new[]	stock-inline	trails.Append( trail ): idList::Append calls Resize, which allocates the array with new[]; ID_INLINE in idlib/containers/List.h
 idGameLocal::BabySitTrail	operator delete[]	stock-inline	trails.Append( trail ): the Resize in idList::Append frees the old array with delete[]; ID_INLINE in idlib/containers/List.h
+idPlayer::tryOpen	idDict::FindKey	stock-inline	door->spawnArgs.GetString( "requires", "", requires ) and GetString( "lockedtext", ..., lockedText ): idDict::GetString( key, default, idStr & ) calls FindKey; ID_INLINE in idlib/Dict.h
+idPlayer::tryOpen	memcpy	stock-inline	idStr::operator=( const idStr & ) (ID_INLINE, idlib/Str.h) copies the text with memcpy, reached from idDict::GetString( key, default, idStr & )
+idPlayer::tryOpen	idStr::ReAllocate	stock-inline	EnsureAlloc in idStr::operator=( const idStr & ) (from idDict::GetString), idStr::Insert( const char *, int ) and operator+=( const char * ) -> Append; ID_INLINE in idlib/Str.h
+idPlayer::tryOpen	idStr::FreeData	stock-inline	~idStr() of the locals requires and lockedText: ID_INLINE in idlib/Str.h, calls FreeData

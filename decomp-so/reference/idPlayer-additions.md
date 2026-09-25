@@ -46,6 +46,7 @@ Offsets are from the start of `idPlayer` in this build (`this + offset`). Names 
 | `void useCustomUI( idUserInterface *ui, idCustomUI *uiEntity )` | custom-ui | 0x14d300 |
 | `void clearCustomUI( void )` | custom-ui | 0x14d320 |
 | `void addItemText( const idItemInfo &info )` | objectives | 0x16f990 |
+| `void tryOpen( void )` | door-opening | 0x16c420 |
 
 ## Types
 
@@ -57,4 +58,4 @@ The HUD map also adds a global, `byte hudmap_alpha[ 5 ][ 128 * 128 * 4 ]` (the f
 
 ## Conflicts reconciled
 
-None yet. Checked for end-level-stats: `levelStats` (`+0x1ea4`..`+0x1ef3`) does not overlap the custom-ui members (`+0x1f0c`, `+0x1f10`). Checked for objectives: `objectives` (`+0x1ef4`..`+0x1f07`) and `nextObjective` (`+0x1f08`) fill the gap between them exactly, and overlap neither. Checked for hud-map: its twelve members fill `+0x1e30`..`+0x1ea3` without gaps, ending right before `levelStats` (`+0x1ea4`), and overlap no other row. `HudMapLevel` was already listed (declared by objectives); hud-map adds its body, no change.
+None yet. Checked for end-level-stats: `levelStats` (`+0x1ea4`..`+0x1ef3`) does not overlap the custom-ui members (`+0x1f0c`, `+0x1f10`). Checked for objectives: `objectives` (`+0x1ef4`..`+0x1f07`) and `nextObjective` (`+0x1f08`) fill the gap between them exactly, and overlap neither. Checked for hud-map: its twelve members fill `+0x1e30`..`+0x1ea3` without gaps, ending right before `levelStats` (`+0x1ea4`), and overlap no other row. `HudMapLevel` was already listed (declared by objectives); hud-map adds its body, no change. Checked for door-opening: `tryOpen` uses no new members (only the stock `viewAngles`), so it adds a method row only.

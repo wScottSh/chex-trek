@@ -22,8 +22,9 @@ suffix; `x - 0.5f` is the constant 0.5, `x * -0.5f` is -0.5), strings as the exa
 (adjacent literals are joined). A string literal in the definition that the binary function
 never reads is reported as mismatched, unless the function builds its text from instruction
 immediates: a string of IMMEDIATE_STRING_MIN or more characters whose bytes, NUL included,
-run through the function's `mov` immediates (binary.immediate_bytes) is accepted and reported.
-Such a string is not required, since it cannot be told from integers without its source text.
+run through the function's `mov` immediates (binary.immediate_bytes), or whose bytes are exactly
+one whole run of byte-immediate stores (binary.immediate_byte_runs: the inline idStr::Insert
+copies its text without the NUL), is accepted and reported. Such a string is not required, since it cannot be told from integers without its source text.
 Integer-load x87 operands (`fild`) are integers, not float constants, and are not checked.
 
 Check 3 -- compile. The group's header block and implementation block are compiled, 32-bit,
@@ -503,8 +504,11 @@ def check_literals(res: FunctionResult, binary: Binary, body: str, literal_allow
     in_binary = {lit.value for lit in res.literals if lit.kind == "string"}
     not_read = list(dict.fromkeys(s for s in strings if s not in in_binary))
     immediates = binary.immediate_bytes(res.function) if not_read else b""
+    byte_runs = binary.immediate_byte_runs(res.function) if not_read else []
     for s in not_read:
-        if len(s) >= IMMEDIATE_STRING_MIN and s.isascii() and s.encode() + b"\0" in immediates:
+        if len(s) >= IMMEDIATE_STRING_MIN and s.isascii() and (
+            s.encode() + b"\0" in immediates or s.encode() in byte_runs
+        ):
             res.immediate_strings.append(s)
         else:
             res.mismatched_strings.append(s)
