@@ -49,27 +49,31 @@
 # ever entered; the only other callers that reset that window's timeline
 # (resetTime "hudmap_close" "0", guis/pda_chex.gui's Data/Stats tab buttons) are themselves
 # mouse-click handlers this harness never fires, so it never refires - it is a one-time event, not
-# a recurring one. But that flip is timed off ~400ms of *real elapsed time* since the PDA gui was
-# created, not off a fixed number of engine frames: probing chextrek_dump's map_pda line at fine
-# grain (5-frame steps, no re-assert after the first) across several runs showed the flip lands at
-# a different frame count almost every time, and once it lands, mapView/mapScale stay frozen for
-# the rest of the run (movement never resumes on its own - confirmed by extending a probe well past
-# the freeze with no recovery). Two earlier fixes each assumed a fixed frame-count margin was
-# enough to place a single re-assert safely past that flip (first, re-sending before every step;
-# then, replaced by a single 60-frame wait up front) - both still lost a run's movement
-# intermittently, because a frame-count margin can't reliably bound a real-time-based, one-time
-# event: on a slower or busier run, 60 frames of console-script "wait" ticks can elapse in well
-# under 400ms of real time, landing before the flip; on a faster run, the flip can land mid-step
-# regardless of which single point was chosen to re-assert from. Rather than fight that GUI timing
-# detail in C++ (out of #37's scope - #37 only ports the mapControl-setting side, not the PDA gui's
-# own page-navigation script), this scenario re-sends chextrek_test_pda_map_open 1 immediately
-# before every measured step and after every 5-frame chunk of every wait (the last chunk right
-# before a chextrek_dump is the one exception, since nothing after it needs the flag true), keeping
-# the gap between re-asserts well under the ~400ms period regardless of exactly when the flip
-# lands - the test-only command is documented as setting the flag directly, and re-asserting it
+# a recurring one. But that flip is timed off ~400ms of gameLocal.time (idPlayerView::SingleView
+# calls player->objectiveSystem->Redraw( gameLocal.time ) every frame the PDA is open,
+# PlayerView.cpp) since the PDA gui was created, not off a fixed number of console-script "wait"
+# ticks - and the two don't map 1:1: how much gameLocal.time advances per "wait" tick isn't fixed,
+# so a fixed frame-count margin can't reliably bound a gameLocal.time-based threshold. Probing
+# chextrek_dump's map_pda line at fine grain (5-frame steps, no re-assert after the first) across
+# several runs showed the flip lands at
+# a different "wait"-tick count almost every time, and once it lands, mapView/mapScale stay frozen
+# for the rest of the run (movement never resumes on its own - confirmed by extending a probe well
+# past the freeze with no recovery, and consistent with idWindow's own onTime semantics: a timeline
+# fires once and only resetTime rearms it, and nothing here ever calls resetTime "hudmap_close"
+# again). Two earlier fixes each assumed a fixed frame-count margin was enough to place a single
+# re-assert safely past that flip (first, re-sending before every step; then, replaced by a single
+# 60-frame wait up front) - both still lost a run's movement intermittently, for exactly that
+# reason. Rather than fight that GUI timing detail in C++ (out of #37's scope - #37 only ports the
+# mapControl-setting side, not the PDA gui's own page-navigation script), this scenario re-sends
+# chextrek_test_pda_map_open 1 immediately before every measured step and after every 5-frame chunk
+# of every wait (the last chunk right before a chextrek_dump is the one exception, since nothing
+# after it needs the flag true) - keeping the re-assert dense enough that the flip, whenever it
+# lands, is always corrected again within a handful of frames, well before the next measured
+# dump - the test-only command is documented as setting the flag directly, and re-asserting it
 # repeatedly is no different from a real player staying on the map page. In real play, the same
 # one-time flip presumably happens too; it is just not disruptive there, since a player is unlikely
-# to sit motionless on the map tab for ~400ms without also triggering something else.
+# to sit motionless on the map tab for ~400ms of gameLocal.time without also triggering something
+# else.
 #
 # chextrek_dump's new `map_pda: scale=<f> view_x=<f> view_y=<f> control=<N>` line (ChexTrekDump.cpp)
 # reads idPlayer::mapScale/mapView/mapControl directly, so this scenario can assert each map_*
