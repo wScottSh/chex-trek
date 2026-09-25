@@ -71,8 +71,10 @@ fi
 # default g_doorTraceDist of 100), after the AC2 far-range attempt (func_door_24, well outside the
 # default 100 - expected to NOT reach the door), and after raising g_doorTraceDist to 200 and
 # retrying from the same far spot (well within 200 - expected to now reach and open it). Each
-# isOpen() check below prints a scenario-specific base (40100/40200/40300) plus the 0/1 result, so
-# a stray "0"/"1" elsewhere in the log can't be mistaken for one of these checks.
+# isOpen() check below prints a scenario-specific base (40000/40100/40200/40300) plus the 0/1
+# result, so a stray "0"/"1" elsewhere in the log can't be mistaken for one of these checks. The
+# first (40000, right after the baseline dump) confirms func_door_1 actually starts closed, so
+# AC1's "it opened" claim isn't just inferred from no_touch/no-other-trigger reasoning.
 CONSOLE_SCRIPT="${SCRATCH_DIR}/door-open.cfg"
 cat > "$CONSOLE_SCRIPT" <<'EOF'
 developer 1
@@ -80,6 +82,7 @@ map sf_923
 wait 20
 noclip
 chextrek_dump
+script sys.println( 40000 + sys.getEntity( $chextrek_test_str10 ).isOpen() )
 
 setviewpos -214 180 64 180
 wait 10
@@ -150,6 +153,14 @@ else
 fi
 
 # --- AC1: face an unlocked door within range, use impulse; log/dump shows it opened ---
+ISOPEN_40000="$(grep -c '^40000$' "$LOCAL_LOG")"
+if [ "$ISOPEN_40000" -ge 1 ]; then
+	echo "PASS: AC1 - func_door_1.isOpen() reports closed (40000) before the use impulse, so the later open isn't inferred"
+else
+	echo "FAIL: expected to see '40000' in the log (40000 + func_door_1.isOpen()) before the use impulse"
+	FAIL=1
+fi
+
 if [ -n "$COUNT_BASELINE" ] && [ -n "$COUNT_AFTER_NEAR" ] && [ "$COUNT_AFTER_NEAR" -eq $(( COUNT_BASELINE + 1 )) ] && [ "$LAST_AFTER_NEAR" = "func_door_1" ]; then
 	echo "PASS: AC1 - the use-key trace reached func_door_1 within range (door_tryopen_count ${COUNT_BASELINE} -> ${COUNT_AFTER_NEAR}, last=${LAST_AFTER_NEAR})"
 else
