@@ -4747,6 +4747,59 @@ bool idPlayer::HandleSingleGuiCommand( idEntity *entityGui, idLexer *src ) {
 		return true;
 	}
 
+	// chextrek: spec #16/#37 (decomp-so/reference/hud-map.md; edits-inside-stock-functions lead).
+	// The PDA map page's arrow/center/zoom buttons (guis/pda.gui, guis/pda_chex.gui) send these as
+	// GUI commands on release; updateMapUI (Player.cpp) reads mapControl every frame to drive the
+	// PDA map's scroll/zoom/center. "map_stop" keeps only MAP_CENTER, and only when a zoom bit was
+	// also set alongside it (Notes: "Scrolling ... stops while a zoom or center bit is set;
+	// map_stop keeps only MAP_CENTER, and only when a zoom bit was set with it"); zoom and center
+	// OR in their bit so they can combine with each other; the four scroll commands replace the
+	// whole value (updateMapUI's switch compares mapControl with ==, so scrolling only applies
+	// while no other bit is set).
+	if ( token.Icmp( "map_stop" ) == 0 ) {
+		if ( ( mapControl & ( MAP_ZOOM_IN | MAP_ZOOM_OUT ) ) && ( mapControl & MAP_CENTER ) ) {
+			mapControl = MAP_CENTER;
+		} else {
+			mapControl = 0;
+		}
+		return true;
+	}
+
+	if ( token.Icmp( "map_zoom_in" ) == 0 ) {
+		mapControl |= MAP_ZOOM_IN;
+		return true;
+	}
+
+	if ( token.Icmp( "map_zoom_out" ) == 0 ) {
+		mapControl |= MAP_ZOOM_OUT;
+		return true;
+	}
+
+	if ( token.Icmp( "map_scroll_center" ) == 0 ) {
+		mapControl |= MAP_CENTER;
+		return true;
+	}
+
+	if ( token.Icmp( "map_scroll_up" ) == 0 ) {
+		mapControl = MAP_SCROLL_UP;
+		return true;
+	}
+
+	if ( token.Icmp( "map_scroll_down" ) == 0 ) {
+		mapControl = MAP_SCROLL_DOWN;
+		return true;
+	}
+
+	if ( token.Icmp( "map_scroll_left" ) == 0 ) {
+		mapControl = MAP_SCROLL_LEFT;
+		return true;
+	}
+
+	if ( token.Icmp( "map_scroll_right" ) == 0 ) {
+		mapControl = MAP_SCROLL_RIGHT;
+		return true;
+	}
+
 	src->UnreadToken( &token );
 	return false;
 }

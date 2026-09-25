@@ -228,10 +228,10 @@ typedef struct {
 	idVec3	pos;
 } aasLocation_t;
 
-// chextrek: spec #16/#36 (decomp-so/reference/hud-map.md). idPlayer::mapControl bits: the PDA
-// map's buttons (guis/pda.gui, guis/pda_chex.gui) send these as GUI commands, and
-// idPlayer::HandleSingleGuiCommand sets the bits (#37's scope - not ported here, so mapControl
-// stays 0 until #37 lands). Scrolling replaces the whole value; centering and zooming add a bit.
+// chextrek: spec #16/#36/#37 (decomp-so/reference/hud-map.md). idPlayer::mapControl bits: the PDA
+// map's buttons (guis/pda.gui, guis/pda_chex.gui) send these as GUI commands, and the edited stock
+// idPlayer::HandleSingleGuiCommand (#37) sets the bits. Scrolling replaces the whole value;
+// centering and zooming add a bit.
 enum {
 	MAP_CENTER			= BIT( 0 ),		// "map_scroll_center": keep the view on the player
 	MAP_ZOOM_IN			= BIT( 1 ),		// "map_zoom_in"
@@ -318,19 +318,20 @@ public:
 	// (decomp-so/reference/hud-map.md) - see its definition in Player.cpp.
 	int						HudMapLevel( const idVec3 *pos );
 
-	// chextrek: spec #16/#36 (decomp-so/reference/hud-map.md). The player's map of the level:
-	// a corner HUD box (always centered on the player) and a PDA page (scrollable/zoomable -
-	// the PDA's map_* GUI commands that drive mapControl are #37's scope, not ported here).
-	// Fog of war (hudmap_alpha, extern above, before this class) is revealed as the player walks.
-	// Only initHudMap/updateMap/updateMapUI/updateHudMapAlpha/MapImageCoords and HudMapLevel's real
-	// body are #36; the "showMap" console command is #38, and saving/restoring this state is #39.
+	// chextrek: spec #16/#36/#37 (decomp-so/reference/hud-map.md). The player's map of the level:
+	// a corner HUD box (always centered on the player) and a PDA page, scrollable/zoomable via
+	// mapControl (set by the edited stock idPlayer::HandleSingleGuiCommand, #37, from the PDA's
+	// map_* GUI commands). Fog of war (hudmap_alpha, extern above, before this class) is revealed
+	// as the player walks. Only initHudMap/updateMap/updateMapUI/updateHudMapAlpha/MapImageCoords
+	// and HudMapLevel's real body are #36; the "showMap" console command is #38, and saving/
+	// restoring this state is #39.
 	void					initHudMap( void );
 	void					updateMap( void );
 	void					updateMapUI( idUserInterface *gui, int level, bool isHud );
 	void					updateHudMapAlpha( int level );
 	void					MapImageCoords( float width, float height, const idVec2 &pos, idVec2 &out );
 
-	int						mapControl;			// MAP_* bits (#37 sets these from PDA GUI commands). Not saved (#39).
+	int						mapControl;			// MAP_* bits, set by HandleSingleGuiCommand (#37). Not saved (#39).
 	float					mapScale;				// PDA zoom, "map_scale" (default 1), 0.1 .. 9. Not saved here (#39).
 	idVec2					mapView;				// world x, y at the center of the map box. Not saved.
 	int						mapRadius;				// reveal radius in alpha texels, "map_radius" (default 8). Not saved here (#39).

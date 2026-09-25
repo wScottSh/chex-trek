@@ -83,4 +83,36 @@ void ChexTrek_TestGuiCompletion_f( const idCmdArgs &args );
 // CheatsOk( false ) check, matching chextrek_customui_cmd.
 void ChexTrek_TestImpulse_f( const idCmdArgs &args );
 
+// chextrek: spec #37, test-only. Registered as the "chextrek_test_map_cmd" console command by
+// idGameLocal::InitConsoleCommands. AC ("each map_* command changes the map scale/position shown
+// in the dump as expected") needs the PDA map's GUI commands (map_zoom_in/out, map_scroll_up/
+// down/left/right, map_scroll_center, map_stop - decomp-so/reference/hud-map.md) to actually reach
+// idPlayer::HandleSingleGuiCommand, but those only ever arrive, in the real game, from a mouse
+// click on the PDA map's buttons (guis/pda.gui, guis/pda_chex.gui onAction) - input the
+// console-only harness can't produce, the same class of gap chextrek_customui_cmd (spec #34)
+// closes for the end-level stats screen's buttons. This command reads one command-name argument
+// and calls the local player's own idEntity::HandleGuiCommands( player, cmd ) - the exact same
+// stock entry point a real GUI onAction reaches - so everything downstream (HandleSingleGuiCommand's
+// token dispatch, the #37 edit itself, updateMapUI's per-frame use of mapControl) is the real,
+// already-ported game code, unchanged. CMD_FL_CHEAT plus its own CheatsOk( false ) check, matching
+// chextrek_customui_cmd/chextrek_test_impulse.
+void ChexTrek_TestMapCmd_f( const idCmdArgs &args );
+
+// chextrek: spec #37, test-only. Registered as the "chextrek_test_pda_map_open" console command by
+// idGameLocal::InitConsoleCommands. idPlayer::updateMap (decomp-so/reference/hud-map.md) only
+// applies mapControl's scroll/zoom/center bits to the PDA's own map page (the `!isHud` branch of
+// updateMapUI) while the PDA is open AND the PDA gui's own "HudMap" state variable is true - the
+// same variable name hud.gui's impulse-23 path uses for the HUD's corner map, but for the PDA it is
+// set only by guis/pda_chex.gui's own click-driven script (its "Data" tab button resets the
+// hudmap_open window's timeline, `set "gui::HudMap" "1"` at its onTime 5) - a real mouse click on a
+// PDA tab, not anything idPlayer's C++ (this sub-issue's scope) drives, and out of the console-only
+// harness's reach the same way #34/#35/#36's real inputs were. Since this variable is purely a GUI
+// state flag (not a member of idPlayer, and not read or written by any #37 C++), setting it
+// directly through idUserInterface::SetStateBool - the exact call the real click's script action
+// ultimately makes - reproduces its real effect without any new C++ decision logic. Takes one
+// "0"/"1" argument; requires the local player to have a registered objectiveSystem gui (spec #35's
+// idPlayer::GivePDA/TogglePDA path opens one - see tools/test-pda.sh for how a scenario gives the
+// player a PDA without mouse/impulse input).
+void ChexTrek_TestPdaMapOpen_f( const idCmdArgs &args );
+
 #endif /* !__CHEXTREK_DUMP_H__ */

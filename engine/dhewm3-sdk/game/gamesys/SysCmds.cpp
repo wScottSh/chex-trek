@@ -2321,6 +2321,14 @@ void idGameLocal::InitConsoleCommands( void ) {
 	// ChexTrek_TestImpulse_f's own comment in ChexTrekDump.cpp/.h for why a console command has to
 	// stand in for a real, currently-held bind key.
 	cmdSystem->AddCommand( "chextrek_test_impulse",	ChexTrek_TestImpulse_f,		CMD_FL_GAME|CMD_FL_CHEAT,	"chextrek: sends an impulse to the local player (test harness only)" );
+	// chextrek: spec #37, test-only. CMD_FL_CHEAT matches chextrek_customui_cmd/
+	// chextrek_test_impulse above - see ChexTrek_TestMapCmd_f's own comment in ChexTrekDump.cpp/.h
+	// for why a console command has to stand in for a real click on the PDA map's buttons.
+	cmdSystem->AddCommand( "chextrek_test_map_cmd",	ChexTrek_TestMapCmd_f,		CMD_FL_GAME|CMD_FL_CHEAT,	"chextrek: sends a PDA map_* GUI command to the local player (test harness only)" );
+	// chextrek: spec #37, test-only. See ChexTrek_TestPdaMapOpen_f's own comment in
+	// ChexTrekDump.cpp/.h for why a console command has to stand in for a real click on the PDA's
+	// "Data" tab that opens its map page.
+	cmdSystem->AddCommand( "chextrek_test_pda_map_open", ChexTrek_TestPdaMapOpen_f, CMD_FL_GAME|CMD_FL_CHEAT, "chextrek: sets the PDA gui's own HudMap state flag directly (test harness only)" );
 	cmdSystem->AddCommand( "listTypeInfo",			ListTypeInfo_f,				CMD_FL_GAME,				"list type info" );
 	cmdSystem->AddCommand( "writeGameState",		WriteGameState_f,			CMD_FL_GAME,				"write game state" );
 	cmdSystem->AddCommand( "testSaveGame",			TestSaveGame_f,				CMD_FL_GAME|CMD_FL_CHEAT,	"test a save game for a level" );

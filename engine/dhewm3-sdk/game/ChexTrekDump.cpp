@@ -145,6 +145,12 @@ windows handle), `level` is idPlayer::HudMapLevel( NULL ) (the player's current 
 128x128 fog-of-war image for that level - so a scenario can assert impulse 23 flips `visible`
 without depending on GUI rendering, and that `setviewpos` moves grow `coverage` without depending
 on a screenshot.
+
+#37 adds `map_pda: scale=<f> view_x=<f> view_y=<f> control=<N>` (decomp-so/reference/hud-map.md):
+idPlayer::mapScale/mapView/mapControl, the PDA map's zoom/scroll/center state driven by the edited
+stock idPlayer::HandleSingleGuiCommand from the PDA map's map_* GUI commands - so a scenario can
+assert each map_* command actually changed the scale or view center shown here, independent of GUI
+rendering.
 ==================
 */
 void ChexTrek_Dump_f( const idCmdArgs &args ) {
@@ -212,6 +218,20 @@ void ChexTrek_Dump_f( const idCmdArgs &args ) {
 		}
 		gameLocal.Printf( "hud_map: level=%d visible=%s coverage=%d\n",
 			level, player->hud->GetStateBool( "HudMap", "0" ) ? "1" : "0", coverage );
+	}
+
+	// chextrek: spec #37 (decomp-so/reference/hud-map.md). idPlayer::mapScale/mapView/mapControl:
+	// the PDA map's zoom/scroll/center state, set by the edited stock
+	// idPlayer::HandleSingleGuiCommand from the PDA map's map_* GUI commands and consumed every
+	// frame by updateMapUI. Printed so a scenario can assert a map_* command actually changed the
+	// scale ("map_scale") or the view center ("map_view_x"/"map_view_y") shown here, independent of
+	// GUI rendering. "map_control" is the raw mapControl bitmask (see the MAP_* enum, Player.h) for
+	// scenarios that want to check which bit(s) are currently set.
+	if ( !player ) {
+		gameLocal.Printf( "map_pda: none\n" );
+	} else {
+		gameLocal.Printf( "map_pda: scale=%f view_x=%f view_y=%f control=%d\n",
+			player->mapScale, player->mapView.x, player->mapView.y, player->mapControl );
 	}
 
 	// chextrek: spec #33 (decomp-so/reference/custom-ui.md, end-level-stats.md). The local
@@ -355,6 +375,71 @@ void ChexTrek_TestImpulse_f( const idCmdArgs &args ) {
 	int impulse = atoi( args.Argv( 1 ) );
 	player->PerformImpulse( impulse );
 	gameLocal.Printf( "chextrek_test_impulse: sent impulse %d\n", impulse );
+}
+
+/*
+==================
+ChexTrek_TestMapCmd_f
+
+Test-only, spec #37. See ChexTrek_TestMapCmd_f's comment in ChexTrekDump.h for why a console
+command has to stand in for a real click on the PDA map's buttons here. Reads one command-name
+argument and calls the local player's own idEntity::HandleGuiCommands( player, cmd ) - the exact
+stock entry point a real GUI onAction reaches - so everything downstream (idPlayer::
+HandleSingleGuiCommand's token dispatch, the #37 edit itself) is the real, already-ported game code,
+unchanged.
+==================
+*/
+void ChexTrek_TestMapCmd_f( const idCmdArgs &args ) {
+	if ( !gameLocal.CheatsOk( false ) ) {
+		return;
+	}
+
+	if ( args.Argc() != 2 ) {
+		gameLocal.Printf( "usage: chextrek_test_map_cmd <command>\n" );
+		return;
+	}
+
+	idPlayer *player = gameLocal.GetLocalPlayer();
+	if ( !player ) {
+		gameLocal.Printf( "chextrek_test_map_cmd: no local player\n" );
+		return;
+	}
+
+	const char *cmd = args.Argv( 1 );
+	bool handled = player->HandleGuiCommands( player, cmd );
+	gameLocal.Printf( "chextrek_test_map_cmd: '%s' %s\n", cmd, handled ? "handled" : "not handled" );
+}
+
+/*
+==================
+ChexTrek_TestPdaMapOpen_f
+
+Test-only, spec #37. See ChexTrek_TestPdaMapOpen_f's comment in ChexTrekDump.h: idPlayer::updateMap
+only routes mapControl's scroll/zoom/center bits to the PDA map page while the PDA gui's own
+"HudMap" state variable is true - a variable only a mouse click on guis/pda_chex.gui's "Data" tab
+sets in the real game, out of the console-only harness's reach. Sets it directly through
+idUserInterface::SetStateBool, the same call that click's script action makes.
+==================
+*/
+void ChexTrek_TestPdaMapOpen_f( const idCmdArgs &args ) {
+	if ( !gameLocal.CheatsOk( false ) ) {
+		return;
+	}
+
+	if ( args.Argc() != 2 ) {
+		gameLocal.Printf( "usage: chextrek_test_pda_map_open <0|1>\n" );
+		return;
+	}
+
+	idPlayer *player = gameLocal.GetLocalPlayer();
+	if ( !player || !player->objectiveSystem ) {
+		gameLocal.Printf( "chextrek_test_pda_map_open: no local player or no objectiveSystem gui\n" );
+		return;
+	}
+
+	bool open = ( atoi( args.Argv( 1 ) ) != 0 );
+	player->objectiveSystem->SetStateBool( "HudMap", open );
+	gameLocal.Printf( "chextrek_test_pda_map_open: set gui::HudMap to %s\n", open ? "1" : "0" );
 }
 
 /*
