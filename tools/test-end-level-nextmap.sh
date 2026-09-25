@@ -27,37 +27,59 @@
 # nothing else does), so this scenario needs that first tic to have fired, but not much more,
 # before it starts sending "skip" (an already-*completed* line, i.e. one whose natural counting
 # ran all the way to state++ before the scenario gets to it, would shift every later "skip" onto
-# the wrong line). g_statTicTime stays at its default (50ms - overriding it was tried and found to
-# race the opposite way: a `set` executed right after `trigger` in the same command-buffer pass,
-# before any frame elapses, took effect before idTarget_EndLevelGUI::Event_Activate's own
-# PostEventMS ever read it, since `trigger`'s EV_Activate itself doesn't run until the *next*
-# server frame - so the override reached Event_Activate too, permanently freezing state at -1
-# instead of letting it start). Instead, `wait 10` (~167ms of sim time) sits comfortably above the
-# one 50ms tic needed to flip -1 -> 0, but well below the ~4 tics (~200ms) monsters' line here
-# needs to finish counting on its own (level_stats monsters 1/22 -> 4%, one percentage point per
-# tic) - the fastest of the three percentage lines to complete, so also the tightest margin. If a
-# future map/setup ever makes that fastest line's target percentage 1% or less (needing only one
-# tic), this wait would need shortening to match.
+# the wrong line - each `chextrek_customui_cmd skip` would still be "handled", but on the wrong
+# line, and the assertions below would need to catch that, not silently reinterpret it).
+# g_statTicTime stays at its default (50ms). An earlier attempt overrode it (set to 1 right before
+# `trigger`, then back to a huge value right after, all in the same command-buffer pass before any
+# `wait`) to try to force the -1 -> 0 transition on a precise, timing-independent frame; that was
+# reverted after it empirically left state stuck at -1 for the rest of the run every time it was
+# tried, for a reason not tracked down (Cmd_Trigger_f's `ent->ProcessEvent(&EV_Activate, player)`
+# runs synchronously, in the same frame as the `trigger` line itself - gamesys/SysCmds.cpp - so the
+# override reaching Event_Activate before it ran isn't, on its own, an adequate explanation; treat
+# that reasoning as unconfirmed if this is ever revisited). `wait 10` (~167ms of sim time) with the
+# default 50ms tic was verified instead, empirically, across multiple consecutive full runs: it
+# reliably leaves state at 0, part-way through (not yet finished) counting the monsters line - the
+# fastest of the three percentage lines here to finish on its own (level_stats monsters 1/22 -> 4%,
+# one percentage point per tic, so ~4 tics/~200ms to complete - comfortably above this wait's
+# ~167ms). If a future map/setup ever makes that fastest line's target percentage 1% or less
+# (needing only one tic), this wait would need shortening to match, and the ASSERTION_BELOW check
+# would start failing loudly instead of silently mis-attributing which line each skip landed on.
 # Four `chextrek_customui_cmd skip` calls are then chained back to back with no `wait` between them
 # (each reads and mutates state instantly, in the same engine frame, so no naturally-scheduled tic
 # - which only fires on a later frame boundary - can interleave and change the picture mid-sequence):
 # one each for the monsters/items/secrets lines (state 0-2) and one for the level-time line
 # (state 3). Each is checked against `chextrek_dump`'s own state (level_stats for the true
 # found/total, customui_gui_* for what the screen now shows) rather than a hardcoded number, so the
-# assertion holds regardless of the map's real monster/item/secret counts.
+# assertion holds regardless of the map's real monster/item/secret counts. Before sending any
+# "skip", the scenario also asserts the *before* dump's `ai_percent` is strictly below its final
+# value (ASSERTION_BELOW) - if natural counting had already finished the monsters line by then
+# (the failure mode the wait margin above is meant to prevent), this catches it directly instead of
+# letting every later "skip" quietly test the wrong line while still reporting PASS.
 #
 # --- AC2: "nextmap" (sf_923) ---
-# sf_923's own target_endlevelgui entities have no "nextmap" spawnArg (decomp-so/reference/
-# end-level-stats.md's Notes: "set on no target_endlevelgui in maps/" - sf_923's own screens fall
-# back to ActivateTargets instead), so this scenario spawns its own idTarget_EndLevelGUI entity
-# with "nextmap" "e1m1" set (Cmd_Spawn_f supports extra key/value pairs after the classname, the
-# same as any other spawnclass), matching the entityDef's own documented "nextmap" var
-# (def/endlevelgui.def: "the map name to transfer to"). Triggering it starts the screen; "nextmap"
-# has no state guard in HandleCustomGUICommand (it always sets state = 5, even before the first
-# tic), so it's sent right after triggering. The next tic (state 5's branch, Event_UpdateStats)
-# then runs `gameLocal.sessionCommand = "map e1m1"` on its own, without any further console command
-# - the harness only proves that map actually loads (the log's "<N> msec to load e1m1" line), the
-# same evidence tools/test-script-events.sh and friends already use for a map finishing loading.
+# What #34's AC actually needs: "nextmap" (the GUI command idTarget_EndLevelGUI::
+# HandleCustomGUICommand handles) makes state 5's branch of Event_UpdateStats read the entity's own
+# "nextmap" spawnArg and load that map (`gameLocal.sessionCommand = "map " + nextMap` - Target.cpp,
+# ported #33). That is NOT sf_923's real, shipped end-of-level path to e1m1: neither of sf_923's own
+# target_endlevelgui entities has a "nextmap" spawnArg set (decomp-so/reference/end-level-stats.md's
+# Notes: "set on no target_endlevelgui in maps/"), and `maps/sf_923.map:35103-35106`'s actual
+# "nextMap" "e1m1" key lives on `target_endlevel_3`, a plain stock `idTarget_EndLevel` entity that
+# a separate script (`script/map_storage_facility.script`, reached from `target_endlevelgui_2`'s
+# `end_trek.gui`, which `target_endlevelgui_1`'s own state 5 reaches only via `ActivateTargets`
+# with no "nextmap" set) triggers - none of that chain is idTarget_EndLevelGUI's "nextmap" GUI
+# command or anything #33/#34 ported; it's stock idTarget_EndLevel behavior plus a different GUI's
+# "runScript" commands, out of both sub-issues' scope. Since no shipped map ever gives
+# idTarget_EndLevelGUI's own "nextmap" spawnArg a value, this scenario spawns a fresh
+# idTarget_EndLevelGUI entity that does (Cmd_Spawn_f supports extra key/value pairs after the
+# classname, the same as any other spawnclass; "nextmap" is the entityDef's own documented var -
+# def/endlevelgui.def: "the map name to transfer to") - the only way to exercise that specific,
+# ported mechanism at all, and a direct reading of AC2's literal wording ("nextmap ... loads e1m1").
+# Triggering it starts the screen; "nextmap" has no state guard in HandleCustomGUICommand (it
+# always sets state = 5, even before the first tic), so it's sent right after triggering. The next
+# tic (state 5's branch, Event_UpdateStats) then runs `gameLocal.sessionCommand = "map e1m1"` on
+# its own, without any further console command - the harness only proves that map actually loads
+# (the log's "<N> msec to load e1m1" line), the same evidence tools/test-script-events.sh and
+# friends already use for a map finishing loading.
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -136,11 +158,10 @@ else
 	FAIL=1
 fi
 
-# There are 6 chextrek_dump calls in order: (1) baseline after map load, (2) after the kill/
+# There are 7 chextrek_dump calls in order: (1) baseline after map load, (2) after the kill/
 # pickup/secret setup (the "final" level_stats values skip should reproduce), (3) right after
-# triggering target_endlevelgui_1 (the untouched/just-started screen), (4)-(6) after each of the
-# first three "skip" calls (monsters, items, secrets). A 4th skip call (level time) follows (6)
-# with no further dump index of its own reserved above; its dump is the 7th and last.
+# triggering target_endlevelgui_1 (the untouched/just-started screen), (4)-(7) after each of the
+# four "skip" calls (monsters, items, secrets, level time).
 LEVEL_STATS_LINES="$(grep -oE '^level_stats: monsters=[0-9]+/[0-9]+ items=[0-9]+/[0-9]+ secrets=[0-9]+/[0-9]+$' "$LOCAL_LOG")"
 MONSTERS_FOUND="$(echo "$LEVEL_STATS_LINES" | sed -n 's/^level_stats: monsters=\([0-9]*\)\/.*/\1/p')"
 MONSTERS_TOTAL="$(echo "$LEVEL_STATS_LINES" | sed -n 's/^level_stats: monsters=[0-9]*\/\([0-9]*\).*/\1/p')"
@@ -182,6 +203,20 @@ ITEMS_PERCENT_VALUES="$(grep -oE '^customui_gui_items_percent: [0-9]+$' "$LOCAL_
 SECRETS_FOUND_VALUES="$(grep -oE '^customui_gui_secrets_found: [0-9]+$' "$LOCAL_LOG" | grep -oE '[0-9]+$')"
 SECRETS_PERCENT_VALUES="$(grep -oE '^customui_gui_secrets_percent: [0-9]+$' "$LOCAL_LOG" | grep -oE '[0-9]+$')"
 LEVEL_TIME_VALUES="$(grep -oE '^customui_gui_level_time: .*$' "$LOCAL_LOG" | sed 's/^customui_gui_level_time: //')"
+
+# Guard against the failure mode the wait-timing comment above describes: if natural counting had
+# already finished the monsters line (state advanced past 0) by dump #3 - before any "skip" - every
+# "skip" below would silently test the wrong line while still reporting PASS (each is still
+# "handled", just for a different stat). Dump #3's ai_percent (occurrence 1, before any skip) must
+# be strictly below the final target percent; if it isn't, that's caught here directly instead of
+# masquerading as a pass below.
+AI_PERCENT_BEFORE_SKIP="$(echo "$AI_PERCENT_VALUES" | sed -n '1p')"
+if [ -n "$AI_PERCENT_BEFORE_SKIP" ] && [ "$AI_PERCENT_BEFORE_SKIP" -lt "$M_PERCENT_EXPECTED" ]; then
+	echo "PASS: before any 'skip', the monsters line hadn't finished counting on its own yet (ai_percent=${AI_PERCENT_BEFORE_SKIP}%, final is ${M_PERCENT_EXPECTED}%) - the 'skip' calls below are exercising the line they're expected to"
+else
+	echo "FAIL: expected the monsters line to still be short of its final ${M_PERCENT_EXPECTED}% before any 'skip' (so the four 'skip' calls below land on the intended lines in order), got ai_percent='${AI_PERCENT_BEFORE_SKIP}' - the wait before the first 'skip' may need shortening"
+	FAIL=1
+fi
 
 AI_KILLED_AFTER_SKIP="$(echo "$AI_KILLED_VALUES" | sed -n '2p')"
 AI_PERCENT_AFTER_SKIP="$(echo "$AI_PERCENT_VALUES" | sed -n '2p')"
@@ -225,7 +260,6 @@ fi
 CONSOLE_SCRIPT2="${SCRATCH_DIR}/end-level-nextmap-nextmap-sf923.cfg"
 cat > "$CONSOLE_SCRIPT2" <<'EOF'
 developer 1
-set g_statTicTime 50
 map sf_923
 wait 20
 chextrek_dump
@@ -264,6 +298,13 @@ if grep -qE '^ *[0-9]+ msec to load sf_923$' "$LOCAL_LOG2"; then
 	echo "PASS: sf_923 finished loading"
 else
 	echo "FAIL: expected to see '<N> msec to load sf_923' in the log"
+	FAIL=1
+fi
+
+if grep -qF "chextrek_customui_cmd: 'nextmap' handled" "$LOCAL_LOG2"; then
+	echo "PASS: chextrek_customui_cmd actually reached HandleCustomGUICommand with 'nextmap' (not just timed out into some other path)"
+else
+	echo "FAIL: expected \"chextrek_customui_cmd: 'nextmap' handled\" in the log - e1m1 loading below could otherwise be coincidental (e.g. a hung/late run reaching state 5 on its own after the 3s pause)"
 	FAIL=1
 fi
 

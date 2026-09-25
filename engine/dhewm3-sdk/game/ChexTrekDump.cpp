@@ -211,16 +211,32 @@ code; this command changes no game behavior of its own, the same as chextrek_dum
 for "any GUI command" generally - it only reaches idCustomUI subclasses (the only kind of GUI this
 mod routes through a single, always-reachable idPlayer member, customUIEntity), which is exactly
 the "nextmap"/"skip"/"unregister" screen spec #34 is about.
+
+Recorded deviation from spec #28's Implementation Decisions, which describe the state-dump command
+as "the only test code in the library": this is a second one, needed because #34's AC can't be
+proven through spec #28's console-only command list otherwise (see above) - the same class of gap
+the state-dump command itself exists to close (observing/driving state those commands can't reach),
+just on the driving side instead of the observing side. Gated the same way idGameLocal's other
+state-changing debug commands are (Cmd_Trigger_f, Cmd_Spawn_f, gamesys/SysCmds.cpp):
+CMD_FL_CHEAT plus an explicit CheatsOk() check, so it needs the same "developer 1"/cheats-enabled
+state the harness already runs under (spec #28 story 34: "developer-only").
 ==================
 */
 void ChexTrek_CustomUICmd_f( const idCmdArgs &args ) {
+	if ( !gameLocal.CheatsOk( false ) ) {
+		return;
+	}
+
 	if ( args.Argc() != 2 ) {
 		gameLocal.Printf( "usage: chextrek_customui_cmd <command>\n" );
 		return;
 	}
 
+	// Same guard idPlayer::HandleSingleGuiCommand itself uses (Player.cpp) before calling
+	// HandleCustomGUICommand: both customUI (the idUserInterface, set by idCustomUI::RegisterGUI
+	// only once its own `gui` is non-NULL) and customUIEntity must be set.
 	idPlayer *player = gameLocal.GetLocalPlayer();
-	if ( !player || !player->customUIEntity ) {
+	if ( !player || !player->customUI || !player->customUIEntity ) {
 		gameLocal.Printf( "chextrek_customui_cmd: no idCustomUI registered on the local player\n" );
 		return;
 	}
