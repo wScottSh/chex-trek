@@ -331,6 +331,13 @@ public:
 	void					updateHudMapAlpha( int level );
 	void					MapImageCoords( float width, float height, const idVec2 &pos, idVec2 &out );
 
+	// chextrek: spec #16/#38 (decomp-so/reference/hud-map.md). Console command "showMap [level]":
+	// fills one level's fog-of-war image (or, with no argument, every level's) with 0xff, revealing
+	// the whole map. Static: the binary calls it with just the idCmdArgs, and the command system
+	// holds a plain function pointer - registered as "showMap" by idGameLocal::InitConsoleCommands
+	// (gamesys/SysCmds.cpp).
+	static void				Cmd_ShowMap_f( const idCmdArgs &args );
+
 	int						mapControl;			// MAP_* bits, set by HandleSingleGuiCommand (#37). Not saved (#39).
 	float					mapScale;				// PDA zoom, "map_scale" (default 1), 0.1 .. 9. Not saved here (#39).
 	idVec2					mapView;				// world x, y at the center of the map box. Not saved.

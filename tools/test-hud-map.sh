@@ -36,8 +36,21 @@
 # in PerformImpulse itself, HandleNamedEvent, hud.gui's own onNamedEvent blocks) is the real,
 # already-ported game code, unchanged. guis/hud.gui's hudmap_open window flips "gui::HudMap" to 1
 # at its own onTime 5 (5ms in) - a short wait is enough - but hudmap_close only flips it back to 0
-# at its onTime 400 (400ms in, after a fade-out transition finishes) - hence the much longer wait
-# after the second chextrek_test_impulse below.
+# at its onTime 400 (400ms in, after a fade-out transition finishes), timed off gameLocal.time
+# (idPlayerView::SingleView calls the HUD gui's Redraw( gameLocal.time ) every frame, PlayerView.cpp),
+# not off a fixed number of console-script "wait" ticks - and the two don't map 1:1 (#37's
+# tools/test-pda-map.sh hit the exact same gap for guis/pda_chex.gui's own onTime 400: "how much
+# gameLocal.time advances per 'wait' tick isn't fixed, so a fixed frame-count margin can't reliably
+# bound a gameLocal.time-based threshold"). A single fixed-length wait followed by one dump
+# (originally "wait 40") was observed to land on either side of the flip across runs - sometimes
+# still 1, sometimes already 0. Rather than guess a bigger fixed margin (liable to the same
+# intermittent failure, just at lower odds), this scenario samples repeatedly: eight chextrek_dumps,
+# 20 frames apart (160 frames of total margin, 4x the original single wait), and the assertion
+# below passes if *any* of the eight shows visible=0 - the flip is one-time and monotonic (hud.gui's
+# own onTime semantics: a timeline fires once and only resetTime rearms it, and nothing here calls
+# resetTime "hudmap_close" again), so once one sample sees 0, every later sample would too. The
+# last of the eight is also reused as AC2's pre-setviewpos coverage baseline (still standing at the
+# spawn point throughout - see AC2 below).
 #
 # --- AC2 ---
 # `coverage` is the number of alpha-revealed texels (hudmap_alpha[level][...][3] > 0) out of the
@@ -83,7 +96,21 @@ wait 10
 chextrek_dump
 
 chextrek_test_impulse 23
-wait 40
+wait 20
+chextrek_dump
+wait 20
+chextrek_dump
+wait 20
+chextrek_dump
+wait 20
+chextrek_dump
+wait 20
+chextrek_dump
+wait 20
+chextrek_dump
+wait 20
+chextrek_dump
+wait 20
 chextrek_dump
 
 setviewpos 300 -976 8 0
@@ -129,14 +156,16 @@ else
 	FAIL=1
 fi
 
-# There are 6 chextrek_dump calls total: baseline, after each of 2 impulse 23 toggles, then after
-# each of 3 setviewpos moves.
+# There are 13 chextrek_dump calls total: baseline, after the first impulse 23 (open), eight
+# samples taken 20 frames apart after the second impulse 23 (close - see the comment above the
+# console script for why eight samples instead of one), then after each of the 3 setviewpos moves.
 VISIBLE_VALUES="$(grep -oE '^hud_map: level=[0-9]+ visible=[01] coverage=[0-9]+$' "$LOCAL_LOG" | grep -oE 'visible=[01]' | grep -oE '[01]$')"
 COVERAGE_VALUES="$(grep -oE '^hud_map: level=[0-9]+ visible=[01] coverage=[0-9]+$' "$LOCAL_LOG" | grep -oE 'coverage=[0-9]+' | grep -oE '[0-9]+$')"
 
 V0="$(echo "$VISIBLE_VALUES" | sed -n '1p')"
 V1="$(echo "$VISIBLE_VALUES" | sed -n '2p')"
-V2="$(echo "$VISIBLE_VALUES" | sed -n '3p')"
+# Eight close samples, dumps 3-10 (1-indexed).
+CLOSE_SAMPLES="$(echo "$VISIBLE_VALUES" | sed -n '3,10p')"
 
 # --- AC1: impulse 23 toggles the map (dump shows visible/hidden) ---
 if [ "$V0" = "0" ]; then
@@ -153,20 +182,24 @@ else
 	FAIL=1
 fi
 
-if [ "$V2" = "0" ]; then
-	echo "PASS: a second impulse 23 hid the HUD map again (visible 1 -> 0)"
+# The close transition (hud.gui's hudmap_close, onTime 400) is one-time and monotonic once it
+# fires, so it's enough for any of the eight samples to already show 0 - see the console-script
+# comment above for why a single fixed-length wait isn't reliable here.
+if echo "$CLOSE_SAMPLES" | grep -qx '0'; then
+	echo "PASS: a second impulse 23 hid the HUD map again (visible 1 -> 0, seen in: $(echo "$CLOSE_SAMPLES" | tr '\n' ' '))"
 else
-	echo "FAIL: expected visible=0 after the second impulse 23, got '${V2}'"
+	echo "FAIL: expected visible=0 in at least one of the eight post-close samples, got: $(echo "$CLOSE_SAMPLES" | tr '\n' ' ')"
 	FAIL=1
 fi
 
 # --- AC2: setviewpos to several points; dump coverage grows after each move ---
-# Dump 3 (1-indexed, the baseline taken right before the first setviewpos, still at the spawn
-# point) is the "before" value for the first move; dumps 4-6 are taken after each setviewpos.
-C0="$(echo "$COVERAGE_VALUES" | sed -n '3p')"
-C1="$(echo "$COVERAGE_VALUES" | sed -n '4p')"
-C2="$(echo "$COVERAGE_VALUES" | sed -n '5p')"
-C3="$(echo "$COVERAGE_VALUES" | sed -n '6p')"
+# Dump 10 (1-indexed, the last of the eight post-close samples, still standing at the spawn point
+# throughout) is the "before" value for the first move; dumps 11-13 are taken after each
+# setviewpos.
+C0="$(echo "$COVERAGE_VALUES" | sed -n '10p')"
+C1="$(echo "$COVERAGE_VALUES" | sed -n '11p')"
+C2="$(echo "$COVERAGE_VALUES" | sed -n '12p')"
+C3="$(echo "$COVERAGE_VALUES" | sed -n '13p')"
 
 if [ -n "$C0" ] && [ "$C0" -gt 0 ]; then
 	echo "PASS: coverage is already nonzero at the spawn-point baseline (${C0} texels revealed)"

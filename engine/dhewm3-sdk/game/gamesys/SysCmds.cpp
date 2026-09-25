@@ -2428,6 +2428,11 @@ void idGameLocal::InitConsoleCommands( void ) {
 	// localization help commands
 	cmdSystem->AddCommand( "nextGUI",				Cmd_NextGUI_f,				CMD_FL_GAME|CMD_FL_CHEAT,	"teleport the player to the next func_static with a gui" );
 	cmdSystem->AddCommand( "testid",				Cmd_TestId_f,				CMD_FL_GAME|CMD_FL_CHEAT,	"output the string for the specified id." );
+
+	// chextrek: spec #16/#38 (decomp-so/reference/hud-map.md). Binary: cmdSystem->AddCommand right
+	// after the last stock command ("testid" above) and before the mod's "takeEnvShots"
+	// (env-shots group, not yet ported).
+	cmdSystem->AddCommand( "showMap",				idPlayer::Cmd_ShowMap_f,	CMD_FL_GAME|CMD_FL_CHEAT,	"show the whole map" );
 }
 
 /*

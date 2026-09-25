@@ -1014,6 +1014,35 @@ void idPlayer::updateHudMapAlpha( int level ) {
 }
 
 /*
+================
+idPlayer::Cmd_ShowMap_f
+
+Console command "showMap [level]": reveals the whole map of one level (0-4), or of all of them.
+================
+*/
+void idPlayer::Cmd_ShowMap_f( const idCmdArgs &args ) {
+	int level;
+
+	if ( args.Argc() > 2 ) {
+		gameLocal.Printf( "usage: showMap [level]\n" );
+		return;
+	}
+	if ( args.Argc() == 2 ) {
+		level = atoi( args.Argv( 1 ) );
+		if ( level < 0 || level > 4 ) {
+			gameLocal.Printf( "bad level %s\n", args.Argv( 1 ) );
+			return;
+		}
+		memset( hudmap_alpha[ level ], 0xff, sizeof( hudmap_alpha[ level ] ) );
+	} else {
+		memset( hudmap_alpha, 0xff, sizeof( hudmap_alpha ) );
+	}
+	// Not uploaded here: the image changes on screen at the next reveal (updateHudMapAlpha). The
+	// change is visible at once in chextrek_dump's "coverage" count (ChexTrekDump.cpp), which
+	// reads hudmap_alpha directly rather than the uploaded render texture.
+}
+
+/*
 ==============
 idPlayer::addObjective
 
