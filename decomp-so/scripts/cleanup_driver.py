@@ -11,6 +11,7 @@ re-run until it passes.
     python decomp-so/scripts/cleanup_driver.py custom-ui -o p.md    # packet to a file
 
 Pipeline, for reproduction:
+    0. custom_symbols.py: every function the stock source lacks is a target (targets.txt or a custom class)
     1. NoReturnOff.java (pre-script) + ExportCustom.java -> decomp-so/ghidra-full/  (Ghidra 12.1.4, headless)
     2. cleanup_driver.py <group> -> packet -> Claude Opus 5.5 -> decomp-so/reference/<group>.md
     3. python decomp-so/verify/verify.py <group>   (must exit 0), then mark rows `covered`
@@ -50,9 +51,11 @@ RULES = """\
   decomp-so/verify/literal-allowlist.tsv instead.
 - Cross-check spawnArg keys and GUI command names against the mod's def/, script/, guis/
   and maps/; record in Notes which keys the data uses and which it never sets.
-- Every direct callee listed below must appear in that function's definition (a comment
-  counts, e.g. for implicit base-destructor calls). Exception-only and ABI-implicit callees
-  are on decomp-so/verify/allowlist.tsv.
+- Every direct callee listed below must appear in that function's code (a comment counts
+  only for constructor/destructor callees, e.g. implicit base-destructor calls). Callees no
+  source statement names go on decomp-so/verify/allowlist.tsv, with a kind: `exception-only`,
+  `abi-implicit`, `stock-inline` (inside stock ID_INLINE code the function calls by name) or
+  `libc-inline` (inside an inline glibc function); see that file's header.
 - The header and implementation blocks must compile, 32-bit, against the stock DOOM-3 GPL
   game source (check 3). Additions to a stock class are written as a partial declaration
   (`class idPlayer : public idActor { // ... stock members ... public: ... };`) with
@@ -75,6 +78,9 @@ RULES = """\
 
 1. A title, then a **Provenance** line naming the model (Claude Opus 5.5) and the Ghidra
    export files used.
+   Then, if the header block builds on another group's header block (e.g. a subclass of
+   that group's class), a `**Depends on:** `<group>`` line: check 3 compiles those groups'
+   header blocks first.
 2. `## Header`: exactly one ```cpp block with class declarations (member offsets as comments).
 3. `## Implementation`: exactly one ```cpp block with every function definition.
 4. `## Notes`: open questions, Ghidra artifacts, cross-group links.

@@ -85,3 +85,7 @@ matt_func_envshot_takeEnvShots_f_002b7890.c	1	1
 matt_func_envshot_matt_func_envshot_002b7940.c	2	2	
 matt_func_envshot_matt_func_envshot_002b7990.c	1	1	
 idStr_FormatTime_00354230.c	5	5	
+# Not in the first export: exported in PR #27's final review, rows from that export.
+idGameLocal_ProjectDecal_00101c80.c	0	0	
+idWorldspawn_Think_001bbe40.c	6	6	
+idWorldspawn_Save_001bb5e0.c	0	0	

@@ -14,3 +14,15 @@ mkTrail::Think	float [01].5	stock-inline	the Newton step ( 1.5f - r * r * ( x * 
 mkTrail::UpdateRenderEntity	float 1.5	stock-inline	the Newton step ( 1.5f - r * r * ( x * 0.5f ) ) of idMath::RSqrt in idVec3::LengthFast; ID_INLINE in idlib/math/Math.h and idlib/math/Vector.h
 mkTrail::addNewAnchor	float 1.5	stock-inline	the Newton steps ( 1.5f - r * r * ( x * 0.5f ) ) of idMath::RSqrt in idVec3::LengthFast and of idMath::InvSqrt in idVec3::Normalize; ID_INLINE in idlib/math/Math.h and idlib/math/Vector.h
 idActor::Event_FootPrint	float [01].5	stock-inline	the Newton steps ( 1.5f - r * r * ( x * 0.5f ) ) of idMath::InvSqrt in the two idVec3::Normalize calls; ID_INLINE in idlib/math/Math.h and idlib/math/Vector.h
+idGameLocal::ProjectDecal	float 3.0517578e-05	stock-inline	the 1 / ( MAX_RAND + 1 ) of idRandom::RandomFloat ( RandomInt() / ( float )( idRandom::MAX_RAND + 1 ) ), in random.RandomFloat(); ID_INLINE in idlib/math/Random.h
+idGameLocal::ProjectDecal	float 1.5	stock-inline	the Newton steps ( 1.5f - r * r * ( x * 0.5f ) ) of idMath::InvSqrt in idVec3::Normalize and idVec3::NormalVectors; ID_INLINE in idlib/math/Math.h and idlib/math/Vector.h
+idGameLocal::ProjectDecal	float -1.0	stock-inline	d = -1.0f, the sign idMath::SinCos16 gives the cosine in the second and third quadrants; ID_INLINE in idlib/math/Math.h
+idGameLocal::ProjectDecal	float -2.605e-07	stock-inline	a coefficient of idMath::SinCos16's sine / cosine polynomial; ID_INLINE in idlib/math/Math.h
+idGameLocal::ProjectDecal	float 2.47609e-05	stock-inline	a coefficient of idMath::SinCos16's sine / cosine polynomial; ID_INLINE in idlib/math/Math.h
+idGameLocal::ProjectDecal	float 0.0013888397	stock-inline	a coefficient of idMath::SinCos16's sine / cosine polynomial; ID_INLINE in idlib/math/Math.h
+idGameLocal::ProjectDecal	float 0.04166664	stock-inline	a coefficient of idMath::SinCos16's sine / cosine polynomial; ID_INLINE in idlib/math/Math.h
+idGameLocal::ProjectDecal	float -2.39e-08	stock-inline	a coefficient of idMath::SinCos16's sine / cosine polynomial; ID_INLINE in idlib/math/Math.h
+idGameLocal::ProjectDecal	float 2.7526e-06	stock-inline	a coefficient of idMath::SinCos16's sine / cosine polynomial; ID_INLINE in idlib/math/Math.h
+idGameLocal::ProjectDecal	float 0.000198409	stock-inline	a coefficient of idMath::SinCos16's sine / cosine polynomial; ID_INLINE in idlib/math/Math.h
+idGameLocal::ProjectDecal	float 0.008333332	stock-inline	a coefficient of idMath::SinCos16's sine / cosine polynomial; ID_INLINE in idlib/math/Math.h
+idGameLocal::ProjectDecal	float 0.16666667	stock-inline	a coefficient of idMath::SinCos16's sine / cosine polynomial; ID_INLINE in idlib/math/Math.h

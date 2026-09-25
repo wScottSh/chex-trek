@@ -1,15 +1,16 @@
-# Standalone script events (`footprint`, `setProj`, `spawnDict`): reconstructed reference
+# Standalone script events (`footprint`, `setProj`, `spawnDict`) and the `ProjectDecal` overload: reconstructed reference
 
-**Provenance:** reconstructed by **Claude Opus 5.5** on 2026-09-24 from the complete Ghidra export `decomp-so/ghidra-full/` of `gamex86.so` (Ghidra 12.1.4, "Non-Returning Functions - Discovered" disabled), enriched export (issue #18: float constants and string literals resolved from `.rodata`). Checks 1-3 pass (issue #26). Check 3 compiles it, 32-bit, against stock DOOM-3 GPL a9c49da. Export files: `idActor_Event_FootPrint_000c6210.c`, `idWeapon_Event_SetProj_001af990.c` and `idThread_Event_SpawnDict_0024dc00.c`. Facts marked *binary* were read straight from `gamex86.so` (symbol table, relocations, event tables, static initializers, disassembly). Reference material only, not original source. The original source does not exist.
+**Provenance:** reconstructed by **Claude Opus 5.5** on 2026-09-24 from the complete Ghidra export `decomp-so/ghidra-full/` of `gamex86.so` (Ghidra 12.1.4, "Non-Returning Functions - Discovered" disabled), enriched export (issue #18: float constants and string literals resolved from `.rodata`). Checks 1-3 pass (issue #26; the `ProjectDecal` overload was added in PR #27's final review). Check 3 compiles it, 32-bit, against stock DOOM-3 GPL a9c49da. Export files: `idActor_Event_FootPrint_000c6210.c`, `idWeapon_Event_SetProj_001af990.c`, `idThread_Event_SpawnDict_0024dc00.c` and `idGameLocal_ProjectDecal_00101c80.c`. Facts marked *binary* were read straight from `gamex86.so` (symbol table, relocations, event tables, static initializers, disassembly). Reference material only, not original source. The original source does not exist.
 
-Scope (spec #16, issue #26): three new script events, each added to a stock class, and their handlers. `idActor::Event_FootPrint` (the `footprint` event, spelled `footPrint` in the spec), `idWeapon::Event_SetProj` (`setProj`) and `idThread::Event_SpawnDict` (`spawnDict`). They are grouped by kind only: none calls another. Addresses below are ELF virtual addresses. Ghidra's are `+0x10000`. Stock DOOM-3 GPL source (a9c49da) is referenced, not repeated.
+Scope (spec #16, issue #26): three new script events, each added to a stock class, and their handlers. `idActor::Event_FootPrint` (the `footprint` event, spelled `footPrint` in the spec), `idWeapon::Event_SetProj` (`setProj`) and `idThread::Event_SpawnDict` (`spawnDict`). They are grouped by kind only: none calls another. Also the new 8-argument `idGameLocal::ProjectDecal` overload, whose only caller is `Event_FootPrint`.
+
+Spec #16 (story 15) lists six new script events. The other three are in other groups: `openDoors` (`door-opening.md`), `updateStats` (`end-level-stats.md`: really the internal `"<UpdateEndLevelStats>"`) and `envShot` (`env-shots.md`). `envShot` is not a script event: the event is `"<envshot>"`, an internal event with no arguments that only `matt_func_envshot::Spawn` posts. `envShot` is the name of its C++ symbols and of the renderer command it runs. Addresses below are ELF virtual addresses. Ghidra's are `+0x10000`. Stock DOOM-3 GPL source (a9c49da) is referenced, not repeated.
 
 ## Header
 
 ```cpp
 // ---------------------------------------------------------------------------
 // idGameLocal addition (Game_local.h)
-// Not part of this group's scope. It is declared here only because Event_FootPrint calls it (see Notes).
 // ---------------------------------------------------------------------------
 class idGameLocal : public idGame {
 	// ... stock members ...
@@ -17,10 +18,9 @@ public:
 	// A new overload next to the stock 7-argument ProjectDecal. The binary has both:
 	// _ZN11idGameLocal12ProjectDecalERK6idVec3S2_fbfPKcf @ 0xf0db0 (stock) and
 	// _ZN11idGameLocal12ProjectDecalERK6idVec3S2_fbfPKcPS1_f @ 0xf1c80 (this one).
-	// UNCERTAIN: the name and meaning of `winding`. Event_FootPrint passes four corner points shaped
-	// like the stock function's static decalWinding ( +-1, +-1, 0 ), and this overload does not use
-	// that static (only the stock one reads its guard variable). Also UNCERTAIN: default arguments.
-	void					ProjectDecal( const idVec3 &origin, const idVec3 &dir, float depth, bool parallel, float size, const char *material, const idVec3 *winding, float angle );
+	// UNCERTAIN: the name of `decalWinding` (named after the stock static it replaces) and whether
+	// it has default arguments.
+	void					ProjectDecal( const idVec3 &origin, const idVec3 &dir, float depth, bool parallel, float size, const char *material, const idVec3 *decalWinding, float angle );
 };
 
 // ---------------------------------------------------------------------------
@@ -220,6 +220,66 @@ void idActor::Event_FootPrint( const char *side, const char *jointName ) {
 }
 
 // ===========================================================================
+// ProjectDecal overload (Game_local.cpp)
+// ===========================================================================
+
+/*
+================
+idGameLocal::ProjectDecal
+
+The stock ProjectDecal with the decal's four corner directions passed in by the caller
+(decalWinding) instead of read from the stock function's static decalWinding. Only
+Event_FootPrint calls it, with the stock corners scaled by footprint_scale_x / _y.
+
+Binary: the body is the stock one (0xf0db0) instruction for instruction, register allocation
+aside. The two differences: the corners are read through the 7th argument (esi, from
+[esp + 0x65c]; +0x0, +0xc, +0x18, +0x24), and the static's one-time initialization
+(`cmp byte [guard], 0`, __cxa_guard_acquire / __cxa_guard_release and the twelve stores) is gone.
+The rest is the stock inline code: g_decals.GetBool() (internalVar->integerValue),
+random.RandomFloat() (seed * 69069 + 1, & 0x7fff, / 32768), idMath::SinCos16,
+idVec3::Normalize / NormalVectors, idFixedWinding with 64 points on the stack, then the two
+vtable calls declManager->FindMaterial and gameRenderWorld->ProjectDecalOntoWorld.
+================
+*/
+void idGameLocal::ProjectDecal( const idVec3 &origin, const idVec3 &dir, float depth, bool parallel, float size, const char *material, const idVec3 *decalWinding, float angle ) {
+	float s, c;
+	idMat3 axis, axistemp;
+	idFixedWinding winding;
+	idVec3 windingOrigin, projectionOrigin;
+
+	if ( !g_decals.GetBool() ) {
+		return;
+	}
+
+	// randomly rotate the decal winding, unless an angle is given (Event_FootPrint's is 0 only
+	// when the actor's yaw is exactly 90)
+	idMath::SinCos16( ( angle ) ? angle : random.RandomFloat() * idMath::TWO_PI, s, c );
+
+	// winding orientation
+	axis[2] = dir;
+	axis[2].Normalize();
+	axis[2].NormalVectors( axistemp[0], axistemp[1] );
+	axis[0] = axistemp[ 0 ] * c + axistemp[ 1 ] * -s;
+	axis[1] = axistemp[ 0 ] * -s + axistemp[ 1 ] * -c;
+
+	windingOrigin = origin + depth * axis[2];
+	if ( parallel ) {
+		projectionOrigin = origin - depth * axis[2];
+	} else {
+		projectionOrigin = origin;
+	}
+
+	size *= 0.5f;
+
+	winding.Clear();
+	winding += idVec5( windingOrigin + ( axis * decalWinding[0] ) * size, idVec2( 1.0f, 1.0f ) );
+	winding += idVec5( windingOrigin + ( axis * decalWinding[1] ) * size, idVec2( 0.0f, 1.0f ) );
+	winding += idVec5( windingOrigin + ( axis * decalWinding[2] ) * size, idVec2( 0.0f, 0.0f ) );
+	winding += idVec5( windingOrigin + ( axis * decalWinding[3] ) * size, idVec2( 1.0f, 0.0f ) );
+	gameRenderWorld->ProjectDecalOntoWorld( winding, projectionOrigin, parallel, depth * 0.5f, declManager->FindMaterial( material ), time );
+}
+
+// ===========================================================================
 // setProj (Weapon.cpp)
 // ===========================================================================
 
@@ -310,16 +370,17 @@ void idThread::Event_SpawnDict( const char *defName ) {
   - `def/monster_chex_biped.def:42-51`: `footprint_size` 18, scales .7 / 1, `footprint_offset_l` / `_r` `"5 0 0"`, `mtr_footprint` `textures/chex/decals/flemprint`. No `footprint_on_sound`. So the biped prints `flemprint_l` / `flemprint_r` from its walk frame commands, 5 units forward of the foot joint, always.
   - Both defs list `mtr_footprint1` / `mtr_footprint2` as the `_l` / `_r` materials "for preload only". The code never reads those keys: the names it builds (`%s_%s`, `%s%s`) are what the preload is for.
   - `footprint_time_<type>` / `mtr_footprint_<type>` take the stock type names (`metal`, `stone`, ..., `surftype15`). The notes spell them `_surfacetype`, meaning the type's name.
-- **`idGameLocal::ProjectDecal` overload (outside the target set).** `Event_FootPrint` is the only caller of the 8-argument `ProjectDecal` (binary: every direct call in the `.so`). The stock callers (`idEntityFx::Run`, `idProjectile::DefaultDamageEffect`, `idWeapon::Event_Melee`, `idFuncSplat::Event_Splat`, `idExplodingBarrel::ExplodingEffects`, `idGameLocal::BloodSplat`) still call the stock 7-argument one. The overload is a new method but not in `scripts/targets.txt`, so the export, `coverage.md` and spec #16's target set do not include it. It is a copy of the stock function (0xf1c80, 0xf0db0 for stock) that takes the winding from the caller. Its body was not reconstructed or checked. The header block declares it only so that check 3 compiles the call. The declaration is spliced into `idGameLocal`, next to the stock overload.
+- **The `idGameLocal::ProjectDecal` overload.** `Event_FootPrint` is the only caller of the 8-argument `ProjectDecal` (binary: every direct call in the `.so`). The stock callers (`idEntityFx::Run`, `idProjectile::DefaultDamageEffect`, `idWeapon::Event_Melee`, `idFuncSplat::Event_Splat`, `idExplodingBarrel::ExplodingEffects`, `idGameLocal::BloodSplat`) still call the stock 7-argument one. It was found in issue #26 and exported afterwards: `scripts/targets.txt` names it with its entry point (`idGameLocal::ProjectDecal @ 00101c80`), because a plain name would also export the stock overload. Its body is the stock one (0xf0db0) with `decalWinding` passed in, compared instruction by instruction (see the comment above the definition). `Event_FootPrint` passes an angle, so a print is turned to the actor's yaw, not at random (unless the angle is exactly 0), and the scaled corners give it its shape. `g_decals 0` turns footprints off, as it does every decal.
 - **`idActor` event table, entry 42.** After `EV_FootPrint`, `idActor::eventCallbacks` has `{ EV_Remove, idClass::Event_Remove }`, which stock `Actor.cpp` does not have. No new function comes with it, so it is not in any group's scope. Recorded as a lead: some edit made `remove` on actors go straight to `idClass::Event_Remove`. Not checked further.
 - **`setProj` behavior.** `projectileDict` is the stock member that stock `Event_LaunchProjectiles` / `Event_CreateProjectile` spawn from. In stock, `GetWeaponDef` (weapon change) and `Restore` (loading a savegame) refill it from the weapon's `def_projectile`. So `setProj` lasts only until then, which fits `weap_disable()` repeating it once a second. Not checked in this build's `GetWeaponDef` / `Restore`.
 - **`spawnDict` compared to stock `spawn`.** Stock `idThread::Event_Spawn` sets `"classname"` in `spawnArgs` and spawns from `spawnArgs` itself. `Event_SpawnDict` copies into a local `idDict` instead, passes `false` as `SpawnEntityDef`'s third argument (stock `setDefaults`, which the stock body never reads; UNCERTAIN whether this build's does), and clears both dicts after. Like stock, `ent` is not initialized before `SpawnEntityDef`, which sets it.
-- **Check 1 (callees).** Named in the code: `GetPhysics`, `va`, `GetFloat` (the 3-argument, non-inline one), `ToAngles`, `GetVector`, `GetJointHandle`, `GetJointWorldTransform`, `ProjectDecal` (`Event_FootPrint`). `FindEntityDef` and `idDict::operator=` (`Event_SetProj`). `FindEntityDefDict`, `Copy`, `SpawnEntityDef`, `ReturnEntity` and `Clear` (`Event_SpawnDict`). From stock inline code, on `allowlist.tsv` as `stock-inline`: `idDict::FindKey` and `__strtod_internal` in `Event_FootPrint` (`idDict::GetFloat( key, default )` and `GetString`), and `idHashIndex::Init` / `Free` and `operator new[]` / `delete[]` in `Event_SpawnDict` (the local `idDict`'s constructor and destructor). The vtable calls `HasGroundContacts`, `GetOrigin` and `idRenderWorld::Trace` are indirect, which check 1 does not see.
-- **Check 2 (literals).** `Event_FootPrint` reads 18 strings and the floats 8.0 (an immediate, three times: trace radius and both decal depths), 1.0 (immediate, `axis[ 2 ].z`), -1.0 (immediate, both `dir.z`), 12.0 and -12.0 (`.rodata`). All appear in the code. 0.5 and 1.5 are the Newton step of `idMath::InvSqrt` inside the two inline `idVec3::Normalize` calls: on `literal-allowlist.tsv` as `stock-inline`. `Event_SetProj` and `Event_SpawnDict` read no literals. The event names and formats are read by static initializers, which are not covered functions, so check 2 does not cover them. They were read from the disassembly.
+- **Callees (check 1).** Named in the code: `GetPhysics`, `va`, `GetFloat` (the 3-argument, non-inline one), `ToAngles`, `GetVector`, `GetJointHandle`, `GetJointWorldTransform`, `ProjectDecal` (`Event_FootPrint`). `FindEntityDef` and `idDict::operator=` (`Event_SetProj`). `FindEntityDefDict`, `Copy`, `SpawnEntityDef`, `ReturnEntity` and `Clear` (`Event_SpawnDict`). From stock inline code, on `allowlist.tsv` as `stock-inline`: `idDict::FindKey` and `__strtod_internal` in `Event_FootPrint` (`idDict::GetFloat( key, default )` and `GetString`), and `idHashIndex::Init` / `Free` and `operator new[]` / `delete[]` in `Event_SpawnDict` (the local `idDict`'s constructor and destructor). The vtable calls `HasGroundContacts`, `GetOrigin` and `idRenderWorld::Trace` are indirect, which check 1 does not see. `ProjectDecal` makes no direct call (the PIC thunk and `_Unwind_Resume` are never checked): `g_decals.GetBool()`, `random.RandomFloat()`, `idMath::SinCos16`, `Normalize`, `NormalVectors` and the `idFixedWinding` code are inline, and `declManager->FindMaterial`, `gameRenderWorld->ProjectDecalOntoWorld` and the winding's `ReAllocate` (in `operator+=`) are vtable calls.
+- **Literals (check 2).** `Event_FootPrint` reads 18 strings and the floats 8.0 (an immediate, three times: trace radius and both decal depths), 1.0 (immediate, `axis[ 2 ].z`), -1.0 (immediate, both `dir.z`), 12.0 and -12.0 (`.rodata`). All appear in the code. 0.5 and 1.5 are the Newton step of `idMath::InvSqrt` inside the two inline `idVec3::Normalize` calls: on `literal-allowlist.tsv` as `stock-inline`. `Event_SetProj` and `Event_SpawnDict` read no literals. `ProjectDecal` reads 0.5 (`size *= 0.5f`, `depth * 0.5f`) and 1.0 (immediates: the `idVec2` texture coordinates), both in the code. The rest come from stock inline code, on `literal-allowlist.tsv` as `stock-inline`: 3.0517578e-05 (1 / 32768, `idRandom::RandomFloat`), -1.0 and nine polynomial coefficients of `idMath::SinCos16` (its tenth, 0.5, is also in the code), and 1.5 (`idMath::InvSqrt`, in `Normalize` and `NormalVectors`). The event names and formats are read by static initializers, which are not covered functions, so check 2 does not cover them. They were read from the disassembly.
 - **Compile (check 3).** The header and implementation compile with g++ 12 `-m32` against stock DOOM-3 GPL a9c49da. The `idGameLocal`, `idActor`, `idWeapon` and `idThread` partial declarations are spliced into scratch copies of `game/Game_local.h`, `game/Actor.h`, `game/Weapon.h` and `game/script/Script_Thread.h`. The event-table lines are comments because the stock `CLASS_DECLARATION`s cannot be repeated. The check proves the code is well-formed only.
-- **Offsets checked against a g++ 12 `-m32` build of the stock headers** (the build is Itanium-ABI like the binary's GCC 3): `idEntity::spawnArgs` +0x64, `idAnimatedEntity::animator` +0x27c, `idActor::viewAxis` +0x8dc, `sizeof( idActor )` 0xf68, `idWeapon::projectileDict` +0x798, `idThread::spawnArgs` +0x1b40, `idDeclEntityDef::dict` +0x8, `modelTrace_t::material` +0x1c, `idMaterial::surfaceFlags` +0x64. Vtable offsets (pointer-to-virtual-member values): `idPhysics::HasGroundContacts` +0xdc, `idPhysics::GetOrigin` +0x84, `idRenderWorld::Trace` +0x7c. All match the binary's accesses.
+- **Offsets checked against a g++ 12 `-m32` build of the stock headers** (the build is Itanium-ABI like the binary's GCC 3): `idEntity::spawnArgs` +0x64, `idAnimatedEntity::animator` +0x27c, `idActor::viewAxis` +0x8dc, `sizeof( idActor )` 0xf68, `idWeapon::projectileDict` +0x798, `idThread::spawnArgs` +0x1b40, `idGameLocal::random` +0x8fe0 (binary +0x8ff0: 0x10 further on, see `trails.md`), `idDeclEntityDef::dict` +0x8, `modelTrace_t::material` +0x1c, `idMaterial::surfaceFlags` +0x64. Vtable offsets (pointer-to-virtual-member values): `idPhysics::HasGroundContacts` +0xdc, `idPhysics::GetOrigin` +0x84, `idRenderWorld::Trace` +0x7c, `idRenderWorld::ProjectDecalOntoWorld` +0x34, `idDeclManager::FindMaterial` +0x60. All match the binary's accesses.
 - **Ghidra artifacts.**
   - `Event_FootPrint`: `fStack_14 = 1.137217e-39` is the PIC thunk's return address seen as a float. `this + 100` is `spawnArgs`. `idMat3::ToAngles()` shows no arguments: it takes `&viewAxis` (+0x8dc) and a hidden return slot (`angles`, of which `fStack_68` is the yaw). The `iSqrt` table lookups with `0x17c` and the `1.5 - r * r * x * 0.5` steps are the inline `idMath::InvSqrt` in `Normalize`. The `* 0.0` terms are the components of the constant `axis[ 2 ]` = ( 0, 0, 1 ), not folded because x87 math keeps them. The `goto LAB_000c64b6` maze is the `mtr` selection above.
   - `Event_SpawnDict`: `local_14 = 0x24dc0b` is the PIC thunk's return address, not an initial value of `ent`. The `SpawnEntityDef` call shows `gameLocal` as `(idDict *)`, `dict` as `(idEntity **)` and `SUB41( &local_14, 0 )` for the bool: really `( &gameLocal, dict, &ent, false )`. The resize loop over `local_34` is `idList::SetGranularity( 16 )` in the inline `idDict` constructor. The landing pads (0x23ddd8-0x23de14) are the exception cleanup of `dict`. Not code.
   - `Event_SetProj`: `iVar1 + 8` is `&projectileDef->dict`.
+  - `ProjectDecal`: `local_59c = PTR_vtable + 8` and `local_594 = &local_58c` are the inline `idFixedWinding` constructor (vtable, then `p` = the 64-point stack buffer). `this + 0x8ff0` is `random`'s seed (`* 0x10dcd + 1`, `& 0x7fff`). `ROUND( a / TWO_PI )` is `floorf` in `SinCos16`. The two `iSqrt` blocks are `InvSqrt` in `Normalize` and in `NormalVectors`; `local_8c = 1.0` / `local_88 = 0.0` is `NormalVectors`' zero-length branch. The eight "unreachable blocks" Ghidra removed are the four `EnsureAlloc` reallocation paths of `winding +=` (vtable +0xc), reached only when the fixed buffer is full.
 - **Open questions.** Whether `footprintRight` really starts uninitialized (so the first footstep's side is arbitrary). Whether the `mtr_footprint_<type>` NULL test was meant to fall back to `mtr_footprint` when the key is missing (it does not). Why `EV_Remove` was added to `idActor`'s table. All need an in-game check or more work in the binary.

@@ -14,6 +14,7 @@ from functools import cached_property
 from pathlib import Path
 
 import capstone
+from capstone import x86
 import itanium_demangler
 from elftools.elf.elffile import ELFFile
 
@@ -66,7 +67,9 @@ class Literal:
 
 @dataclass(frozen=True)
 class RodataRef:
-    """One PIC-relative read of .rodata; `kind` is `unclassified` when it is neither."""
+    """One PIC-relative read of .rodata. `kind`: `float` / `double` (an x87 read, `literal` holds the
+    value), `string` (a `lea` of a NUL-terminated printable run), `pointer` (a `lea` that a later
+    x87 read goes through: the float's address, not a string) or `unclassified` (none of these)."""
 
     at: int  # instruction address
     target: int
@@ -106,7 +109,6 @@ ARG_SLOT_MAX = 0x20  # [esp+d] with d <= this is taken as an outgoing argument s
 
 def _esp_slot(op) -> int | None:
     """d for a dword memory operand [esp + d] (no index), else None."""
-    from capstone import x86
 
     if op.type == x86.X86_OP_MEM and op.size == 4 and op.mem.base == x86.X86_REG_ESP and not op.mem.index:
         return op.mem.disp
@@ -116,7 +118,6 @@ def _esp_slot(op) -> int | None:
 def _is_zero(insns: list, j: int, src) -> bool:
     """Is operand `src` of insns[j] zero: imm 0, or a register last set by `xor r, r`
     within the preceding DOUBLE_WINDOW instructions?"""
-    from capstone import x86
 
     if src.type == x86.X86_OP_IMM:
         return src.imm == 0
@@ -245,10 +246,16 @@ class Binary:
         ro = self.elf.get_section_by_name(".rodata")
         return ro["sh_addr"], ro.data()
 
+    @cached_property
+    def _symbols(self) -> dict[str, tuple[int, int]]:
+        out: dict[str, tuple[int, int]] = {}
+        for sym in self.elf.get_section_by_name(".symtab").iter_symbols():
+            out.setdefault(sym.name, (sym["st_value"], sym["st_size"]))  # the first, as before
+        return out
+
     def symbol(self, name: str) -> tuple[int, int]:
         """(address, size) of a .symtab symbol of any type (functions, event defs, tables)."""
-        sym = next(s for s in self.elf.get_section_by_name(".symtab").iter_symbols() if s.name == name)
-        return sym["st_value"], sym["st_size"]
+        return self._symbols[name]
 
     def has_rodata_string(self, text: str) -> bool:
         """True if `text` is a whole NUL-terminated string in .rodata."""
@@ -295,7 +302,6 @@ class Binary:
         `pop`s on early-return paths are followed by more code. A reuse of that register
         for something else cannot fake a literal: small displacements land in the GOT,
         and only PIC addressing reaches .rodata (~0x70000 below it)."""
-        from capstone import x86
 
         ro_addr, ro = self._rodata
         pic: set[int] = set()  # capstone register ids seen to receive the GOT address
@@ -388,7 +394,6 @@ class Binary:
         immediate reaches an argument slot [esp+d] (d <= ARG_SLOT_MAX, a call follows) and a
         zero is stored at [esp+d-4] within DOUBLE_WINDOW instructions, the pair is taken as
         that double, if it too is short (<= 6 digits)."""
-        from capstone import x86
 
         insns = list(self._md_detail.disasm(self._bytes(func.vaddr, func.size), func.vaddr))
         out = []
@@ -415,7 +420,6 @@ class Binary:
         GCC inlines a copy of a short string literal (`idStr( "guis/hud_maps/" )`) as `mov`s of
         its text: dword immediates, then the tail as a word/byte and a NUL. The literal is then
         not in .rodata at all, but its text, NUL included, runs through these bytes."""
-        from capstone import x86
 
         out = bytearray()
         for ins in self._md_detail.disasm(self._bytes(func.vaddr, func.size), func.vaddr):
@@ -434,7 +438,6 @@ class Binary:
         one byte store per character, so the text is a whole run. A run continues across `mov`s
         that store or load no immediate (GCC reloads `data` between the stores) and ends at any
         other instruction, or at a `mov` of an immediate that is not a byte store to memory."""
-        from capstone import x86
 
         runs, run = [], bytearray()
         for ins in self._md_detail.disasm(self._bytes(func.vaddr, func.size), func.vaddr):
@@ -457,7 +460,6 @@ class Binary:
     def _double_high_word(self, insns: list, k: int) -> float | None:
         """If insns[k] (`mov <dest>, imm32`) is the high word of a stack double whose low word
         is zero, the double's value (see immediate_floats); else None."""
-        from capstone import x86
 
         imm = insns[k].operands[1].imm & 0xFFFFFFFF
         slot = _esp_slot(insns[k].operands[0])  # stored straight to [esp+d]?

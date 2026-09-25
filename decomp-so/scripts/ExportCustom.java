@@ -24,6 +24,8 @@
 // The C-escape rules (cString) and the x87 mnemonic set are duplicated in binary.py.
 //
 // Args: <outDir> <comma-separated classes> <file of extra qualified method names>
+// A method-file line `name` exports every function of that name; `name @ <entry>` (Ghidra
+// address, hex) exports only the overload at that entry, e.g. a custom overload of a stock method.
 // Run (fresh project, Ghidra 12.1.4 headless; this produced decomp-so/ghidra-full/):
 //   analyzeHeadless <projDir> chex -import gamex86.so -scriptPath <scripts>
 //     -preScript NoReturnOff.java -postScript ExportCustom.java <outDir>
@@ -60,7 +62,14 @@ public class ExportCustom extends GhidraScript {
         String[] args = getScriptArgs();
         Path outDir = Paths.get(args[0]);
         Set<String> classes = new HashSet<>(Arrays.asList(args[1].split(",")));
-        Set<String> methods = new HashSet<>(Files.readAllLines(Paths.get(args[2])));
+        Set<String> methods = new HashSet<>();
+        Set<String> overloads = new HashSet<>(); // "name@entry" (entry as hex offset)
+        for (String line : Files.readAllLines(Paths.get(args[2]))) {
+            if (line.isBlank()) continue;
+            int at = line.indexOf('@');
+            if (at < 0) methods.add(line.trim());
+            else overloads.add(line.substring(0, at).trim() + "@" + Long.parseLong(line.substring(at + 1).trim(), 16));
+        }
         rodata = currentProgram.getMemory().getBlock(".rodata");
         got = gotAddress();
 
@@ -69,7 +78,8 @@ public class ExportCustom extends GhidraScript {
             if (f.isThunk() || f.isExternal()) continue;
             String full = f.getName(true);
             String cls = full.contains("::") ? full.substring(0, full.lastIndexOf("::")) : "";
-            if (classes.contains(cls) || methods.contains(full)) targets.add(f);
+            if (classes.contains(cls) || methods.contains(full)
+                    || overloads.contains(full + "@" + f.getEntryPoint().getOffset())) targets.add(f);
         }
 
         // Pass 1: find and type every literal, so pass 2 decompiles against typed data.

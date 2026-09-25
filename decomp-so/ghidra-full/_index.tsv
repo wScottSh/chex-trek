@@ -1,6 +1,7 @@
 idActor_Event_FootPrint_000c6210	idActor::Event_FootPrint	301
 idGameLocal_RemoveTrail_000fe7f0	idGameLocal::RemoveTrail	87
 idGameLocal_GetLevelStats_00100800	idGameLocal::GetLevelStats	384
+idGameLocal_ProjectDecal_00101c80	idGameLocal::ProjectDecal	1582
 idGameLocal_BabySitTrail_00102a10	idGameLocal::BabySitTrail	386
 idPlayer_incSecretsFound_0015d2e0	idPlayer::incSecretsFound	11
 idPlayer_getLevelStats_0015d2f0	idPlayer::getLevelStats	10
@@ -53,6 +54,8 @@ mkObjective_mkObjective_001a9280	mkObjective::~mkObjective	115
 mkObjective_mkObjective_001a9330	mkObjective::~mkObjective	107
 idTarget_EndLevelGUI_idTarget_EndLevelGUI_001a93e0	idTarget_EndLevelGUI::~idTarget_EndLevelGUI	76
 idWeapon_Event_SetProj_001af990	idWeapon::Event_SetProj	76
+idWorldspawn_Save_001bb5e0	idWorldspawn::Save	1
+idWorldspawn_Think_001bbe40	idWorldspawn::Think	461
 idAI_OpenDoors_001ce950	idAI::OpenDoors	131
 idAI_Event_OpenDoors_001dc9a0	idAI::Event_OpenDoors	40
 idThread_Event_SpawnDict_0024dc00	idThread::Event_SpawnDict	472

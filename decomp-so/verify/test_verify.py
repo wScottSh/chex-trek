@@ -23,6 +23,24 @@ ALLOW = verify.load_allowlist()
 LITERAL_ALLOW = verify.load_allowlist(verify.LITERAL_ALLOWLIST_PATH)
 COVERED_GROUPS = sorted({r.group for r in ROWS if r.status == "covered"})
 
+# Each group's scope: (its methods on stock classes, the custom class all of whose exported
+# functions it reconstructs, its number of coverage rows -- ABI clones are one row each).
+GROUP_SCOPES = {
+    "custom-ui": ({"idPlayer::useCustomUI", "idPlayer::clearCustomUI", "idCmdSystem::ArgCompletion_GuiName"},
+                  "idCustomUI", 16),
+    "end-level-stats": ({"idPlayer::getLevelStats", "idPlayer::incSecretsFound", "idGameLocal::GetLevelStats",
+                         "idStr::FormatTime"}, "idTarget_EndLevelGUI", 15),
+    "objectives": ({"idPlayer::addObjective", "idPlayer::freeObjective", "idPlayer::addItemText"}, "mkObjective", 13),
+    "hud-map": ({f"idPlayer::{m}" for m in ("initHudMap", "HudMapLevel", "MapImageCoords", "updateMap",
+                                            "updateMapUI", "updateHudMapAlpha", "Cmd_ShowMap_f")}, None, 7),
+    "trails": ({"idGameLocal::BabySitTrail", "idGameLocal::RemoveTrail"}, "mkTrail", 19),
+    "door-opening": ({"idPlayer::tryOpen", "idAI::OpenDoors", "idAI::Event_OpenDoors"}, None, 3),
+    "env-shots": (set(), "matt_func_envshot", 8),
+    "script-events": ({"idActor::Event_FootPrint", "idWeapon::Event_SetProj", "idThread::Event_SpawnDict",
+                       "idGameLocal::ProjectDecal"}, None, 4),
+    "worldspawn": ({"idWorldspawn::Think", "idWorldspawn::Save"}, None, 2),
+}
+
 
 def reference(group: str) -> str:
     return (verify.REFERENCE_DIR / f"{group}.md").read_text(encoding="utf-8")
@@ -41,77 +59,22 @@ class CalleeCoverage(unittest.TestCase):
                 self.assertTrue(results)
                 self.assertEqual([l for r in results if not r.ok for l in verify.format_results([r])], [])
 
-    def test_custom_ui_covers_its_scope(self):
-        names = {r.function for r in ROWS if r.group == "custom-ui" and r.status == "covered"}
-        self.assertEqual(
-            names,
-            {"idPlayer::useCustomUI", "idPlayer::clearCustomUI", "idCmdSystem::ArgCompletion_GuiName"}
-            | {r.function for r in ROWS if r.function.startswith("idCustomUI::")},
-        )
-        self.assertEqual(len([r for r in ROWS if r.group == "custom-ui"]), 16)
-
-    def test_end_level_stats_covers_its_scope(self):
-        names = {r.function for r in ROWS if r.group == "end-level-stats" and r.status == "covered"}
-        self.assertEqual(
-            names,
-            {"idPlayer::getLevelStats", "idPlayer::incSecretsFound", "idGameLocal::GetLevelStats", "idStr::FormatTime"}
-            | {r.function for r in ROWS if r.function.startswith("idTarget_EndLevelGUI::")},
-        )
-        self.assertEqual(len([r for r in ROWS if r.group == "end-level-stats"]), 15)
-
-    def test_objectives_covers_its_scope(self):
-        names = {r.function for r in ROWS if r.group == "objectives" and r.status == "covered"}
-        self.assertEqual(
-            names,
-            {"idPlayer::addObjective", "idPlayer::freeObjective", "idPlayer::addItemText"}
-            | {r.function for r in ROWS if r.function.startswith("mkObjective::")},
-        )
-        self.assertEqual(len([r for r in ROWS if r.group == "objectives"]), 13)
-
-    def test_hud_map_covers_its_scope(self):
-        names = {r.function for r in ROWS if r.group == "hud-map" and r.status == "covered"}
-        self.assertEqual(
-            names,
-            {f"idPlayer::{m}" for m in ("initHudMap", "HudMapLevel", "MapImageCoords", "updateMap",
-                                        "updateMapUI", "updateHudMapAlpha", "Cmd_ShowMap_f")},
-        )
-        self.assertEqual(len([r for r in ROWS if r.group == "hud-map"]), 7)
-
-    def test_trails_covers_its_scope(self):
-        names = {r.function for r in ROWS if r.group == "trails" and r.status == "covered"}
-        self.assertEqual(
-            names,
-            {"idGameLocal::BabySitTrail", "idGameLocal::RemoveTrail"}
-            | {r.function for r in ROWS if r.function.startswith("mkTrail::")},
-        )
-        self.assertEqual(len([r for r in ROWS if r.group == "trails"]), 19)
-
-    def test_door_opening_covers_its_scope(self):
-        names = {r.function for r in ROWS if r.group == "door-opening" and r.status == "covered"}
-        self.assertEqual(names, {"idPlayer::tryOpen", "idAI::OpenDoors", "idAI::Event_OpenDoors"})
-        self.assertEqual(len([r for r in ROWS if r.group == "door-opening"]), 3)
-
-    def test_env_shots_covers_its_scope(self):
-        rows = [r for r in ROWS if r.group == "env-shots"]
-        self.assertEqual(len(rows), 8)
-        self.assertEqual({r.status for r in rows}, {"covered"})
-        self.assertEqual({r.function for r in rows}, {
-            "matt_func_envshot::GetType", "matt_func_envshot::Spawn", "matt_func_envshot::CreateInstance",
-            "matt_func_envshot::_GLOBAL__I_Type", "matt_func_envshot::Event_envShot",
-            "matt_func_envshot::takeEnvShots_f", "matt_func_envshot::~matt_func_envshot"})
-
-    def test_script_events_covers_its_scope(self):
-        rows = [r for r in ROWS if r.group == "script-events"]
-        self.assertEqual({r.status for r in rows}, {"covered"})
-        self.assertEqual({r.function for r in rows},
-                         {"idActor::Event_FootPrint", "idWeapon::Event_SetProj", "idThread::Event_SpawnDict"})
+    def test_each_group_covers_its_scope(self):
+        """GROUP_SCOPES is the whole record: every row is in exactly the group named there."""
+        self.assertEqual(sorted(GROUP_SCOPES), sorted({r.group for r in ROWS}))
+        for group, (methods, custom_class, count) in GROUP_SCOPES.items():
+            with self.subTest(group=group):
+                rows = [r for r in ROWS if r.group == group]
+                self.assertEqual(len(rows), count)
+                self.assertEqual({r.status for r in rows}, {"covered"})
+                whole_class = {r.function for r in ROWS if custom_class and r.function.startswith(custom_class + "::")}
+                self.assertEqual({r.function for r in rows}, set(methods) | whole_class)
 
     def test_every_exported_function_is_covered(self):
         """Spec #16's end state: every function in the coverage record is in a group reference that
         passes the harness (checks 1 and 2 here; check 3 in Compile)."""
         self.assertEqual([r.function for r in ROWS if r.status != "covered"], [])
-        self.assertEqual(COVERED_GROUPS, sorted(["custom-ui", "end-level-stats", "objectives", "hud-map",
-                                                 "trails", "door-opening", "env-shots", "script-events"]))
+        self.assertEqual(COVERED_GROUPS, sorted(GROUP_SCOPES))
 
     def test_static_init_entry_needs_the_class_declaration(self):
         """_GLOBAL__I__ZN7mkTrail4TypeE only calls the file's __static_initialization_and_destruction_0;
@@ -234,8 +197,8 @@ def literal_problems(results) -> set[tuple[str, str]]:
 
 
 def synthetic(function: str, group: str = "synthetic") -> list[verify.CoverageRow]:
-    """A coverage record with one `covered` row for `function`, for tests on real binary
-    functions whose group is not reconstructed yet."""
+    """A coverage record with one `covered` row for `function`, for tests that check a real
+    binary function against a made-up reference."""
     f = BINARY.find(function)[0]
     return [verify.CoverageRow(function, f.raw, f.vaddr, "", group, "covered")]
 
@@ -611,9 +574,9 @@ class HarnessRules(unittest.TestCase):
 
 
 class Records(unittest.TestCase):
-    def test_coverage_record_lists_all_84_exported_functions(self):
+    def test_coverage_record_lists_every_exported_function(self):
         index = [l.split("\t") for l in verify.GHIDRA_INDEX.read_text(encoding="utf-8").splitlines()]
-        self.assertEqual(len(ROWS), 84)
+        self.assertEqual(len(ROWS), 87)
         self.assertEqual(sorted(r.export for r in ROWS), sorted(f"{safe}.c" for safe, _, _ in index))
         for r in ROWS:
             with self.subTest(export=r.export):
@@ -639,6 +602,33 @@ class Records(unittest.TestCase):
                 self.assertEqual(len(verify.cpp_blocks(text)), 2)
                 for heading in ("## Header", "## Implementation", "## Notes"):
                     self.assertIn(heading, text)
+
+    def test_idplayer_additions_have_unique_offsets(self):
+        text = (verify.REFERENCE_DIR / "idPlayer-additions.md").read_text(encoding="utf-8")
+        offsets = re.findall(r"^\| `\+(0x[0-9a-f]+)` \|", text, re.M)
+        self.assertIn("0x1f0c", offsets)
+        self.assertIn("0x1f10", offsets)
+        self.assertIn("0x1ea4", offsets)
+        self.assertIn("0x1ef4", offsets)
+        self.assertIn("0x1f08", offsets)
+        for off in ("0x1e30", "0x1e34", "0x1e38", "0x1e40", "0x1e44", "0x1e48", "0x1e4c", "0x1e50", "0x1e5c",
+                    "0x1e60", "0x1e80", "0x1e94"):
+            self.assertIn(off, offsets)  # hud-map
+        self.assertEqual(len(offsets), len(set(offsets)))
+
+
+class GroupContent(unittest.TestCase):
+    """Group-specific facts the references state, checked against the binary and the mod's data."""
+
+    def assert_event_entry(self, table: str, event: str, handler: str, index: int, before: str) -> int:
+        """`table`[index] is { &event, &handler }, right after the stock entry `before`. Returns index."""
+        entries = BINARY.event_callbacks(table)
+        events = [e for e, _ in entries]
+        k = events.index(BINARY.symbol(event)[0])
+        self.assertEqual(k, index)
+        self.assertEqual(entries[k][1], BINARY.by_raw[handler].vaddr)
+        self.assertEqual(events[k - 1], BINARY.symbol(before)[0])
+        return k
 
     def test_trail_save_and_restore_match_the_binary_call_for_call(self):
         """mkTrail::Save makes all 23 of the binary's write calls (the truncated first export had 4),
@@ -686,13 +676,10 @@ class Records(unittest.TestCase):
         self.assertIn("EVENT( AI_OpenDoors,", impl)
         # binary: idAI::eventCallbacks entry 116 is { &AI_OpenDoors, &idAI::Event_OpenDoors },
         # right after the stock AI_KickObstacles entry and before AI_GetObstacle
-        entries = BINARY.event_callbacks("_ZN4idAI14eventCallbacksE")
-        events = [e for e, _ in entries]
-        k = events.index(BINARY.symbol("AI_OpenDoors")[0])
-        self.assertEqual(k, 116)
-        self.assertEqual(entries[k][1], BINARY.by_raw["_ZN4idAI15Event_OpenDoorsEP8idEntity"].vaddr)
-        self.assertEqual(events[k - 1], BINARY.symbol("AI_KickObstacles")[0])
-        self.assertEqual(events[k + 1], BINARY.symbol("AI_GetObstacle")[0])
+        k = self.assert_event_entry("_ZN4idAI14eventCallbacksE", "AI_OpenDoors",
+                                    "_ZN4idAI15Event_OpenDoorsEP8idEntity", 116, "AI_KickObstacles")
+        after = BINARY.event_callbacks("_ZN4idAI14eventCallbacksE")[k + 1][0]
+        self.assertEqual(after, BINARY.symbol("AI_GetObstacle")[0])
         self.assertIn("entry 116", impl)
         # the event's name is in .rodata, and the mod's scripts declare it with one entity argument
         self.assertTrue(BINARY.has_rodata_string("openDoors"))
@@ -746,12 +733,7 @@ class Records(unittest.TestCase):
                 self.assertIn(definition, impl)
                 self.assertIn(f"EVENT( {event},", impl)
                 self.assertIn(f"entry {index} =", impl)
-                entries = BINARY.event_callbacks(table)
-                events = [e for e, _ in entries]
-                k = events.index(BINARY.symbol(event)[0])
-                self.assertEqual(k, index)
-                self.assertEqual(entries[k][1], BINARY.by_raw[handler].vaddr)
-                self.assertEqual(events[k - 1], BINARY.symbol(before)[0])
+                self.assert_event_entry(table, event, handler, index, before)
         # the names are in .rodata ("footprint" only as the tail of "mtr_footprint")
         self.assertTrue(BINARY.has_rodata_string("setProj"))
         self.assertTrue(BINARY.has_rodata_string("spawnDict"))
@@ -770,29 +752,31 @@ class Records(unittest.TestCase):
         self.assertRegex(biped, r"frame 12\s+footprint Lfoot l")
         self.assertRegex(biped, r"frame 33\s+footprint Rfoot r")
 
+    def test_worldspawn_music_volume_matches_the_binary_and_the_menu(self):
+        """g_MusicVolume ("50", "Music Volume") is the cvar the main menu's music slider sets; the
+        binary's idWorldspawn::Save takes an idSaveGame, and the GPL source's idRestoreGame one is gone."""
+        impl = verify.implementation_block(reference("worldspawn"))
+        self.assertIn('idCVar g_MusicVolume( "g_MusicVolume", "50", CVAR_GAME | CVAR_ARCHIVE | CVAR_FLOAT, '
+                      '"Music Volume" );', impl)
+        self.assertEqual(BINARY.symbol("g_MusicVolume")[1], 0x34)  # sizeof( idCVar )
+        for text in ("g_MusicVolume", "Music Volume", "fadeSound", "dff"):  # "50" is the tail of "#str_04250"
+            self.assertTrue(BINARY.has_rodata_string(text), text)
+        self.assertIn("_ZN12idWorldspawn4SaveEP10idSaveGame", BINARY.by_raw)
+        self.assertNotIn("_ZN12idWorldspawn4SaveEP13idRestoreGame", BINARY.by_raw)
+        menu = (verify.REPO_ROOT / "guis" / "mainmenu.gui").read_text(encoding="latin-1")
+        self.assertRegex(menu, r'low\s+0\s+high\s+100\s+step\s+5\s+thumbShader\s+"[^"]+"\s+cvar\s+"g_MusicVolume"')
+
     def test_footprint_projects_with_the_new_projectdecal_overload(self):
-        """Event_FootPrint calls the 8-argument idGameLocal::ProjectDecal (not in the target set), which
-        the header block declares; the stock 7-argument one is still in the binary."""
+        """Event_FootPrint calls the 8-argument idGameLocal::ProjectDecal, a new overload next to the
+        stock 7-argument one (still in the binary); script-events reconstructs it."""
         overload = "_ZN11idGameLocal12ProjectDecalERK6idVec3S2_fbfPKcPS1_f"
         self.assertIn("_ZN11idGameLocal12ProjectDecalERK6idVec3S2_fbfPKcf", BINARY.by_raw)
         foot = BINARY.by_raw["_ZN7idActor15Event_FootPrintEPKcS1_"]
         self.assertEqual([c.raw for c in BINARY.call_sites(foot) if "ProjectDecal" in c.raw], [overload] * 2)
-        header = verify.cpp_blocks(reference("script-events"))[0]
-        self.assertIn("const char *material, const idVec3 *winding, float angle );", header)
-        self.assertIn(overload, (verify.REFERENCE_DIR / "coverage.md").read_text(encoding="utf-8"))
-
-    def test_idplayer_additions_have_unique_offsets(self):
-        text = (verify.REFERENCE_DIR / "idPlayer-additions.md").read_text(encoding="utf-8")
-        offsets = re.findall(r"^\| `\+(0x[0-9a-f]+)` \|", text, re.M)
-        self.assertIn("0x1f0c", offsets)
-        self.assertIn("0x1f10", offsets)
-        self.assertIn("0x1ea4", offsets)
-        self.assertIn("0x1ef4", offsets)
-        self.assertIn("0x1f08", offsets)
-        for off in ("0x1e30", "0x1e34", "0x1e38", "0x1e40", "0x1e44", "0x1e48", "0x1e4c", "0x1e50", "0x1e5c",
-                    "0x1e60", "0x1e80", "0x1e94"):
-            self.assertIn(off, offsets)  # hud-map
-        self.assertEqual(len(offsets), len(set(offsets)))
+        header, impl = verify.reference_blocks(reference("script-events"))
+        self.assertIn("const char *material, const idVec3 *decalWinding, float angle );", header)
+        self.assertIsNotNone(verify.find_definition(impl, "idGameLocal::ProjectDecal"))
+        self.assertEqual([(r.group, r.status) for r in ROWS if r.symbol == overload], [("script-events", "covered")])
 
 
 sys.path.insert(0, str(verify.COMPILE_DIR))
@@ -927,6 +911,24 @@ class CompileSplicing(unittest.TestCase):
             worker.prepare(neo, job)
 
 
+CUSTOM_UI = "decomp-so/reference/custom-ui.md"
+OBJECTIVES = "decomp-so/reference/objectives.md"
+GROUP_SPLICES = {
+    "custom-ui": {("idPlayer", "game/Player.h", None), ("idCmdSystem", "framework/CmdSystem.h", None)},
+    "end-level-stats": {("idPlayer", "game/Player.h", CUSTOM_UI), ("idCmdSystem", "framework/CmdSystem.h", CUSTOM_UI),
+                        ("idPlayer", "game/Player.h", None), ("idGameLocal", "game/Game_local.h", None),
+                        ("idStr", "idlib/Str.h", None)},
+    "objectives": {("idPlayer", "game/Player.h", None)},
+    "hud-map": {("idPlayer", "game/Player.h", OBJECTIVES), ("idPlayer", "game/Player.h", None)},
+    "trails": {("idGameLocal", "game/Game_local.h", None)},
+    "door-opening": {("idPlayer", "game/Player.h", None), ("idAI", "game/ai/AI.h", None)},
+    "env-shots": set(),
+    "script-events": {("idGameLocal", "game/Game_local.h", None), ("idActor", "game/Actor.h", None),
+                      ("idWeapon", "game/Weapon.h", None), ("idThread", "game/script/Script_Thread.h", None)},
+    "worldspawn": {("idWorldspawn", "game/WorldSpawn.h", None)},
+}
+
+
 class Compile(unittest.TestCase):
     """Check 3 against the real toolchain (compile/Dockerfile). Needs a docker daemon:
     local, or DOCKER_HOST=ssh://qwen. One container run covers every case below."""
@@ -944,8 +946,8 @@ class Compile(unittest.TestCase):
     def setUpClass(cls):
         if not verify.docker_reachable():
             raise unittest.SkipTest("check 3 needs docker (set DOCKER_HOST, e.g. ssh://qwen)")
+        jobs = [verify.compile_job(group, reference(group)) for group in COVERED_GROUPS]
         text = reference("custom-ui")
-        jobs = [verify.compile_job("custom-ui", text)]
         cls.lines = {}
         for name, (old, new, needle) in cls.MUTATIONS.items():
             assert text.count(old) == 1, name
@@ -953,16 +955,11 @@ class Compile(unittest.TestCase):
             jobs.append(dict(verify.compile_job("custom-ui", mutated), group=name))
             cls.lines[name] = md_line(mutated, needle)
         ref = reference("end-level-stats")
-        jobs.append(verify.compile_job("end-level-stats", ref))
         old = "\tplayerStats_s\t\t\tlevelStats[ 4 ];"
         assert ref.count(old) == 1
         mutated = ref.replace(old, "\tplayerStat_s\t\t\tlevelStats[ 4 ];")
         jobs.append(dict(verify.compile_job("end-level-stats", mutated), group="els_spliced_member"))
         cls.els_line = md_line(mutated, "playerStat_s\t")
-        jobs.append(verify.compile_job("hud-map", reference("hud-map")))
-        jobs.append(verify.compile_job("door-opening", reference("door-opening")))
-        jobs.append(verify.compile_job("env-shots", reference("env-shots")))
-        jobs.append(verify.compile_job("script-events", reference("script-events")))
         cls.toolchain, results = verify.run_compile(jobs)
         cls.results = {r.group: r for r in results}
 
@@ -972,57 +969,23 @@ class Compile(unittest.TestCase):
         self.assertIn("-m32", self.toolchain["flags"])
         self.assertIn("a9c49da5afb18201d31e3f0a429a037e56ce2b9a", verify.DOCKERFILE.read_text())
 
-    def test_custom_ui_compiles(self):
-        res = self.results["custom-ui"]
-        self.assertEqual(res.errors, [])
-        self.assertTrue(res.ok)
-        self.assertEqual({(s["class"], s["file"]) for s in res.splices},
-                         {("idPlayer", "game/Player.h"), ("idCmdSystem", "framework/CmdSystem.h")})
-        self.assertTrue(verify.format_compile(res)[0].startswith("  ok       compiles (check 3)"))
+    def test_every_group_compiles_with_its_splices(self):
+        """Each group's (class, stock header, dependency it came from) splices; `None` = its own."""
+        self.assertEqual(sorted(GROUP_SPLICES), COVERED_GROUPS)
+        for group, splices in GROUP_SPLICES.items():
+            with self.subTest(group=group):
+                res = self.results[group]
+                self.assertEqual(res.errors, [])
+                self.assertTrue(res.ok)
+                self.assertEqual({(s["class"], s["file"], s.get("from")) for s in res.splices}, splices)
+                self.assertTrue(verify.format_compile(res)[0].startswith("  ok       compiles (check 3)"))
 
-    def test_end_level_stats_compiles_on_top_of_custom_ui(self):
-        res = self.results["end-level-stats"]
-        self.assertEqual(res.errors, [])
-        self.assertTrue(res.ok)
-        self.assertEqual({(s["class"], s["file"], s.get("from")) for s in res.splices},
-                         {("idPlayer", "game/Player.h", "decomp-so/reference/custom-ui.md"),
-                          ("idCmdSystem", "framework/CmdSystem.h", "decomp-so/reference/custom-ui.md"),
-                          ("idPlayer", "game/Player.h", None), ("idGameLocal", "game/Game_local.h", None),
-                          ("idStr", "idlib/Str.h", None)})
-        res = self.results["els_spliced_member"]  # an error in a spliced member of the second group
+    def test_an_error_in_a_dependent_groups_spliced_member_is_reported_at_its_line(self):
+        res = self.results["els_spliced_member"]
         self.assertFalse(res.ok)
         lines = [int(m.group(1)) for m in (re.match(r"decomp-so/reference/end-level-stats\.md:(\d+):", e)
                                            for e in res.errors) if m]
         self.assertIn(self.els_line, lines, res.errors)
-
-    def test_hud_map_compiles_on_top_of_objectives(self):
-        res = self.results["hud-map"]
-        self.assertEqual(res.errors, [])
-        self.assertTrue(res.ok)
-        self.assertEqual({(s["class"], s["file"], s.get("from")) for s in res.splices},
-                         {("idPlayer", "game/Player.h", "decomp-so/reference/objectives.md"),
-                          ("idPlayer", "game/Player.h", None)})
-
-    def test_door_opening_compiles_with_idplayer_and_idai_splices(self):
-        res = self.results["door-opening"]
-        self.assertEqual(res.errors, [])
-        self.assertTrue(res.ok)
-        self.assertEqual({(s["class"], s["file"], s.get("from")) for s in res.splices},
-                         {("idPlayer", "game/Player.h", None), ("idAI", "game/ai/AI.h", None)})
-
-    def test_env_shots_compiles_without_splices(self):
-        res = self.results["env-shots"]
-        self.assertEqual(res.errors, [])
-        self.assertTrue(res.ok)
-        self.assertEqual(res.splices, [])
-
-    def test_script_events_compile_with_four_splices(self):
-        res = self.results["script-events"]
-        self.assertEqual(res.errors, [])
-        self.assertTrue(res.ok)
-        self.assertEqual({(s["class"], s["file"], s.get("from")) for s in res.splices},
-                         {("idGameLocal", "game/Game_local.h", None), ("idActor", "game/Actor.h", None),
-                          ("idWeapon", "game/Weapon.h", None), ("idThread", "game/script/Script_Thread.h", None)})
 
     def test_a_syntax_error_fails_and_is_reported_at_its_markdown_line(self):
         for name in self.MUTATIONS:

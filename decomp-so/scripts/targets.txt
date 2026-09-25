@@ -9,6 +9,7 @@ idCustomUI::setGUI
 idCustomUI::UnregisterGUI
 idGameLocal::BabySitTrail
 idGameLocal::GetLevelStats
+idGameLocal::ProjectDecal @ 00101c80
 idGameLocal::RemoveTrail
 idPlayer::addItemText
 idPlayer::addObjective
@@ -31,6 +32,8 @@ idTarget_EndLevelGUI::HandleCustomGUICommand
 idTarget_EndLevelGUI::updateStats
 idThread::Event_SpawnDict
 idWeapon::Event_SetProj
+idWorldspawn::Save
+idWorldspawn::Think
 matt_func_envshot::Event_envShot
 matt_func_envshot::takeEnvShots_f
 mkObjective::AttachToLocalPlayer

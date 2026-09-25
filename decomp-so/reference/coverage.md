@@ -1,38 +1,48 @@
 # Coverage record: custom game code in `gamex86.so`
 
-Which exported custom functions have a verified reference, and which do not yet.
+Which custom functions have a verified reference. All of them do.
 
-- **Source of the list:** all 84 functions in the complete Ghidra export, `ghidra-full/_index.tsv`
+- **Source of the list:** all 87 functions in the complete Ghidra export, `ghidra-full/_index.tsv`
   (Ghidra 12.1.4, "Non-Returning Functions - Discovered" disabled; made with `scripts/ExportCustom.java`,
   `scripts/NoReturnOff.java` and `scripts/targets.txt`). Enriched export (#18): each file lists the float
   constants and string literals the function reads, and the pseudo-C shows their values.
 - **Status:** `covered` = the function is in its group's reference (`reference/<group>.md`) and passes the
   harness: checks 1 (callees), 2 (constants and strings) and 3 (compile) (`python decomp-so/verify/verify.py <group>`).
-  `pending` = not reconstructed yet.
+  `pending` = not reconstructed yet (no row has it now).
 - **ELF vaddr** is the symbol-table address. The Ghidra export address is this plus `0x10000` (Ghidra's image base).
 - **Symbol** is the mangled `.symtab` name the harness uses to find the function's real byte range (`st_size`).
-- **Group** is the planned reference file. Groups: `custom-ui` (#17), `end-level-stats` (#20), `objectives` (#21),
-  `hud-map` (#22), `trails` (#23), `door-opening` (#24), `env-shots` (#25), `script-events` (#26).
+- **Group** is the reference file. Groups: `custom-ui` (#17), `end-level-stats` (#20), `objectives` (#21),
+  `hud-map` (#22), `trails` (#23), `door-opening` (#24), `env-shots` (#25), `script-events` (#26),
+  `worldspawn` (PR #27's final review).
 
 The harness reads the table below. Keep one function per row and six columns.
 
-## Targets not exported
+## How the target set was checked
 
-None. Checked 2026-09-24 against `gamex86.so`'s `.symtab`:
+`scripts/targets.txt` names the custom methods on stock classes to export, by qualified name
+(`name @ <Ghidra address>` for one overload of a stock name). The export also takes every function of the
+5 custom classes (`mkTrail`, `mkObjective`, `matt_func_envshot`, `idCustomUI`, `idTarget_EndLevelGUI`).
+A list of names misses a new overload of a stock method, or a new method with a common name.
 
-- All 40 method names in `scripts/targets.txt` have at least one exported function.
-- Every `.symtab` function whose name mentions one of the 5 custom classes
-  (`mkTrail`, `mkObjective`, `matt_func_envshot`, `idCustomUI`, `idTarget_EndLevelGUI`) is exported.
+So the list was checked against the binary itself (`python decomp-so/scripts/custom_symbols.py`, 2026-09-24):
+the stock DOOM-3 GPL game and idlib sources were compiled, and every function symbol in `gamex86.so`'s
+`.symtab` was looked up among the stock build's symbols. The ones the stock build lacks are the mod's code,
+except:
+
+- compiler-generated functions (static-initialization entries, atexit destructors) and the C runtime stubs;
+- `CRC16_*` and `Honeyman_*` (10 functions), checksum code from `idlib/hashing/CRC16.cpp` and `Honeyman.cpp`.
+  These files are in the mod's first SVN import (`ChexTrek_SDK_ChangeLog.txt` r1), next to the stock
+  `CRC32` / `MD4` / `MD5`, but not in the GPL release. They call only each other: nothing else in the binary
+  calls them. UNCERTAIN: taken as id's SDK code, not the mod's, so not reconstructed.
+
+Every other function the stock build lacks is in the table below and covered. The check found three that
+the first target list had missed, now exported and covered: the 8-argument `idGameLocal::ProjectDecal`
+overload (found in #26, `script-events`) and `idWorldspawn::Think` / `idWorldspawn::Save( idSaveGame * )`
+(`worldspawn`).
 
 Custom code the export does not reach, by design: code inside stock functions. One example is the `g_PDA` cvar, which
 registers `idCmdSystem::ArgCompletion_GuiName` from `Player.cpp`'s static initializer (see `reference/custom-ui.md`).
 Edits inside stock function bodies are out of scope for spec #16.
-
-A new method outside the target set, found by #26: a second `idGameLocal::ProjectDecal`
-(`_ZN11idGameLocal12ProjectDecalERK6idVec3S2_fbfPKcPS1_f`, ELF 0xf1c80), an overload that takes the decal's
-winding from the caller. `scripts/targets.txt` lists method names only, and a stock name such as `ProjectDecal` is not on it, so
-the export missed this overload. (How the target list was built is not recorded here: presumably a name comparison.) Its only caller is `idActor::Event_FootPrint`. It is not exported, not in the table below
-and not reconstructed. Only its declaration is shown (`reference/script-events.md`).
 
 ## Functions
 
@@ -41,6 +51,7 @@ and not reconstructed. Only its declaration is shown (`reference/script-events.m
 | `idActor::Event_FootPrint` | `_ZN7idActor15Event_FootPrintEPKcS1_` | 0xb6210 | idActor_Event_FootPrint_000c6210.c | script-events | covered |
 | `idGameLocal::RemoveTrail` | `_ZN11idGameLocal11RemoveTrailEP7mkTrail` | 0xee7f0 | idGameLocal_RemoveTrail_000fe7f0.c | trails | covered |
 | `idGameLocal::GetLevelStats` | `_ZN11idGameLocal13GetLevelStatsEP13playerStats_s` | 0xf0800 | idGameLocal_GetLevelStats_00100800.c | end-level-stats | covered |
+| `idGameLocal::ProjectDecal` | `_ZN11idGameLocal12ProjectDecalERK6idVec3S2_fbfPKcPS1_f` | 0xf1c80 | idGameLocal_ProjectDecal_00101c80.c | script-events | covered |
 | `idGameLocal::BabySitTrail` | `_ZN11idGameLocal12BabySitTrailEP7mkTrail` | 0xf2a10 | idGameLocal_BabySitTrail_00102a10.c | trails | covered |
 | `idPlayer::incSecretsFound` | `_ZN8idPlayer15incSecretsFoundEv` | 0x14d2e0 | idPlayer_incSecretsFound_0015d2e0.c | end-level-stats | covered |
 | `idPlayer::getLevelStats` | `_ZN8idPlayer13getLevelStatsEv` | 0x14d2f0 | idPlayer_getLevelStats_0015d2f0.c | end-level-stats | covered |
@@ -93,6 +104,8 @@ and not reconstructed. Only its declaration is shown (`reference/script-events.m
 | `mkObjective::~mkObjective` | `_ZN11mkObjectiveD1Ev` | 0x199330 | mkObjective_mkObjective_001a9330.c | objectives | covered |
 | `idTarget_EndLevelGUI::~idTarget_EndLevelGUI` | `_ZN20idTarget_EndLevelGUID0Ev` | 0x1993e0 | idTarget_EndLevelGUI_idTarget_EndLevelGUI_001a93e0.c | end-level-stats | covered |
 | `idWeapon::Event_SetProj` | `_ZN8idWeapon13Event_SetProjEPKc` | 0x19f990 | idWeapon_Event_SetProj_001af990.c | script-events | covered |
+| `idWorldspawn::Save` | `_ZN12idWorldspawn4SaveEP10idSaveGame` | 0x1ab5e0 | idWorldspawn_Save_001bb5e0.c | worldspawn | covered |
+| `idWorldspawn::Think` | `_ZN12idWorldspawn5ThinkEv` | 0x1abe40 | idWorldspawn_Think_001bbe40.c | worldspawn | covered |
 | `idAI::OpenDoors` | `_ZN4idAI9OpenDoorsEP8idEntity` | 0x1be950 | idAI_OpenDoors_001ce950.c | door-opening | covered |
 | `idAI::Event_OpenDoors` | `_ZN4idAI15Event_OpenDoorsEP8idEntity` | 0x1cc9a0 | idAI_Event_OpenDoors_001dc9a0.c | door-opening | covered |
 | `idThread::Event_SpawnDict` | `_ZN8idThread15Event_SpawnDictEPKc` | 0x23dc00 | idThread_Event_SpawnDict_0024dc00.c | script-events | covered |

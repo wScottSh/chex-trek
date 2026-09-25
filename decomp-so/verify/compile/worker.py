@@ -250,7 +250,8 @@ def toolchain() -> dict:
 _DIAG = re.compile(r": (?:fatal )?error: ")
 
 
-def compile_job(job: dict) -> dict:
+def run_job(job: dict) -> dict:
+    """Compile one job (verify.compile_job) in a scratch copy of the stock source."""
     scratch = tempfile.mkdtemp()
     try:
         neo = os.path.join(scratch, "neo")
@@ -273,4 +274,4 @@ def compile_job(job: dict) -> dict:
 
 
 def run(jobs: list[dict]) -> None:
-    json.dump({"toolchain": toolchain(), "results": [compile_job(j) for j in jobs]}, sys.stdout)
+    json.dump({"toolchain": toolchain(), "results": [run_job(j) for j in jobs]}, sys.stdout)

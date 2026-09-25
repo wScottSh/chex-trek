@@ -743,22 +743,18 @@ def main(argv: list[str] | None = None) -> int:
         print(f"unknown group(s): {', '.join(unknown)}; known: {', '.join(known)}", file=sys.stderr)
         return 2
 
-    if args.callees:
-        for g in groups:
-            for r in (r for r in rows if r.group == g):
-                f = binary.by_raw[r.symbol]
-                print(f"{g}\t{source_name(f.name)}\t{f.vaddr:#x}+{f.size}")
-                for c in binary.callees(f):
-                    print(f"\t{'(ignored) ' if c.ignored else ''}{c.name}")
-        return 0
-    if args.literals:
+    if args.callees or args.literals:
         sys.stdout.reconfigure(encoding="utf-8")
         for g in groups:
             for r in (r for r in rows if r.group == g):
                 f = binary.by_raw[r.symbol]
                 print(f"{g}\t{source_name(f.name)}\t{f.vaddr:#x}+{f.size}")
-                for lit in binary.literals(f):
-                    print(f"\t{lit.render()}")
+                if args.callees:
+                    for c in binary.callees(f):
+                        print(f"\t{'(ignored) ' if c.ignored else ''}{c.name}")
+                if args.literals:
+                    for lit in binary.literals(f):
+                        print(f"\t{lit.render()}")
         return 0
 
     failed = False
