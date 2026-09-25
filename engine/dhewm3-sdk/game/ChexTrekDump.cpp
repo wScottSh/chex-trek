@@ -79,6 +79,11 @@ state-dump list in spec #28.
 #30 adds two lines: `entities: <N>` (gameLocal.spawnedEntities.Num(), so a scenario can prove a
 script's `remove()` call actually shrank the entity count - the log has no other line for this)
 and `footprints: <N>` (see ChexTrek_NoteFootprintProjected).
+
+#31 adds 5 more: `objective_slot_1` .. `objective_slot_5`, one per idPlayer::objectives[] slot
+(MAX_OBJS, decomp-so/reference/objectives.md) - "empty" when the slot is NULL, else that slot's
+mkObjective's title, so a scenario can assert a trigger_objective's slot filling/emptying without
+depending on PDA/HUD GUI state.
 ==================
 */
 void ChexTrek_Dump_f( const idCmdArgs &args ) {

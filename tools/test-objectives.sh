@@ -24,9 +24,11 @@ fi
 # Triggering _1 fills objective_slot_1 (addObjective hands out slots in order, starting at
 # nextObjective); triggering _2 next fills objective_slot_2. Triggering _1 again removes it
 # (Event_Activate's "on the list" branch): freeObjective empties its slot without disturbing _2's.
-# A save/load round-trip after that must show the same two slots (mkObjective::Restore
-# re-attaches anything left `active` half a second after load - see the comment on `wait 150`
-# below for why the scenario waits that long past the load).
+# A save/load round-trip after that must show the same active objective(s) still present
+# (mkObjective::Restore re-attaches anything left `active` half a second after load; `wait 150`
+# gives that PostEventMS( ..., 500, this ) plenty of real frames to fire - 500ms of *game* time
+# comfortably fits inside 150 frames at the engine's fixed 16ms game tick). See the comment above
+# the slot-value assertion below for why this checks the objective's *slot*, not just its presence.
 CONSOLE_SCRIPT="${SCRATCH_DIR}/objectives.cfg"
 cat > "$CONSOLE_SCRIPT" <<'EOF'
 developer 1
@@ -94,35 +96,11 @@ S1_BASELINE="$(echo "$SLOT1_VALUES" | sed -n '1p')"
 S1_AFTER_TRIGGER1="$(echo "$SLOT1_VALUES" | sed -n '2p')"
 S1_AFTER_TRIGGER2="$(echo "$SLOT1_VALUES" | sed -n '3p')"
 S1_AFTER_REMOVE="$(echo "$SLOT1_VALUES" | sed -n '4p')"
+S1_AFTER_LOAD="$(echo "$SLOT1_VALUES" | sed -n '5p')"
 S2_BASELINE="$(echo "$SLOT2_VALUES" | sed -n '1p')"
 S2_AFTER_TRIGGER2="$(echo "$SLOT2_VALUES" | sed -n '3p')"
 S2_AFTER_REMOVE="$(echo "$SLOT2_VALUES" | sed -n '4p')"
-
-# For each numbered chextrek_dump call, the sorted set of non-empty objective titles across all
-# MAX_OBJS slots (not just slot_1/slot_2 above) - used for the save/load check below, because
-# decomp-so/reference/objectives.md's Notes record that reattachment after a load is NOT
-# slot-stable: "Objectives are re-added in the order their Restore events fire" against a
-# nextObjective that Init() resets to 0, so a lone active objective can come back in a different
-# slot than it had before the save (confirmed live: trigger_objective_2, the only one still
-# active going into the save below, comes back as objective_slot_1, not _2). That is the
-# reconstructed mod's actual (if surprising) behavior, not a harness bug - spec #28 targets the
-# original behavior, not an enhancement. AC2 ("the dump shows the same objective slots") is
-# checked as "the same set of active objectives", which is what the log can actually prove.
-dump_active_set() {
-	# Counts dump blocks by "objective_slot_1:" (always the first of the 5 objective lines a
-	# given chextrek_dump call prints), not by the "CHEXTREK-STATE-DUMP v1" header - the header
-	# also prints once, alone, at idGameLocal::Init (ChexTrekDump.h), which would otherwise
-	# throw off a header-based count by one.
-	awk -v n="$1" '
-		/^objective_slot_1: / { c++ }
-		c==n && /^objective_slot_[0-9]+: / {
-			sub( /^objective_slot_[0-9]+: /, "" );
-			if ( $0 != "empty" ) print;
-		}
-	' "$LOCAL_LOG" | sort
-}
-DUMP4_ACTIVE="$(dump_active_set 4)"
-DUMP5_ACTIVE="$(dump_active_set 5)"
+S2_AFTER_LOAD="$(echo "$SLOT2_VALUES" | sed -n '5p')"
 
 # --- triggering an objective shows it in the dump's slots (spec #31 AC1, part 1) ---
 if [ "$S1_BASELINE" = "empty" ] && [ "$S1_AFTER_TRIGGER1" = "Acquire a weapon" ]; then
@@ -148,10 +126,23 @@ else
 fi
 
 # --- save, load; the dump shows the same objective slots (spec #31 AC2) ---
-if [ -n "$DUMP4_ACTIVE" ] && [ "$DUMP4_ACTIVE" = "$DUMP5_ACTIVE" ]; then
-	echo "PASS: save/load round-trip - the same active objective(s) ('$(echo "$DUMP4_ACTIVE" | tr '\n' ',')') are present after loading as before saving"
+# Going into the save, only trigger_objective_2 ("Investigate") is still active (trigger_objective_1
+# was removed above); this asserts its exact post-load slot, not just "is present somewhere",
+# because that slot is deterministic here - not a coin flip this test happens to be ignoring.
+# decomp-so/reference/objectives.md's Notes call out that reattachment after a load is NOT
+# slot-stable in general ("Objectives are re-added in the order their Restore events fire"), and
+# that "next free slot" search resets to the start because nextObjective is never saved: it's set
+# back to 0 by mkObjective's owning idPlayer's *constructor* when the save is loaded (idPlayer is
+# reconstructed, then Restore()'d - idPlayer::Restore never calls Init(), so it's the constructor's
+# zeroing, not Init()'s, that matters here). With exactly one objective active and
+# trigger_objective_2 the only entity whose Restore schedules a re-attach, it always lands in the
+# first free slot: objective_slot_1. Confirmed live (not just inferred from the reference): before
+# saving this run showed objective_slot_2 = Investigate; after loading, objective_slot_1 =
+# Investigate and objective_slot_2 = empty - the exact renumbering this asserts below.
+if [ "$S1_AFTER_LOAD" = "Investigate" ] && [ "$S2_AFTER_LOAD" = "empty" ]; then
+	echo "PASS: save/load round-trip - trigger_objective_2 ('Investigate') is still active after loading, re-attached to objective_slot_1 (the reconstructed mod's documented, non-slot-stable reattachment order - decomp-so/reference/objectives.md's Notes)"
 else
-	echo "FAIL: expected the same active objectives after load as before save ('$(echo "$DUMP4_ACTIVE" | tr '\n' ',')'), got '$(echo "$DUMP5_ACTIVE" | tr '\n' ',')'"
+	echo "FAIL: expected objective_slot_1='Investigate' and objective_slot_2='empty' after the save/load round-trip, got objective_slot_1='${S1_AFTER_LOAD}' and objective_slot_2='${S2_AFTER_LOAD}'"
 	FAIL=1
 fi
 

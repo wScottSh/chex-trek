@@ -584,7 +584,13 @@ class mkObjective : public idEntity {
 public:
 	CLASS_PROTOTYPE( mkObjective );
 
+	// No declared destructor: the reference marks whether the original had an empty ~mkObjective()
+	// as UNCERTAIN (both decompiled clones only run the compiler-generated member/base
+	// destructors), and behaves the same either way - see decomp-so/reference/objectives.md.
+
 	void				Spawn( void );
+	// Save/Restore intentionally do NOT persist objectiveNum/mapLevel, matching the reference:
+	// Restore re-attaches (below) when active, which sets both again via idPlayer::addObjective.
 	void				Save( idSaveGame *savefile ) const;
 	void				Restore( idRestoreGame *savefile );
 

@@ -24,10 +24,6 @@ void ChexTrek_Dump_f( const idCmdArgs &args );
 // above calls this too, so later scenarios can re-dump on demand once maps are loading.
 void ChexTrek_PrintHeader( void );
 
-// chextrek: spec #31. See its section in ChexTrekDump.cpp: 5 objective-slot lines
-// ("objective_slot_<1..5>: empty" or "... : <title>"), read straight from the local player's
-// idPlayer::objectives[] (decomp-so/reference/objectives.md).
-
 // chextrek: spec #30. idActor::Event_FootPrint calls this right after each decal it actually
 // projects (mtr non-empty). Decal projection itself is a renderer call with no log line, so this
 // is the only way a harness scenario can observe "a footprint decal was projected" from the log,
