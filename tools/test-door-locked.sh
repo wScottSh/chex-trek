@@ -15,7 +15,11 @@
 # comment for why (no plain "impulse" console command, and "_impulse16" isn't recognized from a
 # typed console line).
 #
-# `door_tip_up`/`door_tip_title`/`door_tip_text` (ChexTrekDump.cpp, this sub-issue) read
+# `chextrek_line_field_values()` (tools/lib-harness.sh, this sub-issue) is a shared helper for
+# reading any `<field>: <rest of line>` chextrek_dump line's value, so the assertions below don't
+# each repeat the same grep/sed pipeline - see lib-harness.sh's own header comment.
+#
+# `hud_tip_up`/`hud_tip_title`/`hud_tip_text` (ChexTrekDump.cpp, this sub-issue) read
 # idPlayer::ShowTip's own HUD gui state directly (idPlayer::IsTipVisible(), hud->GetStateString
 # "tiptitle"/"tip") - tryOpen's locked branches call the already-stock ShowTip, which logs
 # nothing itself, so this is the only way a scenario can see the tip text/title from the log,
@@ -26,11 +30,12 @@
 # Both doors used here are real, already-locked doors from the shipped maps (no synthetic
 # fixture): sf_923's "hbdoor1" (locked "1", no "requires", "lockedtext" "This door is locked.  It
 # can be opened at a console on the bridge.") and e1m1's "func_door_13" (locked "1", "requires"
-# "Blue Key"). Neither is targeted by any other entity in its own map data (grep confirms - a
-# "map_storage_facility.script" thread references hbdoor1/hbdoor2, but nothing in this scenario's
-# console script fires whatever triggers that thread), and both have "no_touch" "1", so nothing
-# but tryOpen's own EV_Activate can start them moving - both start closed and unmoved, and
-# setviewpos/noclip teleporting near them can't itself trigger anything.
+# "Blue Key"). Neither is targeted by any *map* entity ("target<N>" key) in its own map data (grep
+# confirms) - a "map_storage_facility.script" thread does reference hbdoor1/hbdoor2 by name
+# (setKey/trigger calls), but nothing in this scenario's console script fires whatever triggers
+# that thread, so it never runs here. Both doors have "no_touch" "1", so nothing but tryOpen's own
+# EV_Activate can start them moving - both start closed and unmoved, and setviewpos/noclip
+# teleporting near them can't itself trigger anything.
 #
 # sf_923 also has a second "lockedtext" door, "brokendoor" (maps/sf_923.map, entity 74) - not used
 # here: it sits immediately adjacent to a second, unlocked "unbrokendoor" (entity 178, no
@@ -50,8 +55,8 @@
 # +X side of the door's origin, facing -X (yaw 180), the same technique tools/test-door-open.sh
 # uses for sf_923's own func_door_1/func_door_24. hbdoor1/hbdoor2 use a mesh model (no brush
 # primitive in the .map to read plane offsets from), so their approach point/facing below was
-# found the same way any of this - an actual harness run, checked against `door_tryopen_last`,
-# not derived from the map text alone.
+# found the same way the brokendoor/unbrokendoor probing above was - an actual harness run,
+# checked against `door_tryopen_last` - rather than derived from the map text alone.
 #
 # "noclip" (stock, CMD_FL_CHEAT) is set once up front so each `setviewpos` teleport can't be
 # blocked or corrected by collision; it doesn't affect tryOpen's own world trace
@@ -75,6 +80,9 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SCRATCH_DIR="$(mktemp -d)"
 trap 'rm -rf "$SCRATCH_DIR"' EXIT
+
+# shellcheck source=tools/lib-harness.sh
+source "${SCRIPT_DIR}/lib-harness.sh"
 
 echo "=== #41 locked-door test: build ==="
 if ! bash "${SCRIPT_DIR}/build-chextrek.sh"; then
@@ -120,64 +128,64 @@ fi
 LOCAL_LOG_SF923="$(echo "$RUN_OUT_SF923" | sed -n 's/^CHEXTREK_LOCAL_LOG=//p')"
 if [ -z "$LOCAL_LOG_SF923" ] || [ ! -f "$LOCAL_LOG_SF923" ]; then
 	echo "FAIL: couldn't find the archived sf_923 log to check scenario-specific assertions"
-	exit 1
-fi
-
-if grep -qE '^ *[0-9]+ msec to load sf_923$' "$LOCAL_LOG_SF923"; then
-	echo "PASS: sf_923 finished loading"
-else
-	echo "FAIL: expected to see '<N> msec to load sf_923' in the log"
 	FAIL=1
-fi
-
-COUNT_41000_SF923="$(grep -c '^41000$' "$LOCAL_LOG_SF923")"
-if [ "$COUNT_41000_SF923" -ge 1 ]; then
-	echo "PASS: hbdoor1.isOpen() reports closed (41000) before the use impulse"
 else
-	echo "FAIL: expected to see '41000' in the log before the use impulse"
-	FAIL=1
-fi
+	if grep -qE '^ *[0-9]+ msec to load sf_923$' "$LOCAL_LOG_SF923"; then
+		echo "PASS: sf_923 finished loading"
+	else
+		echo "FAIL: expected to see '<N> msec to load sf_923' in the log"
+		FAIL=1
+	fi
 
-TIPUP_SF923_VALUES="$(grep -oE '^door_tip_up: [01]$' "$LOCAL_LOG_SF923" | grep -oE '[01]$')"
-TIPUP_SF923_BASELINE="$(echo "$TIPUP_SF923_VALUES" | sed -n '1p')"
-TIPUP_SF923_AFTER="$(echo "$TIPUP_SF923_VALUES" | sed -n '2p')"
-if [ "$TIPUP_SF923_BASELINE" = "0" ] && [ "$TIPUP_SF923_AFTER" = "1" ]; then
-	echo "PASS: door_tip_up went from 0 to 1 after using the locked hbdoor1"
-else
-	echo "FAIL: expected door_tip_up 0 then 1, got '${TIPUP_SF923_BASELINE}' then '${TIPUP_SF923_AFTER}'"
-	FAIL=1
-fi
+	COUNT_41000_SF923="$(grep -c '^41000$' "$LOCAL_LOG_SF923")"
+	if [ "$COUNT_41000_SF923" -ge 1 ]; then
+		echo "PASS: hbdoor1.isOpen() reports closed (41000) before the use impulse"
+	else
+		echo "FAIL: expected to see '41000' in the log before the use impulse"
+		FAIL=1
+	fi
 
-TIPTITLE_SF923="$(grep -oE '^door_tip_title: .*$' "$LOCAL_LOG_SF923" | sed 's/^door_tip_title: //' | sed -n '2p')"
-if [ "$TIPTITLE_SF923" = "Door Locked" ]; then
-	echo "PASS: door_tip_title reads 'Door Locked'"
-else
-	echo "FAIL: expected door_tip_title 'Door Locked', got '${TIPTITLE_SF923}'"
-	FAIL=1
-fi
+	TIPUP_SF923_VALUES="$(chextrek_line_field_values "$LOCAL_LOG_SF923" hud_tip_up)"
+	TIPUP_SF923_BASELINE="$(echo "$TIPUP_SF923_VALUES" | sed -n '1p')"
+	TIPUP_SF923_AFTER="$(echo "$TIPUP_SF923_VALUES" | sed -n '2p')"
+	if [ "$TIPUP_SF923_BASELINE" = "0" ] && [ "$TIPUP_SF923_AFTER" = "1" ]; then
+		echo "PASS: hud_tip_up went from 0 to 1 after using the locked hbdoor1"
+	else
+		echo "FAIL: expected hud_tip_up 0 then 1, got '${TIPUP_SF923_BASELINE}' then '${TIPUP_SF923_AFTER}'"
+		FAIL=1
+	fi
 
-TIPTEXT_SF923="$(grep -oE '^door_tip_text: .*$' "$LOCAL_LOG_SF923" | sed 's/^door_tip_text: //' | sed -n '2p')"
-if [ "$TIPTEXT_SF923" = "This door is locked.  It can be opened at a console on the bridge." ]; then
-	echo "PASS: AC1 - door_tip_text shows hbdoor1's own lockedtext"
-else
-	echo "FAIL: expected door_tip_text 'This door is locked.  It can be opened at a console on the bridge.', got '${TIPTEXT_SF923}'"
-	FAIL=1
-fi
+	TIPTITLE_SF923="$(chextrek_line_field_values "$LOCAL_LOG_SF923" hud_tip_title | sed -n '2p')"
+	if [ "$TIPTITLE_SF923" = "Door Locked" ]; then
+		echo "PASS: hud_tip_title reads 'Door Locked'"
+	else
+		echo "FAIL: expected hud_tip_title 'Door Locked', got '${TIPTITLE_SF923}'"
+		FAIL=1
+	fi
 
-TRYOPEN_LAST_SF923="$(grep -oE '^door_tryopen_last: .*$' "$LOCAL_LOG_SF923" | sed 's/^door_tryopen_last: //' | sed -n '2p')"
-if [ "$TRYOPEN_LAST_SF923" = "hbdoor1" ]; then
-	echo "PASS: the use-key trace reached hbdoor1 (door_tryopen_last=hbdoor1)"
-else
-	echo "FAIL: expected door_tryopen_last=hbdoor1, got '${TRYOPEN_LAST_SF923}'"
-	FAIL=1
-fi
+	TIPTEXT_SF923="$(chextrek_line_field_values "$LOCAL_LOG_SF923" hud_tip_text | sed -n '2p')"
+	if [ "$TIPTEXT_SF923" = "This door is locked.  It can be opened at a console on the bridge." ]; then
+		echo "PASS: AC1 - hud_tip_text shows hbdoor1's own lockedtext"
+	else
+		echo "FAIL: expected hud_tip_text 'This door is locked.  It can be opened at a console on the bridge.', got '${TIPTEXT_SF923}'"
+		FAIL=1
+	fi
 
-COUNT_41100_SF923="$(grep -c '^41100$' "$LOCAL_LOG_SF923")"
-if [ "$COUNT_41100_SF923" -ge 1 ]; then
-	echo "PASS: AC1 - hbdoor1 stays closed (41100) after the locked use"
-else
-	echo "FAIL: expected to see '41100' in the log after the locked use"
-	FAIL=1
+	TRYOPEN_LAST_SF923="$(chextrek_line_field_values "$LOCAL_LOG_SF923" door_tryopen_last | sed -n '2p')"
+	if [ "$TRYOPEN_LAST_SF923" = "hbdoor1" ]; then
+		echo "PASS: the use-key trace reached hbdoor1 (door_tryopen_last=hbdoor1)"
+	else
+		echo "FAIL: expected door_tryopen_last=hbdoor1, got '${TRYOPEN_LAST_SF923}'"
+		FAIL=1
+	fi
+
+	COUNT_41100_SF923="$(grep -c '^41100$' "$LOCAL_LOG_SF923")"
+	if [ "$COUNT_41100_SF923" -ge 1 ]; then
+		echo "PASS: AC1 - hbdoor1 stays closed (41100) after the locked use"
+	else
+		echo "FAIL: expected to see '41100' in the log after the locked use"
+		FAIL=1
+	fi
 fi
 
 # --- AC2 (e1m1): "requires" "Blue Key" ---
@@ -225,73 +233,90 @@ fi
 LOCAL_LOG_E1M1="$(echo "$RUN_OUT_E1M1" | sed -n 's/^CHEXTREK_LOCAL_LOG=//p')"
 if [ -z "$LOCAL_LOG_E1M1" ] || [ ! -f "$LOCAL_LOG_E1M1" ]; then
 	echo "FAIL: couldn't find the archived e1m1 log to check scenario-specific assertions"
-	exit 1
-fi
-
-if grep -qE '^ *[0-9]+ msec to load e1m1$' "$LOCAL_LOG_E1M1"; then
-	echo "PASS: e1m1 finished loading"
-else
-	echo "FAIL: expected to see '<N> msec to load e1m1' in the log"
 	FAIL=1
-fi
-
-COUNT_42000_E1M1="$(grep -c '^42000$' "$LOCAL_LOG_E1M1")"
-if [ "$COUNT_42000_E1M1" -ge 1 ]; then
-	echo "PASS: func_door_13.isOpen() reports closed (42000) before the use impulse"
 else
-	echo "FAIL: expected to see '42000' in the log before the use impulse"
-	FAIL=1
-fi
+	if grep -qE '^ *[0-9]+ msec to load e1m1$' "$LOCAL_LOG_E1M1"; then
+		echo "PASS: e1m1 finished loading"
+	else
+		echo "FAIL: expected to see '<N> msec to load e1m1' in the log"
+		FAIL=1
+	fi
 
-TIPUP_E1M1_VALUES="$(grep -oE '^door_tip_up: [01]$' "$LOCAL_LOG_E1M1" | grep -oE '[01]$')"
-TIPUP_E1M1_BASELINE="$(echo "$TIPUP_E1M1_VALUES" | sed -n '1p')"
-TIPUP_E1M1_AFTER="$(echo "$TIPUP_E1M1_VALUES" | sed -n '2p')"
-if [ "$TIPUP_E1M1_BASELINE" = "0" ] && [ "$TIPUP_E1M1_AFTER" = "1" ]; then
-	echo "PASS: door_tip_up went from 0 to 1 after using func_door_13 without the Blue Key"
-else
-	echo "FAIL: expected door_tip_up 0 then 1, got '${TIPUP_E1M1_BASELINE}' then '${TIPUP_E1M1_AFTER}'"
-	FAIL=1
-fi
+	COUNT_42000_E1M1="$(grep -c '^42000$' "$LOCAL_LOG_E1M1")"
+	if [ "$COUNT_42000_E1M1" -ge 1 ]; then
+		echo "PASS: func_door_13.isOpen() reports closed (42000) before the use impulse"
+	else
+		echo "FAIL: expected to see '42000' in the log before the use impulse"
+		FAIL=1
+	fi
 
-TIPTEXT_E1M1="$(grep -oE '^door_tip_text: .*$' "$LOCAL_LOG_E1M1" | sed 's/^door_tip_text: //' | sed -n '2p')"
-if [ "$TIPTEXT_E1M1" = "You need a Blue Key to open this door." ]; then
-	echo "PASS: AC2 - door_tip_text names the required item (Blue Key)"
-else
-	echo "FAIL: expected door_tip_text 'You need a Blue Key to open this door.', got '${TIPTEXT_E1M1}'"
-	FAIL=1
-fi
+	TIPUP_E1M1_VALUES="$(chextrek_line_field_values "$LOCAL_LOG_E1M1" hud_tip_up)"
+	TIPUP_E1M1_BASELINE="$(echo "$TIPUP_E1M1_VALUES" | sed -n '1p')"
+	TIPUP_E1M1_AFTER="$(echo "$TIPUP_E1M1_VALUES" | sed -n '2p')"
+	if [ "$TIPUP_E1M1_BASELINE" = "0" ] && [ "$TIPUP_E1M1_AFTER" = "1" ]; then
+		echo "PASS: hud_tip_up went from 0 to 1 after using func_door_13 without the Blue Key"
+	else
+		echo "FAIL: expected hud_tip_up 0 then 1, got '${TIPUP_E1M1_BASELINE}' then '${TIPUP_E1M1_AFTER}'"
+		FAIL=1
+	fi
 
-TRYOPEN_LAST_VALUES_E1M1="$(grep -oE '^door_tryopen_last: .*$' "$LOCAL_LOG_E1M1" | sed 's/^door_tryopen_last: //')"
-TRYOPEN_LAST_AFTER_NOKEY="$(echo "$TRYOPEN_LAST_VALUES_E1M1" | sed -n '2p')"
-if [ "$TRYOPEN_LAST_AFTER_NOKEY" = "func_door_13" ]; then
-	echo "PASS: the use-key trace reached func_door_13 without the key too (door_tryopen_last=func_door_13)"
-else
-	echo "FAIL: expected door_tryopen_last=func_door_13 after the no-key use, got '${TRYOPEN_LAST_AFTER_NOKEY}'"
-	FAIL=1
-fi
+	TIPTITLE_E1M1="$(chextrek_line_field_values "$LOCAL_LOG_E1M1" hud_tip_title | sed -n '2p')"
+	if [ "$TIPTITLE_E1M1" = "Door Locked" ]; then
+		echo "PASS: hud_tip_title reads 'Door Locked' for the no-key use too"
+	else
+		echo "FAIL: expected hud_tip_title 'Door Locked', got '${TIPTITLE_E1M1}'"
+		FAIL=1
+	fi
 
-COUNT_42100_E1M1="$(grep -c '^42100$' "$LOCAL_LOG_E1M1")"
-if [ "$COUNT_42100_E1M1" -ge 1 ]; then
-	echo "PASS: AC2 - func_door_13 stays shut (42100) after the use without the key"
-else
-	echo "FAIL: expected to see '42100' in the log after the no-key use"
-	FAIL=1
-fi
+	TIPTEXT_E1M1="$(chextrek_line_field_values "$LOCAL_LOG_E1M1" hud_tip_text | sed -n '2p')"
+	if [ "$TIPTEXT_E1M1" = "You need a Blue Key to open this door." ]; then
+		echo "PASS: AC2 - hud_tip_text names the required item (Blue Key)"
+	else
+		echo "FAIL: expected hud_tip_text 'You need a Blue Key to open this door.', got '${TIPTEXT_E1M1}'"
+		FAIL=1
+	fi
 
-TRYOPEN_LAST_AFTER_KEY="$(echo "$TRYOPEN_LAST_VALUES_E1M1" | sed -n '3p')"
-if [ "$TRYOPEN_LAST_AFTER_KEY" = "func_door_13" ]; then
-	echo "PASS: the use-key trace reached func_door_13 again after giving the key (door_tryopen_last=func_door_13)"
-else
-	echo "FAIL: expected door_tryopen_last=func_door_13 after giving the key, got '${TRYOPEN_LAST_AFTER_KEY}'"
-	FAIL=1
-fi
+	TRYOPEN_COUNT_VALUES_E1M1="$(chextrek_line_field_values "$LOCAL_LOG_E1M1" door_tryopen_count)"
+	TRYOPEN_COUNT_BASELINE_E1M1="$(echo "$TRYOPEN_COUNT_VALUES_E1M1" | sed -n '1p')"
+	TRYOPEN_COUNT_AFTER_NOKEY_E1M1="$(echo "$TRYOPEN_COUNT_VALUES_E1M1" | sed -n '2p')"
+	TRYOPEN_COUNT_AFTER_KEY_E1M1="$(echo "$TRYOPEN_COUNT_VALUES_E1M1" | sed -n '3p')"
 
-COUNT_42201_E1M1="$(grep -c '^42201$' "$LOCAL_LOG_E1M1")"
-if [ "$COUNT_42201_E1M1" -ge 1 ]; then
-	echo "PASS: AC2 - func_door_13 opens (42201) once the Blue Key is given and the door is used again"
-else
-	echo "FAIL: expected to see '42201' in the log after giving the key and using the door again"
-	FAIL=1
+	TRYOPEN_LAST_VALUES_E1M1="$(chextrek_line_field_values "$LOCAL_LOG_E1M1" door_tryopen_last)"
+	TRYOPEN_LAST_AFTER_NOKEY="$(echo "$TRYOPEN_LAST_VALUES_E1M1" | sed -n '2p')"
+	if [ -n "$TRYOPEN_COUNT_BASELINE_E1M1" ] && [ -n "$TRYOPEN_COUNT_AFTER_NOKEY_E1M1" ] \
+		&& [ "$TRYOPEN_COUNT_AFTER_NOKEY_E1M1" -eq $(( TRYOPEN_COUNT_BASELINE_E1M1 + 1 )) ] \
+		&& [ "$TRYOPEN_LAST_AFTER_NOKEY" = "func_door_13" ]; then
+		echo "PASS: the use-key trace reached func_door_13 without the key too (door_tryopen_count ${TRYOPEN_COUNT_BASELINE_E1M1} -> ${TRYOPEN_COUNT_AFTER_NOKEY_E1M1}, last=func_door_13)"
+	else
+		echo "FAIL: expected door_tryopen_count to rise by exactly 1 and door_tryopen_last=func_door_13 after the no-key use, got count='${TRYOPEN_COUNT_BASELINE_E1M1}'->'${TRYOPEN_COUNT_AFTER_NOKEY_E1M1}' last='${TRYOPEN_LAST_AFTER_NOKEY}'"
+		FAIL=1
+	fi
+
+	COUNT_42100_E1M1="$(grep -c '^42100$' "$LOCAL_LOG_E1M1")"
+	if [ "$COUNT_42100_E1M1" -ge 1 ]; then
+		echo "PASS: AC2 - func_door_13 stays shut (42100) after the use without the key"
+	else
+		echo "FAIL: expected to see '42100' in the log after the no-key use"
+		FAIL=1
+	fi
+
+	TRYOPEN_LAST_AFTER_KEY="$(echo "$TRYOPEN_LAST_VALUES_E1M1" | sed -n '3p')"
+	if [ -n "$TRYOPEN_COUNT_AFTER_NOKEY_E1M1" ] && [ -n "$TRYOPEN_COUNT_AFTER_KEY_E1M1" ] \
+		&& [ "$TRYOPEN_COUNT_AFTER_KEY_E1M1" -eq $(( TRYOPEN_COUNT_AFTER_NOKEY_E1M1 + 1 )) ] \
+		&& [ "$TRYOPEN_LAST_AFTER_KEY" = "func_door_13" ]; then
+		echo "PASS: the use-key trace reached func_door_13 again after giving the key (door_tryopen_count ${TRYOPEN_COUNT_AFTER_NOKEY_E1M1} -> ${TRYOPEN_COUNT_AFTER_KEY_E1M1}, last=func_door_13)"
+	else
+		echo "FAIL: expected door_tryopen_count to rise by exactly 1 more and door_tryopen_last=func_door_13 after giving the key, got count='${TRYOPEN_COUNT_AFTER_NOKEY_E1M1}'->'${TRYOPEN_COUNT_AFTER_KEY_E1M1}' last='${TRYOPEN_LAST_AFTER_KEY}'"
+		FAIL=1
+	fi
+
+	COUNT_42201_E1M1="$(grep -c '^42201$' "$LOCAL_LOG_E1M1")"
+	if [ "$COUNT_42201_E1M1" -ge 1 ]; then
+		echo "PASS: AC2 - func_door_13 opens (42201) once the Blue Key is given and the door is used again"
+	else
+		echo "FAIL: expected to see '42201' in the log after giving the key and using the door again"
+		FAIL=1
+	fi
 fi
 
 echo

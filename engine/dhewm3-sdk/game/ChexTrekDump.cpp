@@ -176,20 +176,23 @@ happened), so a scenario can assert the use-key's trace reached (or, out of g_do
 didn't reach) a door, independent of the door's own lock/open state (checked directly via script,
 e.g. `<door>.isOpen()`, same as tools/test-script-events.sh does for idAI::OpenDoors).
 
-#41 adds `door_tip_up`/`door_tip_title`/`door_tip_text` (decomp-so/reference/door-opening.md,
+#41 adds `hud_tip_up`/`hud_tip_title`/`hud_tip_text` (decomp-so/reference/door-opening.md,
 three separate lines - not one packed line - so a title/text containing spaces, e.g. "This door
 is slimed. Find another route.", stays grep-able as "the rest of the line", the same convention
-`objective_slot_N`/`item_text_last` above already use). A locked idDoor's tryOpen branch (either
-the "requires" case or the plain "lockedtext" case) doesn't log anything itself - it just calls
-the already-stock idPlayer::ShowTip, which sets the HUD gui's own "tip"/"tiptitle" state strings
-and idPlayer::tipUp (Player.cpp/h). Rather than add a new test-only hook to already-ported code
-(the pattern #30/#32/#40's hooks use), these lines read that HUD state directly, the same way
-#35/#36/#37's pda_gui/hud_map/map_pda lines already read other HUD gui state without any new hook:
-`door_tip_up` is idPlayer::IsTipVisible() (public), `door_tip_title`/`door_tip_text` are
-idPlayer::hud->GetStateString( "tiptitle" )/GetStateString( "tip" ) - exactly the strings
-ShowTip's tryOpen callers pass it (the "You need a <requires> to open this door." tip, or the
-door's own "lockedtext"), so a scenario can assert the right tip text/title showed up without
-depending on GUI rendering. No hook, no change to tryOpen/ShowTip's own code.
+`objective_slot_N`/`item_text_last` above already use). Named `hud_tip_*`, not `door_tip_*`:
+idPlayer::ShowTip is a generic stock method (Player.cpp has non-door callers too, e.g. the "no
+PDA" tip), not specific to doors - #41 is just its first caller a scenario needs to observe. A
+locked idDoor's tryOpen branch (either the "requires" case or the plain "lockedtext" case)
+doesn't log anything itself - it just calls the already-stock idPlayer::ShowTip, which sets the
+HUD gui's own "tip"/"tiptitle" state strings and idPlayer::tipUp (Player.cpp/h). Rather than add
+a new test-only hook to already-ported code (the pattern #30/#32/#40's hooks use), these lines
+read that HUD state directly, the same way #35/#36/#37's pda_gui/hud_map/map_pda lines already
+read other HUD gui state without any new hook: `hud_tip_up` is idPlayer::IsTipVisible() (public),
+`hud_tip_title`/`hud_tip_text` are idPlayer::hud->GetStateString( "tiptitle" )/GetStateString(
+"tip" ) - exactly the strings ShowTip's tryOpen callers pass it (the "You need a <requires> to
+open this door." tip, or the door's own "lockedtext"), so a scenario can assert the right tip
+text/title showed up without depending on GUI rendering. No hook, no change to tryOpen/ShowTip's
+own code.
 ==================
 */
 void ChexTrek_Dump_f( const idCmdArgs &args ) {
@@ -281,14 +284,15 @@ void ChexTrek_Dump_f( const idCmdArgs &args ) {
 	// chextrek: spec #41 (decomp-so/reference/door-opening.md). idPlayer::tryOpen's locked-door
 	// branches call the already-stock idPlayer::ShowTip, which only sets HUD gui state - read
 	// directly here instead of adding a new hook, see the ChexTrek_Dump_f header comment above.
+	// Named hud_tip_* rather than door_tip_*: ShowTip isn't door-specific.
 	if ( !player || !player->hud ) {
-		gameLocal.Printf( "door_tip_up: none\n" );
-		gameLocal.Printf( "door_tip_title: none\n" );
-		gameLocal.Printf( "door_tip_text: none\n" );
+		gameLocal.Printf( "hud_tip_up: none\n" );
+		gameLocal.Printf( "hud_tip_title: none\n" );
+		gameLocal.Printf( "hud_tip_text: none\n" );
 	} else {
-		gameLocal.Printf( "door_tip_up: %s\n", player->IsTipVisible() ? "1" : "0" );
-		gameLocal.Printf( "door_tip_title: %s\n", player->hud->GetStateString( "tiptitle", "" ) );
-		gameLocal.Printf( "door_tip_text: %s\n", player->hud->GetStateString( "tip", "" ) );
+		gameLocal.Printf( "hud_tip_up: %s\n", player->IsTipVisible() ? "1" : "0" );
+		gameLocal.Printf( "hud_tip_title: %s\n", player->hud->GetStateString( "tiptitle", "" ) );
+		gameLocal.Printf( "hud_tip_text: %s\n", player->hud->GetStateString( "tip", "" ) );
 	}
 
 	// chextrek: spec #33 (decomp-so/reference/custom-ui.md, end-level-stats.md). The local

@@ -14,6 +14,11 @@
 # tools/test-show-map.sh and tools/test-hud-map-saveload.sh so none of them repeat the same
 # `hud_map: level=<N> visible=<0|1> coverage=<N>` parsing pipeline.
 #
+# Also provides chextrek_line_field_values() (#41), for any `chextrek_dump` line of the form
+# `<field>: <rest of line>` (one field per line, e.g. `door_tryopen_last`, `hud_tip_title`) -
+# shared by tools/test-door-locked.sh so its own repeated `grep -oE '^<field>: .*$' | sed
+# 's/^<field>: //'` pipeline lives in one place.
+#
 # See docs/dev-setup.md for the environment variables this reads (DHEWM3_HOME, DOOM3_BASEPATH,
 # DHEWM3_DOCUMENTS_DIR) and for why the mount/save-path/timeout handling works the way it does.
 
@@ -36,6 +41,18 @@ chextrek_hud_map_coverage_values() {
 # Prints each chextrek_dump `hud_map:` line's `level` field, in log order, one per line. (#39)
 chextrek_hud_map_level_values() {
 	grep -oE '^hud_map: level=[0-9]+ visible=[01] coverage=[0-9]+$' "$1" | grep -oE '^hud_map: level=[0-9]+' | grep -oE '[0-9]+$'
+}
+
+# chextrek_line_field_values LOG_FILE FIELD_NAME
+#
+# Prints each `<FIELD_NAME>: <rest of line>` chextrek_dump line's value (everything after
+# "<FIELD_NAME>: "), in log order, one per line. FIELD_NAME must be a plain field name (no regex
+# metacharacters - every field this is used for is a fixed identifier like "door_tryopen_last" or
+# "hud_tip_title", never user input). (#41)
+chextrek_line_field_values() {
+	local LOG_FILE="$1"
+	local FIELD_NAME="$2"
+	grep -oE "^${FIELD_NAME}: .*\$" "$LOG_FILE" | sed "s/^${FIELD_NAME}: //"
 }
 
 # chextrek_run_console_script REPO_ROOT CONSOLE_SCRIPT_BODY TIMEOUT_SECS RUN_LABEL
