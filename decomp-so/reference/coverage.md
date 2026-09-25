@@ -30,8 +30,8 @@ Edits inside stock function bodies are out of scope for spec #16.
 
 A new method outside the target set, found by #26: a second `idGameLocal::ProjectDecal`
 (`_ZN11idGameLocal12ProjectDecalERK6idVec3S2_fbfPKcPS1_f`, ELF 0xf1c80), an overload that takes the decal's
-winding from the caller. The stock-source check that built `scripts/targets.txt` compared names, so it missed this
-overload of a stock name. Its only caller is `idActor::Event_FootPrint`. It is not exported, not in the table below
+winding from the caller. `scripts/targets.txt` lists method names only, and a stock name such as `ProjectDecal` is not on it, so
+the export missed this overload. (How the target list was built is not recorded here: presumably a name comparison.) Its only caller is `idActor::Event_FootPrint`. It is not exported, not in the table below
 and not reconstructed. Only its declaration is shown (`reference/script-events.md`).
 
 ## Functions

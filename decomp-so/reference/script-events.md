@@ -32,18 +32,19 @@ extern const idEventDef EV_FootPrint;
 
 class idActor : public idAFEntity_Gibbable {
 	// ... stock members ...
-public:
-	// UNCERTAIN: access level. Stock idActor keeps its Event_* handlers private. idActor's own
-	// PlayFootStepSound calls this one directly (see Notes).
+private:
+	// UNCERTAIN: access level. Stock idActor keeps its Event_* handlers private; the only direct
+	// caller, PlayFootStepSound, is an idActor member (see Notes), so private is enough.
 	void					Event_FootPrint( const char *side, const char *jointName );
 
+public:
 	// UNCERTAIN: every name, and the access level. Offsets (binary): idActor is 0xf78 bytes in this build
 	// (idActor::CreateInstance allocates 0xf78), and 0xf68 in stock (g++ -m32 of the stock header). The
 	// last stock members are 4 bytes further on than in stock (allowPain +0xf54, stock 0xf50; attachments
 	// +0xf5c, stock 0xf58). So the new members come after attachments, at the end:
 	//   +0xf6c  bool hasTrail (reference/trails.md, Notes: idActor::Spawn stores spawnArgs "hasTrail")
 	//   +0xf6d .. +0xf77  the footprint state below.
-	// idActor::idActor sets footprintSurfaceType = -1 and footprintEndTime = 0 (0xb593f, 0xb5945; binary).
+	// idActor::idActor sets footprintSurfaceType = -1 and footprintEndTime = 0 (binary: C1 0xb593f / 0xb5945, C2 0xb75df / 0xb75e5).
 	// It does not set footprintRight. No idActor, idAI or idPlayer function other than Event_FootPrint
 	// touches +0xf6d, +0xf70 or +0xf74 (binary scan), so Save / Restore write none of the three.
 	// Check 3 splices them at the end of the stock declaration.
@@ -286,7 +287,9 @@ void idThread::Event_SpawnDict( const char *defName ) {
 	dict.Copy( *defDict );
 	// spawnArgs is the stock member (+0x1b40, as in stock) that setSpawnArg fills.
 	dict.Copy( spawnArgs );
-	// expandInheritance false (binary: 0 pushed). The stock spawn event uses the default, true.
+	// Third argument false (binary: 0 pushed at 0x23dd55). Stock names it setDefaults (default true) and
+	// never reads it. UNCERTAIN: whether this build's SpawnEntityDef reads it (not checked).
+	// The stock spawn event passes the default.
 	gameLocal.SpawnEntityDef( dict, &ent, false );
 	ReturnEntity( ent );
 	dict.Clear();
@@ -310,7 +313,7 @@ void idThread::Event_SpawnDict( const char *defName ) {
 - **`idGameLocal::ProjectDecal` overload (outside the target set).** `Event_FootPrint` is the only caller of the 8-argument `ProjectDecal` (binary: every direct call in the `.so`). The stock callers (`idEntityFx::Run`, `idProjectile::DefaultDamageEffect`, `idWeapon::Event_Melee`, `idFuncSplat::Event_Splat`, `idExplodingBarrel::ExplodingEffects`, `idGameLocal::BloodSplat`) still call the stock 7-argument one. The overload is a new method but not in `scripts/targets.txt`, so the export, `coverage.md` and spec #16's target set do not include it. It is a copy of the stock function (0xf1c80, 0xf0db0 for stock) that takes the winding from the caller. Its body was not reconstructed or checked. The header block declares it only so that check 3 compiles the call. The declaration is spliced into `idGameLocal`, next to the stock overload.
 - **`idActor` event table, entry 42.** After `EV_FootPrint`, `idActor::eventCallbacks` has `{ EV_Remove, idClass::Event_Remove }`, which stock `Actor.cpp` does not have. No new function comes with it, so it is not in any group's scope. Recorded as a lead: some edit made `remove` on actors go straight to `idClass::Event_Remove`. Not checked further.
 - **`setProj` behavior.** `projectileDict` is the stock member that stock `Event_LaunchProjectiles` / `Event_CreateProjectile` spawn from. In stock, `GetWeaponDef` (weapon change) and `Restore` (loading a savegame) refill it from the weapon's `def_projectile`. So `setProj` lasts only until then, which fits `weap_disable()` repeating it once a second. Not checked in this build's `GetWeaponDef` / `Restore`.
-- **`spawnDict` compared to stock `spawn`.** Stock `idThread::Event_SpawnEntity` sets `"classname"` in `spawnArgs` and spawns from `spawnArgs` itself. `Event_SpawnDict` copies into a local `idDict` instead, passes `expandInheritance` false (stock `idDeclEntityDef::Parse` has already copied the inherited keys into the def's dict), and clears both dicts after. Like stock, `ent` is not initialized before `SpawnEntityDef`, which sets it.
+- **`spawnDict` compared to stock `spawn`.** Stock `idThread::Event_Spawn` sets `"classname"` in `spawnArgs` and spawns from `spawnArgs` itself. `Event_SpawnDict` copies into a local `idDict` instead, passes `false` as `SpawnEntityDef`'s third argument (stock `setDefaults`, which the stock body never reads; UNCERTAIN whether this build's does), and clears both dicts after. Like stock, `ent` is not initialized before `SpawnEntityDef`, which sets it.
 - **Check 1 (callees).** Named in the code: `GetPhysics`, `va`, `GetFloat` (the 3-argument, non-inline one), `ToAngles`, `GetVector`, `GetJointHandle`, `GetJointWorldTransform`, `ProjectDecal` (`Event_FootPrint`). `FindEntityDef` and `idDict::operator=` (`Event_SetProj`). `FindEntityDefDict`, `Copy`, `SpawnEntityDef`, `ReturnEntity` and `Clear` (`Event_SpawnDict`). From stock inline code, on `allowlist.tsv` as `stock-inline`: `idDict::FindKey` and `__strtod_internal` in `Event_FootPrint` (`idDict::GetFloat( key, default )` and `GetString`), and `idHashIndex::Init` / `Free` and `operator new[]` / `delete[]` in `Event_SpawnDict` (the local `idDict`'s constructor and destructor). The vtable calls `HasGroundContacts`, `GetOrigin` and `idRenderWorld::Trace` are indirect, which check 1 does not see.
 - **Check 2 (literals).** `Event_FootPrint` reads 18 strings and the floats 8.0 (an immediate, three times: trace radius and both decal depths), 1.0 (immediate, `axis[ 2 ].z`), -1.0 (immediate, both `dir.z`), 12.0 and -12.0 (`.rodata`). All appear in the code. 0.5 and 1.5 are the Newton step of `idMath::InvSqrt` inside the two inline `idVec3::Normalize` calls: on `literal-allowlist.tsv` as `stock-inline`. `Event_SetProj` and `Event_SpawnDict` read no literals. The event names and formats are read by static initializers, which are not covered functions, so check 2 does not cover them. They were read from the disassembly.
 - **Compile (check 3).** The header and implementation compile with g++ 12 `-m32` against stock DOOM-3 GPL a9c49da. The `idGameLocal`, `idActor`, `idWeapon` and `idThread` partial declarations are spliced into scratch copies of `game/Game_local.h`, `game/Actor.h`, `game/Weapon.h` and `game/script/Script_Thread.h`. The event-table lines are comments because the stock `CLASS_DECLARATION`s cannot be repeated. The check proves the code is well-formed only.
