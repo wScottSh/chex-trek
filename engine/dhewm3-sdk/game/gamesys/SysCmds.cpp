@@ -2317,6 +2317,10 @@ void idGameLocal::InitConsoleCommands( void ) {
 	// otherwise show interactively. No CMD_FL_CHEAT (matches chextrek_dump above, not
 	// chextrek_customui_cmd above it): read-only, changes no cvar or game state.
 	cmdSystem->AddCommand( "chextrek_test_gui_completion", ChexTrek_TestGuiCompletion_f, CMD_FL_GAME, "chextrek: dumps g_PDA's value-completion results (test harness only)" );
+	// chextrek: spec #36, test-only. CMD_FL_CHEAT matches chextrek_customui_cmd above - see
+	// ChexTrek_TestImpulse_f's own comment in ChexTrekDump.cpp/.h for why a console command has to
+	// stand in for a real, currently-held bind key.
+	cmdSystem->AddCommand( "chextrek_test_impulse",	ChexTrek_TestImpulse_f,		CMD_FL_GAME|CMD_FL_CHEAT,	"chextrek: sends an impulse to the local player (test harness only)" );
 	cmdSystem->AddCommand( "listTypeInfo",			ListTypeInfo_f,				CMD_FL_GAME,				"list type info" );
 	cmdSystem->AddCommand( "writeGameState",		WriteGameState_f,			CMD_FL_GAME,				"write game state" );
 	cmdSystem->AddCommand( "testSaveGame",			TestSaveGame_f,				CMD_FL_GAME|CMD_FL_CHEAT,	"test a save game for a level" );

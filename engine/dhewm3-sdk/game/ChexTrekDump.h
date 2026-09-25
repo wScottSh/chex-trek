@@ -68,4 +68,19 @@ void ChexTrek_CustomUICmd_f( const idCmdArgs &args );
 // function and that one result names the mod's default PDA GUI ("guis/pda_chex.gui").
 void ChexTrek_TestGuiCompletion_f( const idCmdArgs &args );
 
+// chextrek: spec #36, test-only. Registered as the "chextrek_test_impulse" console command by
+// idGameLocal::InitConsoleCommands. AC1 ("impulse 23 toggles the map") needs idPlayer::
+// PerformImpulse(23) to actually run, but impulses in this engine aren't reachable from a console
+// script: the "_impulseN" strings autoexec.cfg/matt.cfg/scott.cfg bind keys to (decomp-so/
+// reference/hud-map.md's Notes) are bind-target tokens idUsercmdGenLocal recognizes only from a
+// real, currently-held key - typing them directly ("impulse 23" or "_impulse23") is rejected as an
+// unknown command (confirmed against this engine build), and there's no plain "impulse" console
+// command either. The same class of gap chextrek_customui_cmd (spec #34) closes for a GUI button
+// click and chextrek_test_gui_completion (spec #35) closes for interactive tab-completion: this
+// command reads one integer argument and calls the local player's PerformImpulse with it directly -
+// everything downstream (the switch in PerformImpulse, HandleNamedEvent, the GUI's own onNamedEvent
+// blocks) is the real, already-ported game code, unchanged. CMD_FL_CHEAT plus its own
+// CheatsOk( false ) check, matching chextrek_customui_cmd.
+void ChexTrek_TestImpulse_f( const idCmdArgs &args );
+
 #endif /* !__CHEXTREK_DUMP_H__ */

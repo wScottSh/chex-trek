@@ -136,6 +136,15 @@ stock's hardcoded "guis/pda.gui"; "none" if there's no local player or no object
 (idPlayer::TogglePDA, reached here via idPlayer::GivePDA's own call to it on the player's first
 PDA, not an impulse - see tools/test-pda.sh) made the mod's own PDA GUI (not stock's) the active
 one, without depending on any GUI rendering.
+
+#36 adds `hud_map: level=<N> visible=<0|1> coverage=<N>` (decomp-so/reference/hud-map.md):
+`visible` is the HUD gui's own "HudMap" state flag (idPlayer::hud->GetStateBool, the same one
+impulse 23 flips via the "openMap"/"closeMap" named events and hud.gui's hudmap_open/hudmap_close
+windows handle), `level` is idPlayer::HudMapLevel( NULL ) (the player's current map floor), and
+`coverage` is the number of alpha-revealed texels (hudmap_alpha[level][...][3] > 0) out of the
+128x128 fog-of-war image for that level - so a scenario can assert impulse 23 flips `visible`
+without depending on GUI rendering, and that `setviewpos` moves grow `coverage` without depending
+on a screenshot.
 ==================
 */
 void ChexTrek_Dump_f( const idCmdArgs &args ) {
@@ -185,6 +194,24 @@ void ChexTrek_Dump_f( const idCmdArgs &args ) {
 	} else {
 		gameLocal.Printf( "pda_gui: none\n" );
 		gameLocal.Printf( "pda_open: 0\n" );
+	}
+
+	// chextrek: spec #16/#36 (decomp-so/reference/hud-map.md). "visible" is the HUD gui's own
+	// "HudMap" state flag (the same one impulse 23 flips), "level" is the player's current map
+	// floor, and "coverage" counts the fog-of-war texels revealed so far on that level - see the
+	// ChexTrek_Dump_f header comment above.
+	if ( !player || !player->hud ) {
+		gameLocal.Printf( "hud_map: none\n" );
+	} else {
+		int level = player->HudMapLevel( NULL );
+		int coverage = 0;
+		for ( int i = 0; i < 128 * 128; i++ ) {
+			if ( hudmap_alpha[ level ][ i * 4 + 3 ] > 0 ) {
+				coverage++;
+			}
+		}
+		gameLocal.Printf( "hud_map: level=%d visible=%s coverage=%d\n",
+			level, player->hud->GetStateBool( "HudMap", "0" ) ? "1" : "0", coverage );
 	}
 
 	// chextrek: spec #33 (decomp-so/reference/custom-ui.md, end-level-stats.md). The local
@@ -285,6 +312,37 @@ void ChexTrek_CustomUICmd_f( const idCmdArgs &args ) {
 
 	bool handled = player->customUIEntity->HandleCustomGUICommand( player->customUIEntity, &token );
 	gameLocal.Printf( "chextrek_customui_cmd: '%s' %s\n", token.c_str(), handled ? "handled" : "not handled" );
+}
+
+/*
+==================
+ChexTrek_TestImpulse_f
+
+Test-only, spec #36. See ChexTrek_TestImpulse_f's comment in ChexTrekDump.h for why a console
+command has to stand in for a real, currently-held bind key here. Reads one integer argument and
+calls idPlayer::PerformImpulse with it directly - everything downstream is the real, already-ported
+game code (Player.cpp's PerformImpulse switch), unchanged.
+==================
+*/
+void ChexTrek_TestImpulse_f( const idCmdArgs &args ) {
+	if ( !gameLocal.CheatsOk( false ) ) {
+		return;
+	}
+
+	if ( args.Argc() != 2 ) {
+		gameLocal.Printf( "usage: chextrek_test_impulse <N>\n" );
+		return;
+	}
+
+	idPlayer *player = gameLocal.GetLocalPlayer();
+	if ( !player ) {
+		gameLocal.Printf( "chextrek_test_impulse: no local player\n" );
+		return;
+	}
+
+	int impulse = atoi( args.Argv( 1 ) );
+	player->PerformImpulse( impulse );
+	gameLocal.Printf( "chextrek_test_impulse: sent impulse %d\n", impulse );
 }
 
 /*

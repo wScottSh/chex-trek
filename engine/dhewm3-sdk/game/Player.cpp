@@ -732,20 +732,285 @@ void idInventory::AddPickupName( const char *name, const char *icon ) {
 	}
 }
 
+// chextrek: spec #16/#36 (decomp-so/reference/hud-map.md). Definition of the extern declared in
+// Player.h. A single global, not per-player, and not reset per map by this group's code:
+// idPlayer::Init zeroes it (edits-inside-stock-functions lead, below).
+byte hudmap_alpha[ 5 ][ 128 * 128 * 4 ];
+
+/*
+==============
+idPlayer::initHudMap
+
+chextrek: spec #16/#36 (decomp-so/reference/hud-map.md). Reads the HUD map settings from the
+worldspawn. Edit-inside-stock-function lead: idPlayer::Spawn calls this (see Spawn, below).
+==============
+*/
+void idPlayer::initHudMap( void ) {
+	if ( !gameLocal.world ) {
+		return;
+	}
+
+	if ( !gameLocal.world->spawnArgs.GetVec4( "map_coords", "0 0 0 0", mapCoords ) ) {
+		common->Warning( "No map_coords set in world spawn, hud map won't work" );
+	}
+
+	// "maps/e1m1.map" -> "guis/hud_maps/e1m1": Right() drops the first 5 characters, "maps/".
+	idStr mapName = gameLocal.GetMapName();
+	mapName.StripFileExtension();
+	mapMaterial = idStr( "guis/hud_maps/" );
+	mapMaterial += mapName.Right( mapName.Length() - 5 );
+
+	// Floors of the map levels. Level 0 defaults to -131072 (MIN_WORLD_COORD), 1-4 to 131072
+	// (MAX_WORLD_COORD): with no keys, every position is on level 0.
+	gameLocal.world->spawnArgs.GetFloat( va( "map_level_%d", 0 ), va( "%f", -131072.0 ), mapLevels[ 0 ] );
+	gameLocal.world->spawnArgs.GetFloat( va( "map_level_%d", 1 ), va( "%f", 131072.0 ), mapLevels[ 1 ] );
+	gameLocal.world->spawnArgs.GetFloat( va( "map_level_%d", 2 ), va( "%f", 131072.0 ), mapLevels[ 2 ] );
+	gameLocal.world->spawnArgs.GetFloat( va( "map_level_%d", 3 ), va( "%f", 131072.0 ), mapLevels[ 3 ] );
+	gameLocal.world->spawnArgs.GetFloat( va( "map_level_%d", 4 ), va( "%f", 131072.0 ), mapLevels[ 4 ] );
+
+	gameLocal.world->spawnArgs.GetFloat( "map_x", "640", mapWidth );
+	gameLocal.world->spawnArgs.GetFloat( "map_y", "480", mapHeight );
+	gameLocal.world->spawnArgs.GetInt( "map_radius", "8", mapRadius );
+	gameLocal.world->spawnArgs.GetFloat( "map_scale", "1", mapScale );
+
+	// One texel of the 128 x 128 alpha image, in world units, on the map's shorter side.
+	float width = mapCoords[ 2 ] - mapCoords[ 0 ];
+	float height = mapCoords[ 1 ] - mapCoords[ 3 ];
+	revealDistance = ( ( width <= height ) ? width : height ) * 0.0078125f;
+}
+
 /*
 ==============
 idPlayer::HudMapLevel
 
-chextrek: spec #16/#31 stub (decomp-so/reference/objectives.md declares this; its real body is
-decomp-so/reference/hud-map.md, which needs idPlayer::mapLevels[] and the rest of the hud-map
-group's members - not yet ported, see docs/harness-coverage.md's "HUD map" row). addObjective
-needs a level to hand back through its int & argument; nothing yet reads mkObjective::mapLevel
-(only the not-yet-ported idPlayer::updateMapUI does), so a stub is behaviorally inert until the
-HUD map sub-issue lands and replaces this body with the real one.
+chextrek: spec #16/#31 declared this stub (decomp-so/reference/objectives.md); #36 replaces it
+with its real body (decomp-so/reference/hud-map.md). The map level (0-4) at height pos->z, or at
+the player's middle when pos is NULL: the highest level whose floor (mapLevels) is at or below it.
+Below level 0's floor: warns, and returns 0.
 ==============
 */
 int idPlayer::HudMapLevel( const idVec3 *pos ) {
-	return 0;
+	float	z;
+	int		level;
+
+	if ( pos ) {
+		z = pos->z;
+	} else {
+		z = 0.5f * pm_normalheight.GetFloat() + GetPhysics()->GetOrigin().z;
+	}
+
+	if ( z < mapLevels[ 0 ] ) {
+		gameLocal.Warning( "Location below lowest MapLevel" );
+		return 0;
+	}
+	for ( level = 1; level < 5; level++ ) {
+		if ( z < mapLevels[ level ] ) {
+			break;
+		}
+	}
+	return level - 1;
+}
+
+/*
+==============
+idPlayer::MapImageCoords
+
+chextrek: spec #16/#36 (decomp-so/reference/hud-map.md). World x, y -> position on a map image of
+width x height (GUI units, or texels), measured from the image's top left. mapCoords gives the
+world coordinates of the image's edges; world y grows up, image y down.
+==============
+*/
+void idPlayer::MapImageCoords( float width, float height, const idVec2 &pos, idVec2 &out ) {
+	out.x = ( pos.x - mapCoords[ 0 ] ) * width / ( mapCoords[ 2 ] - mapCoords[ 0 ] );
+	out.y = ( mapCoords[ 1 ] - pos.y ) * height / ( mapCoords[ 1 ] - mapCoords[ 3 ] );
+}
+
+/*
+==============
+idPlayer::updateMap
+
+chextrek: spec #16/#36 (decomp-so/reference/hud-map.md). Every frame (edit-inside-stock-function
+lead: idPlayer::Think calls this, see Think, below): redraws the PDA map while the PDA is open and
+on its map page, the HUD map while it is shown, and reveals the map around the player.
+==============
+*/
+void idPlayer::updateMap( void ) {
+	int level;
+
+	if ( gameLocal.isMultiplayer || !objectiveSystem || !hud ) {
+		return;
+	}
+
+	level = HudMapLevel( NULL );
+	// "HudMap" is set to 1 by the GUIs while their map is visible.
+	if ( objectiveSystemOpen && objectiveSystem->GetStateBool( "HudMap", "0" ) ) {
+		updateMapUI( objectiveSystem, level, false );
+	}
+	if ( hud->GetStateBool( "HudMap", "0" ) ) {
+		updateMapUI( hud, level, true );
+	}
+	updateHudMapAlpha( level );
+}
+
+/*
+==============
+idPlayer::updateMapUI
+
+chextrek: spec #16/#36 (decomp-so/reference/hud-map.md). Sets one GUI's map variables. The map box
+is 640 x 480 GUI units (each GUI scales them to its box). The HUD map is always centered on the
+player; the PDA map follows mapControl (#37 wires mapControl from the PDA's GUI commands - it stays
+0, so the PDA map neither scrolls nor zooms, until that lands).
+==============
+*/
+void idPlayer::updateMapUI( idUserInterface *gui, int level, bool isHud ) {
+	int				i;
+	int				color;
+	float			width;
+	float			height;
+	idVec2			mapPos;
+	idVec2			iconPos;
+	mkObjective *	obj;
+
+	width = mapWidth * mapScale;
+	height = mapScale * mapHeight;
+
+	if ( ( mapControl & MAP_CENTER ) || isHud ) {
+		mapView.x = GetPhysics()->GetOrigin().x;
+		mapView.y = GetPhysics()->GetOrigin().y;
+	}
+	if ( !isHud ) {
+		if ( ( mapControl & MAP_ZOOM_OUT ) && mapScale > 0.1f ) {
+			mapScale += mapScale / -100.0f;
+		}
+		if ( ( mapControl & MAP_ZOOM_IN ) && mapScale < 9.0f ) {
+			mapScale += mapScale / 100.0f;
+		}
+		switch ( mapControl ) {
+			case MAP_SCROLL_UP:
+				if ( mapView.y < mapCoords[ 1 ] ) {
+					mapView.y += 16.0f;
+				}
+				break;
+			case MAP_SCROLL_DOWN:
+				if ( mapView.y > mapCoords[ 3 ] ) {
+					mapView.y -= 16.0f;
+				}
+				break;
+			case MAP_SCROLL_LEFT:
+				if ( mapView.x > mapCoords[ 0 ] ) {
+					mapView.x -= 16.0f;
+				}
+				break;
+			case MAP_SCROLL_RIGHT:
+				if ( mapView.x < mapCoords[ 2 ] ) {
+					mapView.x += 16.0f;
+				}
+				break;
+		}
+	}
+
+	// Top left of the map image, so that mapView is at the box's center (320, 240).
+	MapImageCoords( width, height, mapView, mapPos );
+	mapPos.x = 320.0f - mapPos.x;
+	mapPos.y = 240.0f - mapPos.y;
+
+	gui->SetStateString( "hud_map_mtr", va( "%s%i", mapMaterial.c_str(), level ) );
+	gui->SetStateString( "hud_map_faded_mtr", va( "%s%i", mapMaterial.c_str(), ( level != 0 ) ? level - 1 : 0 ) );
+	gui->SetStateInt( "map_w", (int)width );
+	gui->SetStateInt( "map_h", (int)height );
+	gui->SetStateInt( "map_pos_x", (int)mapPos.x );
+	gui->SetStateInt( "map_pos_y", (int)mapPos.y );
+
+	// Icons are 32 x 32: their top left is 16 up and left of the point.
+	MapImageCoords( width, height, GetPhysics()->GetOrigin().ToVec2(), iconPos );
+	gui->SetStateInt( "player_x", (int)( mapPos.x + iconPos.x ) - 16 );
+	gui->SetStateInt( "player_y", (int)( mapPos.y + iconPos.y ) - 16 );
+	gui->SetStateFloat( "player_direction", viewAngles.yaw );
+
+	for ( i = 0; i < MAX_OBJS; i++ ) {
+		obj = objectives[ i ];
+		if ( !obj ) {
+			continue;
+		}
+		// The GUIs tint the icon: 1 red (below this level), 2 green (above), 3 white (on it).
+		if ( level < obj->mapLevel ) {
+			color = 2;
+		} else if ( level == obj->mapLevel ) {
+			color = 3;
+		} else {
+			color = 1;
+		}
+		MapImageCoords( width, height, obj->GetPhysics()->GetOrigin().ToVec2(), iconPos );
+		gui->SetStateInt( va( "map_obj%d_x", i + 1 ), (int)( mapPos.x + iconPos.x ) - 16 );
+		gui->SetStateInt( va( "map_obj%d_y", i + 1 ), (int)( mapPos.y + iconPos.y ) - 16 );
+		gui->SetStateInt( va( "map_obj%d_c", i + 1 ), color );
+	}
+}
+
+/*
+==============
+idPlayer::updateHudMapAlpha
+
+chextrek: spec #16/#36 (decomp-so/reference/hud-map.md). Reveals the map of this level around the
+player: raises the alpha of the texels within mapRadius, 255 at the player fading to 0 at the
+corners of the 2 x mapRadius square, and uploads the image. Only after the player moved
+revealDistance since the last reveal.
+==============
+*/
+void idPlayer::updateHudMapAlpha( int level ) {
+	int		x;
+	int		y;
+	int		x0;
+	int		y0;
+	int		x1;
+	int		y1;
+	int		alpha;
+	float	maxDist;
+	idVec2	center;
+	byte *	texel;
+
+	if ( ( lastRevealOrigin - GetPhysics()->GetOrigin() ).LengthFast() < revealDistance ) {
+		return;
+	}
+	lastRevealOrigin = GetPhysics()->GetOrigin();
+
+	MapImageCoords( 128.0f, 128.0f, GetPhysics()->GetOrigin().ToVec2(), center );
+	x0 = (int)( center.x - mapRadius );
+	if ( x0 < 0 ) {
+		x0 = 0;
+	}
+	y0 = (int)( center.y - mapRadius );
+	if ( y0 < 0 ) {
+		y0 = 0;
+	}
+	x1 = x0 + mapRadius * 2;
+	if ( x1 > 128 ) {
+		x1 = 128;
+	}
+	y1 = y0 + mapRadius * 2;
+	if ( y1 > 128 ) {
+		y1 = 128;
+	}
+	maxDist = idMath::Sqrt( (float)( mapRadius * ( mapRadius * 2 ) ) );
+
+	for ( x = x0; x < x1; x++ ) {
+		for ( y = y0; y < y1; y++ ) {
+			alpha = (int)( ( 1.0f - ( center - idVec2( (float)x, (float)y ) ).Length() / maxDist ) * 255.0f );
+			if ( alpha < 0 ) {
+				alpha = 0;
+			} else if ( alpha > 255 ) {
+				alpha = 255;
+			}
+			texel = &hudmap_alpha[ level ][ ( y * 128 + x ) * 4 ];
+			if ( alpha > texel[ 3 ] ) {
+				texel[ 3 ] = (byte)alpha;
+			}
+		}
+	}
+
+	if ( renderSystem ) {
+		renderSystem->UploadImage( va( "textures/guis/hudmap_alpha%d.tga", level ), hudmap_alpha[ level ], 128, 128 );
+	}
 }
 
 /*
@@ -1125,6 +1390,12 @@ idPlayer::idPlayer() {
 	customUIEntity			= NULL;
 	customUI				= NULL;
 
+	// chextrek: spec #16/#36 (decomp-so/reference/hud-map.md; edits-inside-stock-functions lead:
+	// both idPlayer constructors construct mapMaterial - idStr's own default constructor already
+	// does this, nothing to add here besides the comment). mapControl/mapView/lastRevealOrigin/
+	// unknown1e5c are zeroed by Init() (the binary's constructors don't set them either - only
+	// Init and Spawn's initHudMap do).
+
 	heartRate				= BASE_HEARTRATE;
 	heartInfo.Init( 0, 0, 0, 0 );
 	lastHeartAdjust			= 0;
@@ -1362,6 +1633,16 @@ void idPlayer::Init( void ) {
 	// chextrek: spec #16/#31 (decomp-so/reference/objectives.md; edits-inside-stock-functions
 	// lead: idPlayer::Init also zeroes nextObjective, not the slots themselves).
 	nextObjective			= 0;
+
+	// chextrek: spec #16/#36 (decomp-so/reference/hud-map.md; edits-inside-stock-functions lead:
+	// idPlayer::Init zeroes mapControl/mapView/lastRevealOrigin, sets unknown1e5c to -1, and
+	// memsets hudmap_alpha - the fog of war is a single global, not per player, and this is the
+	// only place it's reset).
+	mapControl				= 0;
+	mapView.Zero();
+	lastRevealOrigin.Zero();
+	unknown1e5c				= -1;
+	memset( hudmap_alpha, 0, sizeof( hudmap_alpha ) );
 
 	weapon_soulcube			= SlotForWeapon( "weapon_soulcube" );
 	weapon_pda				= SlotForWeapon( "weapon_pda" );
@@ -1623,6 +1904,11 @@ void idPlayer::Spawn( void ) {
 		// lead: reads g_PDA instead of the stock hardcoded "guis/pda.gui" (0x16f730).
 		objectiveSystem = uiManager->FindGui( g_PDA.GetString(), true, false, true );
 		objectiveSystemOpen = false;
+
+		// chextrek: spec #16/#36 (decomp-so/reference/hud-map.md; edits-inside-stock-functions
+		// lead: idPlayer::Spawn calls initHudMap, 0x16f77b - right after the objectiveSystem GUI
+		// load it sits next to in the binary).
+		initHudMap();
 	}
 
 	// chextrek: spec #16/#33 (decomp-so/reference/end-level-stats.md; edits-inside-stock-functions
@@ -5813,6 +6099,20 @@ void idPlayer::PerformImpulse( int impulse ) {
 			}
 			break;
 		}
+		case IMPULSE_23: {
+			// chextrek: spec #16/#36 (decomp-so/reference/hud-map.md; edits-inside-stock-functions
+			// lead: idPlayer::PerformImpulse, 0x16cb92-0x16cd7c). Toggles the HUD map: the GUI's own
+			// "HudMap" state flag, flipped by named events hud.gui's hudmap_open/hudmap_close
+			// windows handle.
+			if ( hud ) {
+				if ( hud->GetStateBool( "HudMap", "0" ) ) {
+					hud->HandleNamedEvent( "closeMap" );
+				} else {
+					hud->HandleNamedEvent( "openMap" );
+				}
+			}
+			break;
+		}
 		case IMPULSE_28: {
 			if ( gameLocal.isClient || entityNumber == gameLocal.localClientNum ) {
 				gameLocal.mpGame.CastVote( gameLocal.localClientNum, true );
@@ -6538,6 +6838,10 @@ void idPlayer::Think( void ) {
 	}
 
 	UpdateAir();
+
+	// chextrek: spec #16/#36 (decomp-so/reference/hud-map.md; edits-inside-stock-functions lead:
+	// idPlayer::Think calls updateMap, 0x16e558).
+	updateMap();
 
 	UpdateHud();
 

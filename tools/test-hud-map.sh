@@ -1,0 +1,204 @@
+#!/usr/bin/env bash
+# Automated test for spec #36's acceptance criteria (decomp-so/reference/hud-map.md):
+#   AC1: impulse 23 toggles the map (dump shows visible/hidden)
+#   AC2: setviewpos to several points; dump coverage grows after each move
+#
+# Ported from decomp-so/reference/hud-map.md: idPlayer::initHudMap/updateMap/updateMapUI/
+# updateHudMapAlpha/MapImageCoords, plus HudMapLevel's real body (spec #16/#31 left it a stub).
+# Wiring (edits-inside-stock-functions leads, all in Player.cpp):
+#   - idPlayer::Spawn calls initHudMap() right after loading objectiveSystem.
+#   - idPlayer::Think calls updateMap() every frame (just before UpdateHud()).
+#   - idPlayer::Init zeroes mapControl/mapView/lastRevealOrigin, sets unknown1e5c to -1, and
+#     memsets the fog-of-war global hudmap_alpha.
+#   - impulse 23 (idPlayer::PerformImpulse) toggles the HUD gui's own "HudMap" state flag via the
+#     "openMap"/"closeMap" named events hud.gui's hudmap_open/hudmap_close windows handle.
+# Explicitly NOT ported here (separate sub-issues, per spec #28's order list):
+#   - #37: the PDA's map_scroll_*/map_zoom_*/map_scroll_center GUI commands that drive
+#     idPlayer::mapControl (idPlayer::HandleSingleGuiCommand) - mapControl stays 0 in this scenario.
+#   - #38: the "showMap" console command.
+#   - #39: saving/restoring the HUD map's state across a save/load.
+#
+# --- AC1 ---
+# "Visible/hidden" isn't a new idPlayer member - it's the HUD gui's own "HudMap" state flag
+# (hud.gui's hudmap_open/hudmap_close windows set it on the "openMap"/"closeMap" named events
+# impulse 23 sends). chextrek_dump's new `hud_map: level=<N> visible=<0|1> coverage=<N>` line
+# (ChexTrekDump.cpp) reads it straight from idPlayer::hud->GetStateBool( "HudMap", "0" ), so a
+# scenario can assert impulse 23 flips it without depending on GUI rendering.
+#
+# There's no way to send an impulse from a console script directly: neither a plain "impulse 23"
+# command nor typing the bind-target token itself ("_impulse23", what autoexec.cfg/matt.cfg/
+# scott.cfg actually bind keys to per decomp-so/reference/hud-map.md's Notes) exists as a real
+# console command (both confirmed rejected as "Unknown command" against this engine build) -
+# "_impulseN" strings are recognized by idUsercmdGenLocal only from a real, currently-held bound
+# key, which a console script can't simulate. `chextrek_test_impulse <N>` (test-only, spec #36,
+# ChexTrekDump.cpp/.h) closes that gap the same way chextrek_customui_cmd (#34) does for a GUI
+# button click: it calls idPlayer::PerformImpulse(N) directly - everything downstream (the switch
+# in PerformImpulse itself, HandleNamedEvent, hud.gui's own onNamedEvent blocks) is the real,
+# already-ported game code, unchanged. guis/hud.gui's hudmap_open window flips "gui::HudMap" to 1
+# at its own onTime 5 (5ms in) - a short wait is enough - but hudmap_close only flips it back to 0
+# at its onTime 400 (400ms in, after a fade-out transition finishes) - hence the much longer wait
+# after the second chextrek_test_impulse below.
+#
+# --- AC2 ---
+# `coverage` is the number of alpha-revealed texels (hudmap_alpha[level][...][3] > 0) out of the
+# level's 128x128 fog-of-war image (idPlayer::updateHudMapAlpha, called every frame from
+# idPlayer::Think via updateMap). e1m1's info_player_start_3 sits at -1032 -976 8; e1m1's own
+# worldspawn map_coords ("-1768 1840 1752 -2120") make one texel ~27.5 world units and the default
+# map_radius (12 texels) reveals a square roughly 660 world units on a side around each reveal
+# point - so each scenario setviewpos jumps by 1300+ world units in at least one axis to guarantee
+# it lands well outside the previous point's fully-revealed square (a jump too close to that could
+# land entirely inside ground already maxed out to alpha 255, showing no growth even though the
+# feature works - this was seen while writing this scenario with smaller jumps). `noclip` (stock,
+# CMD_FL_CHEAT) is set first so `setviewpos`'s teleport can't be blocked or immediately corrected
+# by collision against the level geometry - irrelevant to
+# fog-of-war, which only reads the player's origin, not whether the player physically fits there.
+set -uo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRATCH_DIR="$(mktemp -d)"
+trap 'rm -rf "$SCRATCH_DIR"' EXIT
+
+echo "=== #36 HUD map test: build ==="
+if ! bash "${SCRIPT_DIR}/build-chextrek.sh"; then
+	echo "FAIL: build-chextrek.sh failed"
+	exit 1
+fi
+
+CONSOLE_SCRIPT="${SCRATCH_DIR}/hud_map.cfg"
+cat > "$CONSOLE_SCRIPT" <<'EOF'
+developer 1
+map e1m1
+wait 20
+noclip
+
+chextrek_dump
+
+chextrek_test_impulse 23
+wait 10
+chextrek_dump
+
+chextrek_test_impulse 23
+wait 40
+chextrek_dump
+
+setviewpos -1032 -976 8 0
+wait 15
+chextrek_dump
+
+setviewpos 300 -976 8 0
+wait 15
+chextrek_dump
+
+setviewpos 300 700 8 0
+wait 15
+chextrek_dump
+
+setviewpos -1300 700 8 0
+wait 15
+chextrek_dump
+
+screenshot chextrek_hud_map
+wait 10
+quit
+EOF
+
+echo
+echo "=== #36 HUD map test: scenario run ==="
+RUN_OUT="$(bash "${SCRIPT_DIR}/run-scenario.sh" chextrek_hud_map "$CONSOLE_SCRIPT" 120 2>&1)"
+RUN_EXIT=$?
+echo "$RUN_OUT"
+
+FAIL=0
+if [ $RUN_EXIT -ne 0 ]; then
+	echo "FAIL: expected the always-on harness checks to pass (chextrek.dll loaded, state-dump header, no ERROR/unknown-event/unknown-spawnclass/script-compile lines), but the run exited ${RUN_EXIT}"
+	FAIL=1
+fi
+
+LOCAL_LOG="$(echo "$RUN_OUT" | sed -n 's/^CHEXTREK_LOCAL_LOG=//p')"
+if [ -z "$LOCAL_LOG" ] || [ ! -f "$LOCAL_LOG" ]; then
+	echo "FAIL: couldn't find the archived log to check scenario-specific assertions"
+	exit 1
+fi
+
+# --- e1m1 finishes loading (spec #28 always-on check) ---
+if grep -qE '^ *[0-9]+ msec to load e1m1$' "$LOCAL_LOG"; then
+	echo "PASS: e1m1 finished loading"
+else
+	echo "FAIL: expected to see '<N> msec to load e1m1' in the log"
+	FAIL=1
+fi
+
+# There are 6 chextrek_dump calls total: baseline, after each of 2 impulse 23 toggles, then after
+# each of 4 setviewpos moves.
+VISIBLE_VALUES="$(grep -oE '^hud_map: level=[0-9]+ visible=[01] coverage=[0-9]+$' "$LOCAL_LOG" | grep -oE 'visible=[01]' | grep -oE '[01]$')"
+COVERAGE_VALUES="$(grep -oE '^hud_map: level=[0-9]+ visible=[01] coverage=[0-9]+$' "$LOCAL_LOG" | grep -oE 'coverage=[0-9]+' | grep -oE '[0-9]+$')"
+
+V0="$(echo "$VISIBLE_VALUES" | sed -n '1p')"
+V1="$(echo "$VISIBLE_VALUES" | sed -n '2p')"
+V2="$(echo "$VISIBLE_VALUES" | sed -n '3p')"
+
+# --- AC1: impulse 23 toggles the map (dump shows visible/hidden) ---
+if [ "$V0" = "0" ]; then
+	echo "PASS: hud_map starts hidden (visible=0)"
+else
+	echo "FAIL: expected hud_map baseline visible=0, got '${V0}'"
+	FAIL=1
+fi
+
+if [ "$V1" = "1" ]; then
+	echo "PASS: impulse 23 showed the HUD map (visible 0 -> 1)"
+else
+	echo "FAIL: expected visible=1 after the first impulse 23, got '${V1}'"
+	FAIL=1
+fi
+
+if [ "$V2" = "0" ]; then
+	echo "PASS: a second impulse 23 hid the HUD map again (visible 1 -> 0)"
+else
+	echo "FAIL: expected visible=0 after the second impulse 23, got '${V2}'"
+	FAIL=1
+fi
+
+# --- AC2: setviewpos to several points; dump coverage grows after each move ---
+# Dumps 4-7 (1-indexed) are the ones taken after each setviewpos.
+C1="$(echo "$COVERAGE_VALUES" | sed -n '4p')"
+C2="$(echo "$COVERAGE_VALUES" | sed -n '5p')"
+C3="$(echo "$COVERAGE_VALUES" | sed -n '6p')"
+C4="$(echo "$COVERAGE_VALUES" | sed -n '7p')"
+
+if [ -n "$C1" ] && [ "$C1" -gt 0 ]; then
+	echo "PASS: coverage is nonzero after the first setviewpos (${C1} texels revealed)"
+else
+	echo "FAIL: expected coverage > 0 after the first setviewpos, got '${C1}'"
+	FAIL=1
+fi
+
+if [ -n "$C2" ] && [ -n "$C1" ] && [ "$C2" -ge "$C1" ] && [ "$C2" -gt "$C1" ]; then
+	echo "PASS: coverage grew after the second setviewpos (${C1} -> ${C2})"
+else
+	echo "FAIL: expected coverage to grow after the second setviewpos, got ${C1} -> ${C2}"
+	FAIL=1
+fi
+
+if [ -n "$C3" ] && [ -n "$C2" ] && [ "$C3" -gt "$C2" ]; then
+	echo "PASS: coverage grew after the third setviewpos (${C2} -> ${C3})"
+else
+	echo "FAIL: expected coverage to grow after the third setviewpos, got ${C2} -> ${C3}"
+	FAIL=1
+fi
+
+if [ -n "$C4" ] && [ -n "$C3" ] && [ "$C4" -gt "$C3" ]; then
+	echo "PASS: coverage grew after the fourth setviewpos (${C3} -> ${C4})"
+else
+	echo "FAIL: expected coverage to grow after the fourth setviewpos, got ${C3} -> ${C4}"
+	FAIL=1
+fi
+
+echo
+if [ $FAIL -eq 0 ]; then
+	echo "PASS: #36 HUD map scenario - impulse 23 toggles the map and fog of war grows as the player moves"
+	exit 0
+else
+	echo "FAIL: #36 HUD map scenario - see above"
+	exit 1
+fi

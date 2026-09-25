@@ -228,6 +228,25 @@ typedef struct {
 	idVec3	pos;
 } aasLocation_t;
 
+// chextrek: spec #16/#36 (decomp-so/reference/hud-map.md). idPlayer::mapControl bits: the PDA
+// map's buttons (guis/pda.gui, guis/pda_chex.gui) send these as GUI commands, and
+// idPlayer::HandleSingleGuiCommand sets the bits (#37's scope - not ported here, so mapControl
+// stays 0 until #37 lands). Scrolling replaces the whole value; centering and zooming add a bit.
+enum {
+	MAP_CENTER			= BIT( 0 ),		// "map_scroll_center": keep the view on the player
+	MAP_ZOOM_IN			= BIT( 1 ),		// "map_zoom_in"
+	MAP_ZOOM_OUT		= BIT( 2 ),		// "map_zoom_out"
+	MAP_SCROLL_UP		= BIT( 3 ),		// "map_scroll_up"
+	MAP_SCROLL_DOWN		= BIT( 4 ),		// "map_scroll_down"
+	MAP_SCROLL_LEFT		= BIT( 5 ),		// "map_scroll_left"
+	MAP_SCROLL_RIGHT	= BIT( 6 )		// "map_scroll_right"
+};
+
+// chextrek: spec #16/#36 (decomp-so/reference/hud-map.md). The fog-of-war images, one per map
+// level: 128 x 128 RGBA texels each, only alpha (byte 3) used. Uploaded as
+// "textures/guis/hudmap_alpha<level>.tga" (idPlayer::updateHudMapAlpha, Player.cpp).
+extern byte				hudmap_alpha[ 5 ][ 128 * 128 * 4 ];
+
 class idPlayer : public idActor {
 public:
 	enum {
@@ -295,10 +314,34 @@ public:
 	mkObjective *			objectives[ MAX_OBJS ];
 	int						nextObjective;
 
-	// Declared here for addObjective's call; its real body belongs to the (pending) HUD map
-	// feature (decomp-so/reference/hud-map.md) - see the stub comment above its definition in
-	// Player.cpp.
+	// Declared here for addObjective's call; its real body is ported by #36
+	// (decomp-so/reference/hud-map.md) - see its definition in Player.cpp.
 	int						HudMapLevel( const idVec3 *pos );
+
+	// chextrek: spec #16/#36 (decomp-so/reference/hud-map.md). The player's map of the level:
+	// a corner HUD box (always centered on the player) and a PDA page (scrollable/zoomable -
+	// the PDA's map_* GUI commands that drive mapControl are #37's scope, not ported here).
+	// Fog of war (hudmap_alpha, extern below) is revealed as the player walks. Only initHudMap/
+	// updateMap/updateMapUI/updateHudMapAlpha/MapImageCoords and HudMapLevel's real body are #36;
+	// the "showMap" console command is #38, and saving/restoring this state is #39.
+	void					initHudMap( void );
+	void					updateMap( void );
+	void					updateMapUI( idUserInterface *gui, int level, bool isHud );
+	void					updateHudMapAlpha( int level );
+	void					MapImageCoords( float width, float height, const idVec2 &pos, idVec2 &out );
+
+	int						mapControl;			// MAP_* bits (#37 sets these from PDA GUI commands). Not saved (#39).
+	float					mapScale;				// PDA zoom, "map_scale" (default 1), 0.1 .. 9. Not saved here (#39).
+	idVec2					mapView;				// world x, y at the center of the map box. Not saved.
+	int						mapRadius;				// reveal radius in alpha texels, "map_radius" (default 8). Not saved here (#39).
+	float					mapWidth;				// map image width at scale 1, GUI units, "map_x" (default 640). Not saved here (#39).
+	float					mapHeight;				// map image height at scale 1, GUI units, "map_y" (default 480). Not saved here (#39).
+	float					revealDistance;			// distance to move before revealing again: one alpha texel. Not saved here (#39).
+	idVec3					lastRevealOrigin;		// origin at the last reveal. Init zeroes it. Not saved.
+	int						unknown1e5c;			// set to -1 by Init; saved/restored by the binary (#39), never read otherwise.
+	idStr					mapMaterial;			// "guis/hud_maps/<map name>": material name without the level. Not saved here (#39).
+	float					mapLevels[ 5 ];			// "map_level_0" ... "map_level_4": floor height of each map level. Not saved.
+	idVec4					mapCoords;				// "map_coords": left, top, right, bottom world coordinates of the map image. Not saved here (#39).
 
 	// Puts obj in the first free slot from nextObjective on (does not wrap around); sets level to
 	// the HUD map level of origin; returns the objective's number (slot + 1), or -1 if full.
