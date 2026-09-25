@@ -91,6 +91,15 @@ class CalleeCoverage(unittest.TestCase):
         self.assertEqual(names, {"idPlayer::tryOpen", "idAI::OpenDoors", "idAI::Event_OpenDoors"})
         self.assertEqual(len([r for r in ROWS if r.group == "door-opening"]), 3)
 
+    def test_env_shots_covers_its_scope(self):
+        rows = [r for r in ROWS if r.group == "env-shots"]
+        self.assertEqual(len(rows), 8)
+        self.assertEqual({r.status for r in rows}, {"covered"})
+        self.assertEqual({r.function for r in rows}, {
+            "matt_func_envshot::GetType", "matt_func_envshot::Spawn", "matt_func_envshot::CreateInstance",
+            "matt_func_envshot::_GLOBAL__I_Type", "matt_func_envshot::Event_envShot",
+            "matt_func_envshot::takeEnvShots_f", "matt_func_envshot::~matt_func_envshot"})
+
     def test_static_init_entry_needs_the_class_declaration(self):
         """_GLOBAL__I__ZN7mkTrail4TypeE only calls the file's __static_initialization_and_destruction_0;
         the CLASS_DECLARATION that defines mkTrail::Type accounts for it."""
@@ -116,6 +125,7 @@ class CalleeCoverage(unittest.TestCase):
         cases = [  # group, class, its base, a wrong base
             ("end-level-stats", "idTarget_EndLevelGUI", "idCustomUI", "idEntity"),
             ("objectives", "mkObjective", "idEntity", "idCustomUI"),
+            ("env-shots", "matt_func_envshot", "idEntity", "idCustomUI"),
         ]
         for group, cls, base, wrong in cases:
             with self.subTest(group=group):
@@ -677,6 +687,32 @@ class Records(unittest.TestCase):
         self.assertRegex(script, r"(?m)^scriptEvent\s+void\s+openDoors\(\s*entity\s+\w+\s*\);")
         self.assertIn("script/chex_events.script", text)
 
+    def test_env_shot_event_and_take_env_shots_registration(self):
+        """EV_envShot = idEventDef( "<envshot>" ) (no arguments), the only entry of the class's event
+        table; takeEnvShots is registered with its function, flags and description."""
+        text = reference("env-shots")
+        impl = verify.implementation_block(text)
+        self.assertIn("Base class: idEntity. Evidence (binary):", text)
+        self.assertIn('const idEventDef EV_envShot( "<envshot>" );', impl)
+        self.assertIn("EVENT( EV_envShot,\t\tmatt_func_envshot::Event_envShot )", impl)
+        # binary: { &EV_envShot, &matt_func_envshot::Event_envShot }, { NULL }
+        entries = BINARY.event_callbacks("_ZN17matt_func_envshot14eventCallbacksE")
+        self.assertEqual(entries, [(BINARY.symbol("EV_envShot")[0],
+                                    BINARY.by_raw["_ZN17matt_func_envshot13Event_envShotEv"].vaddr), (0, 0)])
+        # the event's name is "<envshot>"; "envShot" is not a whole string in the binary
+        self.assertTrue(BINARY.has_rodata_string("<envshot>"))
+        self.assertFalse(BINARY.has_rodata_string("envShot"))
+        # the registration's strings are in .rodata, and the reference registers the command with them
+        self.assertTrue(BINARY.has_rodata_string("takeEnvShots"))
+        self.assertTrue(BINARY.has_rodata_string("takes an environment shot at func_envshots"))
+        self.assertIn('cmdSystem->AddCommand( "takeEnvShots", matt_func_envshot::takeEnvShots_f, '
+                      'CMD_FL_GAME|CMD_FL_CHEAT, "takes an environment shot at func_envshots" );', impl)
+        # def/func_envshot.def spawns the class and lists exactly the keys the binary reads
+        edef = (verify.REPO_ROOT / "def" / "func_envshot.def").read_text(encoding="utf-8")
+        self.assertIn('"spawnclass"\t\t\t"matt_func_envshot"', edef)
+        block = edef[edef.index("entityDef func_envshot"):edef.index("entityDef trigger_objective")]
+        self.assertEqual(set(re.findall(r'"editor_var (\w+)"', block)), {"size", "name", "blends", "atSpawn"})
+
     def test_idplayer_additions_have_unique_offsets(self):
         text = (verify.REFERENCE_DIR / "idPlayer-additions.md").read_text(encoding="utf-8")
         offsets = re.findall(r"^\| `\+(0x[0-9a-f]+)` \|", text, re.M)
@@ -857,6 +893,7 @@ class Compile(unittest.TestCase):
         cls.els_line = md_line(mutated, "playerStat_s\t")
         jobs.append(verify.compile_job("hud-map", reference("hud-map")))
         jobs.append(verify.compile_job("door-opening", reference("door-opening")))
+        jobs.append(verify.compile_job("env-shots", reference("env-shots")))
         cls.toolchain, results = verify.run_compile(jobs)
         cls.results = {r.group: r for r in results}
 
@@ -903,6 +940,12 @@ class Compile(unittest.TestCase):
         self.assertTrue(res.ok)
         self.assertEqual({(s["class"], s["file"], s.get("from")) for s in res.splices},
                          {("idPlayer", "game/Player.h", None), ("idAI", "game/ai/AI.h", None)})
+
+    def test_env_shots_compiles_without_splices(self):
+        res = self.results["env-shots"]
+        self.assertEqual(res.errors, [])
+        self.assertTrue(res.ok)
+        self.assertEqual(res.splices, [])
 
     def test_a_syntax_error_fails_and_is_reported_at_its_markdown_line(self):
         for name in self.MUTATIONS:

@@ -86,3 +86,10 @@ idPlayer::tryOpen	idDict::FindKey	stock-inline	door->spawnArgs.GetString( "requi
 idPlayer::tryOpen	memcpy	stock-inline	idStr::operator=( const idStr & ) (ID_INLINE, idlib/Str.h) copies the text with memcpy, reached from idDict::GetString( key, default, idStr & )
 idPlayer::tryOpen	idStr::ReAllocate	stock-inline	EnsureAlloc in idStr::operator=( const idStr & ) (from idDict::GetString), idStr::Insert( const char *, int ) and operator+=( const char * ) -> Append; ID_INLINE in idlib/Str.h
 idPlayer::tryOpen	idStr::FreeData	stock-inline	~idStr() of the locals requires and lockedText: ID_INLINE in idlib/Str.h, calls FreeData
+matt_func_envshot::Spawn	idDict::FindKey	stock-inline	spawnArgs.GetBool( "atSpawn", "0" ): idDict::GetBool -> idDict::GetString( key, default ) -> FindKey, all ID_INLINE in idlib/Dict.h
+matt_func_envshot::Spawn	__strtol_internal	stock-inline	atoi() inside idDict::GetBool (idlib/Dict.h): glibc's inline atoi is strtol( s, NULL, 10 ), which its headers turn into __strtol_internal( s, NULL, 10, 0 )
+matt_func_envshot::Event_envShot	idDict::FindKey	stock-inline	spawnArgs.GetString( key, default, idStr & ) for "name", "size" and "blends": ID_INLINE in idlib/Dict.h, calls FindKey
+matt_func_envshot::Event_envShot	memcpy	stock-inline	idStr::operator=( const idStr & ) (ID_INLINE, idlib/Str.h) copies the text with memcpy, reached from idDict::GetString( key, default, idStr & )
+matt_func_envshot::Event_envShot	idStr::ReAllocate	stock-inline	EnsureAlloc in idStr::operator=( const idStr & ) (from idDict::GetString), and in the idStr( const char * ) / idStr( const idStr & ) constructors and Append calls of the idStr operator+ chain; ID_INLINE in idlib/Str.h
+matt_func_envshot::Event_envShot	strcpy	stock-inline	idStr::idStr( const idStr & ) copies the text with strcpy: operator+( const idStr &, const char * ) and operator+( const idStr &, const idStr & ) start with idStr result( a ); ID_INLINE in idlib/Str.h
+matt_func_envshot::Event_envShot	idStr::FreeData	stock-inline	~idStr() of the locals name, size, blends and of the five operator+ temporaries: ID_INLINE in idlib/Str.h, calls FreeData
