@@ -33,10 +33,13 @@
 # secret "1", not locked) - no physical movement needed. The item is a freshly *spawned*
 # ammo_bullets_small (def/ammo.def, level_item "1"), not one of e1m1's own placed items (e.g.
 # chex_fruit_bowl_3, inv_health "25"): idPlayer::GiveItem(idItem*) only counts a pickup
-# (levelStats[1].found++) when it actually "gave" something (Give() returned true for at least one
-# attribute - Player.cpp), and the player spawns at full health, so a health-only item's Give()
-# fails silently and never reaches our edit. A freshly spawned ammo item the player can't already
-# be maxed out on (inv_ammo_bullets "12") always gives successfully.
+# (levelStats[1].found++) when it both actually "gave" something (Give() returned true for at
+# least one attribute - Player.cpp) AND the item's own spawnArgs has "level_item" "1" (checked
+# against the binary disassembly - see docs/harness-coverage.md's Custom UI row). A health-only
+# item like chex_fruit_bowl_3 fails the first condition too (the player spawns at full health, so
+# Give() fails silently), but even a health item that did give something would still need
+# "level_item" to count. A freshly spawned ammo item the player can't already be maxed out on
+# (inv_ammo_bullets "12") always satisfies both.
 #
 # The usual test-only cvar workaround (chextrek_test_str1..9, ChexTrekDump.cpp) is needed for the
 # "script" line's string-literal/entity-name arguments - see its comment there, and
@@ -167,15 +170,14 @@ fi
 # Event_UpdateStats/updateStats) needs only a handful of tics to catch the monsters/items/secrets
 # lines (0-2) up to their actual small counts - reaching 100% for each takes at most a couple-dozen
 # tics even in the worst case, since e1m1 has a few dozen monsters/items/secrets total and this
-# scenario only raises one of each. This deliberately checks right after those first few tics
-# (the "wait 80" below), not after the full ~4-line animation (which also counts level_time, up to
-# ~100 more tics, then a fixed 3000ms pause before the screen unregisters itself and leaves via
-# ActivateTargets - waiting that long risks the dump landing after the screen has already closed
-# and gone back to "customui: none"). The baseline ITEMS_FOUND above is 1, not 0, before this
-# scenario does anything (so items-found ends up 2, not 1) - the exact cause isn't determined here
-# (not yet root-caused: possibly some other level_item-flagged entity on e1m1 is already given to
-# the player during spawn, but that's not confirmed), so this checks against the actual
-# level_stats value read from the log rather than assuming a hardcoded expected count.
+# scenario only raises one of each. This deliberately checks right after those first few tics (the
+# "wait 80" above, right after triggering target_endlevelgui_1), not after the full ~4-line
+# animation (which also counts level_time, up to ~100 more tics, then a fixed 3000ms pause before
+# the screen unregisters itself and leaves via ActivateTargets - waiting that long risks the dump
+# landing after the screen has already closed and gone back to "customui: none"). This checks
+# against the actual level_stats value read from the log (MONSTERS_AFTER/ITEMS_AFTER/
+# SECRETS_AFTER, all 1 as of the idPlayer::GiveItem level_item fix - e1m1's baseline items-found is
+# 0 before this scenario does anything) rather than assuming a hardcoded expected count.
 LAST_AI_KILLED="$(grep -oE '^customui_gui_ai_killed: [0-9]+$' "$LOCAL_LOG" | tail -1 | grep -oE '[0-9]+$')"
 LAST_ITEMS_FOUND="$(grep -oE '^customui_gui_items_found: [0-9]+$' "$LOCAL_LOG" | tail -1 | grep -oE '[0-9]+$')"
 LAST_SECRETS_FOUND="$(grep -oE '^customui_gui_secrets_found: [0-9]+$' "$LOCAL_LOG" | tail -1 | grep -oE '[0-9]+$')"

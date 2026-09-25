@@ -1934,7 +1934,15 @@ void idTarget_EndLevelGUI::Spawn( void ) {
 	unknown2d4	= 0;
 	state		= -1;
 	timeStep	= 0;
-	// ticSound is not set here (nor in a constructor): it is set only by Event_Activate.
+	// chextrek: spec #16/#33 deviation from the reference (decomp-so/reference/end-level-stats.md's
+	// Notes: the binary leaves ticSound uninitialized here - set only by Event_Activate, and never
+	// saved). Zeroed here instead: Restore re-posts EV_UpdateEndLevelStats when state != -1 (i.e. a
+	// save mid-count), and Event_UpdateStats calls StartSoundShader(ticSound, ...) once that event
+	// fires - an uninitialized pointer there is a real crash risk on dhewm3 (spec #28's "unless
+	// they crash" carve-out for preserving the original mod's own bugs), not just a cosmetic
+	// difference. NULL here has no other observable effect: `if ( ticSound )` already treats a NULL
+	// the same as never having played a tic sound.
+	ticSound	= NULL;
 }
 
 /*

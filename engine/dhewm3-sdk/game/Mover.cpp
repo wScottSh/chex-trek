@@ -2122,7 +2122,8 @@ idMover_Binary::idMover_Binary() {
 	fl.networkSync = true;
 
 	// chextrek: spec #16/#33 (decomp-so/reference/end-level-stats.md; edits-inside-stock-functions
-	// lead, CONFIRMED against the binary - both zeroed in the constructor, 0x132f78/0x132f7f).
+	// lead, checked against the binary's constructor disassembly: secretFound (this+0x7bd) zeroed
+	// at 0x132f78, secret (this+0x7bc) zeroed right after at 0x132f7f.
 	secret = false;
 	secretFound = false;
 }
