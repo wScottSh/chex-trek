@@ -18,18 +18,19 @@
 # stock function's edits-inside-stock-functions leads, so there is no such lead to record here.
 #
 # Scenario: on e1m1, a baseline chextrek_dump (standing at the spawn point, some but not all of
-# the map already revealed by the initial wait - the same partial-coverage baseline #36's own
-# scenario asserts) is followed by "showMap 1" (the single-level argument form, targeting level 1
-# - e1m1's own player is on level 0, so this must leave the player's current-level coverage
-# untouched) and a second chextrek_dump, which must still show the same partial coverage as the
-# baseline - proving the argument form only fills the level it names, not every level. A third
-# dump, after a plain "showMap" (no level argument, filling every level), must show
-# coverage=16384 (the full 128x128 fog-of-war image) for the player's own level - the AC this
+# the map already revealed by the initial wait - a partial, nonzero coverage, same as #36's own
+# baseline) is followed by "showMap 1" (the single-level argument form, targeting level 1 - e1m1's
+# own player is on level 0) and a second chextrek_dump, which must still show the same coverage as
+# the baseline - proving the argument form doesn't spill onto the player's own level when given a
+# different one (not a full proof that it fills only the level it names and nothing else - see
+# below). A third dump, after a plain "showMap" (no level argument, filling every level), must
+# show coverage=16384 (the full 128x128 fog-of-war image) for the player's own level - the AC this
 # scenario exists to prove. chextrek_dump's `hud_map` line only ever reports the *current* level
 # (idPlayer::HudMapLevel), so there's no way for this harness to directly inspect level 1's own
-# coverage after "showMap 1" and confirm it, specifically, went to 16384 - the two assertions above
-# (unaffected level 0, then full level 0 after the no-argument form) are what's actually
-# observable, and are what's checked below.
+# coverage after "showMap 1" and confirm it, specifically, went to 16384 (a "showMap 1" that
+# quietly did nothing at all would pass the same assertion) - the two assertions above (unaffected
+# level 0, then full level 0 after the no-argument form) are what's actually observable, and are
+# what's checked below.
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
