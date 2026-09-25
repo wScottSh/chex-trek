@@ -122,6 +122,11 @@ const int MAX_PDA_ITEMS = 128;
 const int STEPUP_TIME = 200;
 const int MAX_INVENTORY_ITEMS = 20;
 
+// chextrek: spec #16/#35 (decomp-so/reference/custom-ui.md). Flags 0x21080 = CVAR_ARCHIVE |
+// CVAR_STATIC | CVAR_GAME (idCVar::Init adds CVAR_STATIC). Read in idPlayer::Spawn below, in
+// place of stock's hardcoded "guis/pda.gui", so the mod's own PDA GUI is used instead.
+idCVar g_PDA( "g_PDA", "guis/pda_chex.gui", CVAR_GAME | CVAR_ARCHIVE, "gui file to use for the pda", idCmdSystem::ArgCompletion_GuiName );
+
 idVec3 idPlayer::colorBarTable[ 5 ] = {
 	idVec3( 0.25f, 0.25f, 0.25f ),
 	idVec3( 1.00f, 0.00f, 0.00f ),
@@ -1614,7 +1619,9 @@ void idPlayer::Spawn( void ) {
 			cursor->Activate( true, gameLocal.time );
 		}
 
-		objectiveSystem = uiManager->FindGui( "guis/pda.gui", true, false, true );
+		// chextrek: spec #16/#35 (decomp-so/reference/custom-ui.md). Edit-inside-stock-function
+		// lead: reads g_PDA instead of the stock hardcoded "guis/pda.gui" (0x16f730).
+		objectiveSystem = uiManager->FindGui( g_PDA.GetString(), true, false, true );
 		objectiveSystemOpen = false;
 	}
 

@@ -128,6 +128,12 @@ depending on HUD GUI state or racing the queue idPlayer::UpdateHud drains within
   through SetStateInt/SetStateString) - so a scenario can assert the screen counted up without
   depending on idTarget_EndLevelGUI's private displayStats/state members, which nothing outside the
   class can read.
+
+#35 adds `pda_gui: <name|none>` (idPlayer::objectiveSystem's idUserInterface::Name(), the gui file
+it was loaded from - g_PDA's value once #35's edit-inside-idPlayer::Spawn lead lands, "guis/pda.gui"
+if that edit were somehow missing, "none" if no local player) and `pda_open: <0|1>`
+(idPlayer::objectiveSystemOpen), so a scenario can assert opening the PDA (impulse 0/TogglePDA) made
+the mod's own PDA GUI (not stock's) the active one, without depending on any GUI rendering.
 ==================
 */
 void ChexTrek_Dump_f( const idCmdArgs &args ) {
@@ -162,6 +168,21 @@ void ChexTrek_Dump_f( const idCmdArgs &args ) {
 			stats[ 2 ].found, stats[ 2 ].total );
 	} else {
 		gameLocal.Printf( "level_stats: none\n" );
+	}
+
+	// chextrek: spec #16/#35 (decomp-so/reference/custom-ui.md). idPlayer::objectiveSystem is the
+	// GUI idPlayer::Spawn loads from g_PDA (stock loads a hardcoded "guis/pda.gui" instead) and
+	// shows while the PDA is up (idPlayer::objectiveSystemOpen, toggled by TogglePDA). Printing
+	// idUserInterface::Name() (the gui's own qpath, not just "some gui is up") lets a scenario
+	// assert the *mod's* PDA GUI (g_PDA's value, "guis/pda_chex.gui" by default) is the one that
+	// actually got loaded and is the active GUI when the PDA is opened, not merely that opening
+	// the PDA does something.
+	if ( player && player->objectiveSystem ) {
+		gameLocal.Printf( "pda_gui: %s\n", player->objectiveSystem->Name() );
+		gameLocal.Printf( "pda_open: %s\n", player->objectiveSystemOpen ? "1" : "0" );
+	} else {
+		gameLocal.Printf( "pda_gui: none\n" );
+		gameLocal.Printf( "pda_open: 0\n" );
 	}
 
 	// chextrek: spec #33 (decomp-so/reference/custom-ui.md, end-level-stats.md). The local
@@ -262,4 +283,36 @@ void ChexTrek_CustomUICmd_f( const idCmdArgs &args ) {
 
 	bool handled = player->customUIEntity->HandleCustomGUICommand( player->customUIEntity, &token );
 	gameLocal.Printf( "chextrek_customui_cmd: '%s' %s\n", token.c_str(), handled ? "handled" : "not handled" );
+}
+
+/*
+==================
+ChexTrek_TestGuiCompletion_f
+
+Test-only, spec #35. See ChexTrek_TestGuiCompletion_f's comment in ChexTrekDump.h for why a
+console command has to stand in for interactive tab-completion here. Builds a fake idCmdArgs whose
+Argv(0) is "g_PDA" (the only real registration site of idCmdSystem::ArgCompletion_GuiName in the
+binary, decomp-so/reference/custom-ui.md), calls it directly with a callback that collects every
+string the engine's ArgCompletion_FolderExtension produces, and prints the count plus each result
+so a scenario can assert completion actually ran and lists guis/*.gui files, including the mod's
+own default PDA gui.
+==================
+*/
+static idList<idStr> chextrekGuiCompletions;
+
+static void ChexTrek_GuiCompletionCallback( const char *s ) {
+	chextrekGuiCompletions.Append( s );
+}
+
+void ChexTrek_TestGuiCompletion_f( const idCmdArgs &args ) {
+	chextrekGuiCompletions.Clear();
+
+	idCmdArgs fakeArgs;
+	fakeArgs.TokenizeString( "g_PDA", false );
+	idCmdSystem::ArgCompletion_GuiName( fakeArgs, ChexTrek_GuiCompletionCallback );
+
+	gameLocal.Printf( "gui_completion_count: %d\n", chextrekGuiCompletions.Num() );
+	for ( int i = 0; i < chextrekGuiCompletions.Num(); i++ ) {
+		gameLocal.Printf( "gui_completion_%d: %s\n", i, chextrekGuiCompletions[ i ].c_str() );
+	}
 }

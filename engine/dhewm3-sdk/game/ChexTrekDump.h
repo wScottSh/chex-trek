@@ -54,4 +54,15 @@ void ChexTrek_NoteItemTextShown( const char *name );
 // command has to stand in for what a real mouse click on the stats screen produces.
 void ChexTrek_CustomUICmd_f( const idCmdArgs &args );
 
+// chextrek: spec #35, test-only. Registered as the "chextrek_test_gui_completion" console command
+// by idGameLocal::InitConsoleCommands. AC2 ("g_PDA exists with GUI-name completion") needs
+// idCmdSystem::ArgCompletion_GuiName (framework/CmdSystem.h) to actually run and list guis/*.gui
+// files, but tab-completion itself isn't reachable from a console script (spec #28's harness only
+// drives the game through queued commands, not interactive keystrokes) - the same class of gap
+// chextrek_customui_cmd (spec #34) closes for a GUI button click. This command calls
+// ArgCompletion_GuiName directly with "g_PDA" as the completed command name and prints how many
+// results it produced plus each one, so a scenario can assert the callback actually ran and that
+// one result names the mod's default PDA GUI (g_PDA's default, "guis/pda_chex.gui").
+void ChexTrek_TestGuiCompletion_f( const idCmdArgs &args );
+
 #endif /* !__CHEXTREK_DUMP_H__ */

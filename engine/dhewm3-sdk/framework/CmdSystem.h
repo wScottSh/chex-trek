@@ -125,6 +125,11 @@ public:
 	static void			ArgCompletion_ConfigName( const idCmdArgs &args, void(*callback)( const char *s ) );
 	static void			ArgCompletion_SaveGame( const idCmdArgs &args, void(*callback)( const char *s ) );
 	static void			ArgCompletion_DemoName( const idCmdArgs &args, void(*callback)( const char *s ) );
+
+	// chextrek: spec #16/#35 (decomp-so/reference/custom-ui.md). The only use in the binary is
+	// the g_PDA cvar's value completion (game/Player.cpp). STB_WEAK symbol in the binary, which
+	// fits an ID_INLINE body here, as the other ArgCompletion_* helpers above have.
+	static void			ArgCompletion_GuiName( const idCmdArgs &args, void(*callback)( const char *s ) );
 };
 
 extern idCmdSystem *	cmdSystem;
@@ -165,6 +170,12 @@ ID_INLINE void idCmdSystem::ArgCompletion_ModelName( const idCmdArgs &args, void
 
 ID_INLINE void idCmdSystem::ArgCompletion_SoundName( const idCmdArgs &args, void(*callback)( const char *s ) ) {
 	cmdSystem->ArgCompletion_FolderExtension( args, callback, "sound/", false, ".wav", ".ogg", NULL );
+}
+
+// chextrek: spec #16/#35 (decomp-so/reference/custom-ui.md). cmdSystem vtable +0x2c =
+// ArgCompletion_FolderExtension( args, callback, folder, stripFolder, ... ).
+ID_INLINE void idCmdSystem::ArgCompletion_GuiName( const idCmdArgs &args, void(*callback)( const char *s ) ) {
+	cmdSystem->ArgCompletion_FolderExtension( args, callback, "guis/", false, ".gui", NULL );
 }
 
 ID_INLINE void idCmdSystem::ArgCompletion_ImageName( const idCmdArgs &args, void(*callback)( const char *s ) ) {
