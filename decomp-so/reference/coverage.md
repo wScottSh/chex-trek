@@ -28,11 +28,17 @@ Custom code the export does not reach, by design: code inside stock functions. O
 registers `idCmdSystem::ArgCompletion_GuiName` from `Player.cpp`'s static initializer (see `reference/custom-ui.md`).
 Edits inside stock function bodies are out of scope for spec #16.
 
+A new method outside the target set, found by #26: a second `idGameLocal::ProjectDecal`
+(`_ZN11idGameLocal12ProjectDecalERK6idVec3S2_fbfPKcPS1_f`, ELF 0xf1c80), an overload that takes the decal's
+winding from the caller. The stock-source check that built `scripts/targets.txt` compared names, so it missed this
+overload of a stock name. Its only caller is `idActor::Event_FootPrint`. It is not exported, not in the table below
+and not reconstructed. Only its declaration is shown (`reference/script-events.md`).
+
 ## Functions
 
 | Function | Symbol | ELF vaddr | Ghidra export | Group | Status |
 |---|---|---|---|---|---|
-| `idActor::Event_FootPrint` | `_ZN7idActor15Event_FootPrintEPKcS1_` | 0xb6210 | idActor_Event_FootPrint_000c6210.c | script-events | pending |
+| `idActor::Event_FootPrint` | `_ZN7idActor15Event_FootPrintEPKcS1_` | 0xb6210 | idActor_Event_FootPrint_000c6210.c | script-events | covered |
 | `idGameLocal::RemoveTrail` | `_ZN11idGameLocal11RemoveTrailEP7mkTrail` | 0xee7f0 | idGameLocal_RemoveTrail_000fe7f0.c | trails | covered |
 | `idGameLocal::GetLevelStats` | `_ZN11idGameLocal13GetLevelStatsEP13playerStats_s` | 0xf0800 | idGameLocal_GetLevelStats_00100800.c | end-level-stats | covered |
 | `idGameLocal::BabySitTrail` | `_ZN11idGameLocal12BabySitTrailEP7mkTrail` | 0xf2a10 | idGameLocal_BabySitTrail_00102a10.c | trails | covered |
@@ -86,10 +92,10 @@ Edits inside stock function bodies are out of scope for spec #16.
 | `mkObjective::~mkObjective` | `_ZN11mkObjectiveD0Ev` | 0x199280 | mkObjective_mkObjective_001a9280.c | objectives | covered |
 | `mkObjective::~mkObjective` | `_ZN11mkObjectiveD1Ev` | 0x199330 | mkObjective_mkObjective_001a9330.c | objectives | covered |
 | `idTarget_EndLevelGUI::~idTarget_EndLevelGUI` | `_ZN20idTarget_EndLevelGUID0Ev` | 0x1993e0 | idTarget_EndLevelGUI_idTarget_EndLevelGUI_001a93e0.c | end-level-stats | covered |
-| `idWeapon::Event_SetProj` | `_ZN8idWeapon13Event_SetProjEPKc` | 0x19f990 | idWeapon_Event_SetProj_001af990.c | script-events | pending |
+| `idWeapon::Event_SetProj` | `_ZN8idWeapon13Event_SetProjEPKc` | 0x19f990 | idWeapon_Event_SetProj_001af990.c | script-events | covered |
 | `idAI::OpenDoors` | `_ZN4idAI9OpenDoorsEP8idEntity` | 0x1be950 | idAI_OpenDoors_001ce950.c | door-opening | covered |
 | `idAI::Event_OpenDoors` | `_ZN4idAI15Event_OpenDoorsEP8idEntity` | 0x1cc9a0 | idAI_Event_OpenDoors_001dc9a0.c | door-opening | covered |
-| `idThread::Event_SpawnDict` | `_ZN8idThread15Event_SpawnDictEPKc` | 0x23dc00 | idThread_Event_SpawnDict_0024dc00.c | script-events | pending |
+| `idThread::Event_SpawnDict` | `_ZN8idThread15Event_SpawnDictEPKc` | 0x23dc00 | idThread_Event_SpawnDict_0024dc00.c | script-events | covered |
 | `mkTrail::GetType` | `_ZNK7mkTrail7GetTypeEv` | 0x2a3e60 | mkTrail_GetType_002b3e60.c | trails | covered |
 | `mkTrail::Save` | `_ZNK7mkTrail4SaveEP10idSaveGame` | 0x2a3eb0 | mkTrail_Save_002b3eb0.c | trails | covered |
 | `mkTrail::_GLOBAL__I_Type` | `_GLOBAL__I__ZN7mkTrail4TypeE` | 0x2a4250 | mkTrail__GLOBAL__I_Type_002b4250.c | trails | covered |

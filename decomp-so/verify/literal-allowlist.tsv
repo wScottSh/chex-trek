@@ -13,3 +13,4 @@ idPlayer::Cmd_ShowMap_f	string ""	stock-inline	args.Argv( 1 ) in the "bad level"
 mkTrail::Think	float [01].5	stock-inline	the Newton step ( 1.5f - r * r * ( x * 0.5f ) ) of idMath::RSqrt in idVec3::LengthFast; ID_INLINE in idlib/math/Math.h and idlib/math/Vector.h
 mkTrail::UpdateRenderEntity	float 1.5	stock-inline	the Newton step ( 1.5f - r * r * ( x * 0.5f ) ) of idMath::RSqrt in idVec3::LengthFast; ID_INLINE in idlib/math/Math.h and idlib/math/Vector.h
 mkTrail::addNewAnchor	float 1.5	stock-inline	the Newton steps ( 1.5f - r * r * ( x * 0.5f ) ) of idMath::RSqrt in idVec3::LengthFast and of idMath::InvSqrt in idVec3::Normalize; ID_INLINE in idlib/math/Math.h and idlib/math/Vector.h
+idActor::Event_FootPrint	float [01].5	stock-inline	the Newton steps ( 1.5f - r * r * ( x * 0.5f ) ) of idMath::InvSqrt in the two idVec3::Normalize calls; ID_INLINE in idlib/math/Math.h and idlib/math/Vector.h

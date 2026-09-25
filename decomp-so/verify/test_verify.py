@@ -100,6 +100,19 @@ class CalleeCoverage(unittest.TestCase):
             "matt_func_envshot::_GLOBAL__I_Type", "matt_func_envshot::Event_envShot",
             "matt_func_envshot::takeEnvShots_f", "matt_func_envshot::~matt_func_envshot"})
 
+    def test_script_events_covers_its_scope(self):
+        rows = [r for r in ROWS if r.group == "script-events"]
+        self.assertEqual({r.status for r in rows}, {"covered"})
+        self.assertEqual({r.function for r in rows},
+                         {"idActor::Event_FootPrint", "idWeapon::Event_SetProj", "idThread::Event_SpawnDict"})
+
+    def test_every_exported_function_is_covered(self):
+        """Spec #16's end state: every function in the coverage record is in a group reference that
+        passes the harness (checks 1 and 2 here; check 3 in Compile)."""
+        self.assertEqual([r.function for r in ROWS if r.status != "covered"], [])
+        self.assertEqual(COVERED_GROUPS, sorted(["custom-ui", "end-level-stats", "objectives", "hud-map",
+                                                 "trails", "door-opening", "env-shots", "script-events"]))
+
     def test_static_init_entry_needs_the_class_declaration(self):
         """_GLOBAL__I__ZN7mkTrail4TypeE only calls the file's __static_initialization_and_destruction_0;
         the CLASS_DECLARATION that defines mkTrail::Type accounts for it."""
@@ -715,6 +728,59 @@ class Records(unittest.TestCase):
         block = edef[start:end if end >= 0 else len(edef)]
         self.assertEqual(set(re.findall(r'"editor_var (\w+)"', block)), {"size", "name", "blends", "atSpawn"})
 
+    def test_script_events_are_shown_and_match_the_mod_data(self):
+        """footprint / setProj / spawnDict: each idEventDef as the static initializers build it, its
+        place in the class's event table, and the mod's scripts and defs that use it."""
+        text = reference("script-events")
+        impl = verify.implementation_block(text)
+        cases = [  # event symbol, table, handler, stock entry before it, definition, entry index
+            ("EV_FootPrint", "_ZN7idActor14eventCallbacksE", "_ZN7idActor15Event_FootPrintEPKcS1_",
+             "AI_GetHead", 'const idEventDef EV_FootPrint( "footprint", "ss" );', 41),
+            ("EV_Weapon_SetProj", "_ZN8idWeapon14eventCallbacksE", "_ZN8idWeapon13Event_SetProjEPKc",
+             "EV_Weapon_NetEndReload", 'const idEventDef EV_Weapon_SetProj( "setProj", "s" );', 36),
+            ("EV_Thread_SpawnDict", "_ZN8idThread14eventCallbacksE", "_ZN8idThread15Event_SpawnDictEPKc",
+             "EV_Thread_InfluenceActive", "const idEventDef EV_Thread_SpawnDict( \"spawnDict\", \"s\", 'e' );", 78),
+        ]
+        for event, table, handler, before, definition, index in cases:
+            with self.subTest(event=event):
+                self.assertIn(definition, impl)
+                self.assertIn(f"EVENT( {event},", impl)
+                self.assertIn(f"entry {index} =", impl)
+                entries = BINARY.event_callbacks(table)
+                events = [e for e, _ in entries]
+                k = events.index(BINARY.symbol(event)[0])
+                self.assertEqual(k, index)
+                self.assertEqual(entries[k][1], BINARY.by_raw[handler].vaddr)
+                self.assertEqual(events[k - 1], BINARY.symbol(before)[0])
+        # the names are in .rodata ("footprint" only as the tail of "mtr_footprint")
+        self.assertTrue(BINARY.has_rodata_string("setProj"))
+        self.assertTrue(BINARY.has_rodata_string("spawnDict"))
+        self.assertFalse(BINARY.has_rodata_string("footprint"))
+        self.assertTrue(BINARY.has_rodata_string("mtr_footprint"))
+        # the mod's script declarations match the definitions' arguments and return types
+        script = (verify.REPO_ROOT / "script" / "chex_events.script").read_text(encoding="utf-8")
+        self.assertRegex(script, r"(?m)^scriptEvent\s+void\s+setProj\(\s*string\s+\w+\s*\);")
+        self.assertRegex(script, r"(?m)^scriptEvent\s+entity\s+spawnDict\(\s*string\s+\w+\s*\);")
+        self.assertNotIn("footprint", script.lower())
+        storage = (verify.REPO_ROOT / "script" / "map_storage_facility.script").read_text(encoding="utf-8")
+        self.assertEqual(len(re.findall(r"\.setProj\(", storage)), 2)
+        self.assertIn("script/map_storage_facility.script:128", text)
+        # footprint is an anim frame command, "footprint <joint> <l|r>"
+        biped = (verify.REPO_ROOT / "def" / "monster_chex_biped.def").read_text(encoding="utf-8")
+        self.assertRegex(biped, r"frame 12\s+footprint Lfoot l")
+        self.assertRegex(biped, r"frame 33\s+footprint Rfoot r")
+
+    def test_footprint_projects_with_the_new_projectdecal_overload(self):
+        """Event_FootPrint calls the 8-argument idGameLocal::ProjectDecal (not in the target set), which
+        the header block declares; the stock 7-argument one is still in the binary."""
+        overload = "_ZN11idGameLocal12ProjectDecalERK6idVec3S2_fbfPKcPS1_f"
+        self.assertIn("_ZN11idGameLocal12ProjectDecalERK6idVec3S2_fbfPKcf", BINARY.by_raw)
+        foot = BINARY.by_raw["_ZN7idActor15Event_FootPrintEPKcS1_"]
+        self.assertEqual([c.raw for c in BINARY.call_sites(foot) if "ProjectDecal" in c.raw], [overload] * 2)
+        header = verify.cpp_blocks(reference("script-events"))[0]
+        self.assertIn("const char *material, const idVec3 *winding, float angle );", header)
+        self.assertIn(overload, (verify.REFERENCE_DIR / "coverage.md").read_text(encoding="utf-8"))
+
     def test_idplayer_additions_have_unique_offsets(self):
         text = (verify.REFERENCE_DIR / "idPlayer-additions.md").read_text(encoding="utf-8")
         offsets = re.findall(r"^\| `\+(0x[0-9a-f]+)` \|", text, re.M)
@@ -896,6 +962,7 @@ class Compile(unittest.TestCase):
         jobs.append(verify.compile_job("hud-map", reference("hud-map")))
         jobs.append(verify.compile_job("door-opening", reference("door-opening")))
         jobs.append(verify.compile_job("env-shots", reference("env-shots")))
+        jobs.append(verify.compile_job("script-events", reference("script-events")))
         cls.toolchain, results = verify.run_compile(jobs)
         cls.results = {r.group: r for r in results}
 
@@ -948,6 +1015,14 @@ class Compile(unittest.TestCase):
         self.assertEqual(res.errors, [])
         self.assertTrue(res.ok)
         self.assertEqual(res.splices, [])
+
+    def test_script_events_compile_with_four_splices(self):
+        res = self.results["script-events"]
+        self.assertEqual(res.errors, [])
+        self.assertTrue(res.ok)
+        self.assertEqual({(s["class"], s["file"], s.get("from")) for s in res.splices},
+                         {("idGameLocal", "game/Game_local.h", None), ("idActor", "game/Actor.h", None),
+                          ("idWeapon", "game/Weapon.h", None), ("idThread", "game/script/Script_Thread.h", None)})
 
     def test_a_syntax_error_fails_and_is_reported_at_its_markdown_line(self):
         for name in self.MUTATIONS:
