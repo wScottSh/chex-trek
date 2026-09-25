@@ -117,4 +117,16 @@ void ChexTrek_TestMapCmd_f( const idCmdArgs &args );
 // player a PDA without mouse/impulse input).
 void ChexTrek_TestPdaMapOpen_f( const idCmdArgs &args );
 
+// chextrek: spec #40. idPlayer::tryOpen (decomp-so/reference/door-opening.md, Player.cpp) calls
+// this right after its trace resolves to an idDoor (before evaluating lock state), passing that
+// door's name. tryOpen itself logs nothing, so this is the only way a scenario can tell "the
+// use-key trace actually reached a door" from "it didn't reach anything" (e.g. because the
+// target is beyond g_doorTraceDist) - the distinction the AC's range check needs, independent of
+// whether the door the trace found was already unlocked/open (that's the door's own isOpen()/
+// script state, checked directly, same as tools/test-script-events.sh does for idAI::OpenDoors).
+// Test-only instrumentation, same pattern as ChexTrek_NoteFootprintProjected/
+// ChexTrek_NoteItemTextShown above: it counts calls and remembers the last door's name, it
+// doesn't change what tryOpen does.
+void ChexTrek_NoteTryOpenDoor( const char *doorName );
+
 #endif /* !__CHEXTREK_DUMP_H__ */

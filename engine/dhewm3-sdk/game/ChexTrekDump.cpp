@@ -31,6 +31,10 @@ static int chextrekFootprintCount = 0;
 static int chextrekItemTextCount = 0;
 static idStr chextrekItemTextLast;
 
+// chextrek: spec #40. See ChexTrek_NoteTryOpenDoor in ChexTrekDump.h.
+static int chextrekDoorTryOpenCount = 0;
+static idStr chextrekDoorTryOpenLast;
+
 // chextrek: spec #30, test-only. The AFK harness drives the game only through console commands
 // (spec #28), including the "script" command to call scriptEvents like setProj/spawnDict that
 // need a string literal argument. The console's own tokenizer (idCmdArgs::TokenizeString,
@@ -58,6 +62,8 @@ idCVar chextrek_test_str6( "chextrek_test_str6", "\"player1\"", CVAR_GAME, "chex
 idCVar chextrek_test_str7( "chextrek_test_str7", "\"projectile_minizorchblast_nodamage\"", CVAR_GAME, "chextrek: test-only string-literal holder for AFK harness scenarios (spec #30) - see ChexTrekDump.cpp" );
 idCVar chextrek_test_str8( "chextrek_test_str8", "\"classname\"", CVAR_GAME, "chextrek: test-only string-literal holder for AFK harness scenarios (spec #30) - see ChexTrekDump.cpp" );
 idCVar chextrek_test_str9( "chextrek_test_str9", "\"damage_rocketSplash\"", CVAR_GAME, "chextrek: test-only string-literal holder for AFK harness scenarios (spec #33) - see ChexTrekDump.cpp" );
+idCVar chextrek_test_str10( "chextrek_test_str10", "\"func_door_1\"", CVAR_GAME, "chextrek: test-only string-literal holder for AFK harness scenarios (spec #40) - see ChexTrekDump.cpp" );
+idCVar chextrek_test_str11( "chextrek_test_str11", "\"func_door_24\"", CVAR_GAME, "chextrek: test-only string-literal holder for AFK harness scenarios (spec #40) - see ChexTrekDump.cpp" );
 
 /*
 ==================
@@ -88,6 +94,16 @@ ChexTrek_NoteItemTextShown
 void ChexTrek_NoteItemTextShown( const char *name ) {
 	chextrekItemTextCount++;
 	chextrekItemTextLast = name;
+}
+
+/*
+==================
+ChexTrek_NoteTryOpenDoor
+==================
+*/
+void ChexTrek_NoteTryOpenDoor( const char *doorName ) {
+	chextrekDoorTryOpenCount++;
+	chextrekDoorTryOpenLast = doorName;
 }
 
 /*
@@ -151,6 +167,12 @@ idPlayer::mapScale/mapView/mapControl, the PDA map's zoom/scroll/center state dr
 stock idPlayer::HandleSingleGuiCommand from the PDA map's map_* GUI commands - so a scenario can
 assert each map_* command actually changed the scale or view center shown here, independent of GUI
 rendering.
+
+#40 adds `door_tryopen_count` (how many times idPlayer::tryOpen's trace has resolved to an idDoor,
+via ChexTrek_NoteTryOpenDoor) and `door_tryopen_last` (that door's name, or "none" if it has never
+happened), so a scenario can assert the use-key's trace reached (or, out of g_doorTraceDist,
+didn't reach) a door, independent of the door's own lock/open state (checked directly via script,
+e.g. `<door>.isOpen()`, same as tools/test-script-events.sh does for idAI::OpenDoors).
 ==================
 */
 void ChexTrek_Dump_f( const idCmdArgs &args ) {
@@ -234,6 +256,10 @@ void ChexTrek_Dump_f( const idCmdArgs &args ) {
 		gameLocal.Printf( "map_pda: scale=%f view_x=%f view_y=%f control=%d\n",
 			player->mapScale, player->mapView.x, player->mapView.y, player->mapControl );
 	}
+
+	// chextrek: spec #40 (decomp-so/reference/door-opening.md). See ChexTrek_NoteTryOpenDoor.
+	gameLocal.Printf( "door_tryopen_count: %d\n", chextrekDoorTryOpenCount );
+	gameLocal.Printf( "door_tryopen_last: %s\n", chextrekDoorTryOpenCount > 0 ? chextrekDoorTryOpenLast.c_str() : "none" );
 
 	// chextrek: spec #33 (decomp-so/reference/custom-ui.md, end-level-stats.md). The local
 	// player's registered idCustomUI (only idTarget_EndLevelGUI in this mod) and, while active, the

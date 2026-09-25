@@ -37,6 +37,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "ai/AI.h"
 #include "WorldSpawn.h"
 #include "Player.h"
+#include "Mover.h"				// chextrek: spec #16/#40, decomp-so/reference/door-opening.md (idPlayer::tryOpen needs idDoor)
 #include "Target.h"				// chextrek: spec #16/#33, idCustomUI::HandleCustomGUICommand
 #include "Camera.h"
 #include "ChexTrekDump.h"		// chextrek: spec #32, ChexTrek_NoteItemTextShown
@@ -6222,6 +6223,13 @@ void idPlayer::PerformImpulse( int impulse ) {
 			PrevWeapon();
 			break;
 		}
+		case IMPULSE_16: {
+			// chextrek: spec #16/#40 (decomp-so/reference/door-opening.md; edits-inside-stock-
+			// functions lead: idPlayer::PerformImpulse, 0x16cc53). Stock's "<unused>" impulse;
+			// the mod's configs bind "e" to _impulse16.
+			tryOpen();
+			break;
+		}
 		case IMPULSE_17: {
 			if ( gameLocal.isClient || entityNumber == gameLocal.localClientNum ) {
 				gameLocal.mpGame.ToggleReady();
@@ -8994,6 +9002,49 @@ idPlayer::StopAudioLog
 void idPlayer::StopAudioLog( void ) {
 	if ( hud ) {
 		hud->HandleNamedEvent( "audioLogDown" );
+	}
+}
+
+/*
+================
+idPlayer::tryOpen
+
+chextrek: spec #16/#40, ported from decomp-so/reference/door-opening.md. Traces
+g_doorTraceDist units along the view direction. If the first thing hit is an idDoor, the
+door is activated when it is unlocked, or when it is locked with a "requires" key whose
+item the player has. Otherwise a "Door Locked" tip names the required item, or shows the
+door's "lockedtext" (default "This door is locked.").
+================
+*/
+void idPlayer::tryOpen( void ) {
+	trace_t		trace;
+	idEntity	*ent;
+	idDoor		*door;
+
+	idVec3 start = GetEyePosition();
+	idVec3 end = start + viewAngles.ToForward() * g_doorTraceDist.GetFloat();
+
+	gameLocal.clip.Translation( trace, start, end, NULL, mat3_identity, CONTENTS_SOLID, this );
+	ent = gameLocal.GetTraceEntity( trace );
+	if ( !ent || !ent->IsType( idDoor::Type ) ) {
+		return;
+	}
+	door = static_cast<idDoor *>( ent );
+	ChexTrek_NoteTryOpenDoor( door->GetName() );	// chextrek: spec #40, test-only (ChexTrekDump.h)
+
+	idStr requires;
+	door->spawnArgs.GetString( "requires", "", requires );
+	idStr lockedText;
+	door->spawnArgs.GetString( "lockedtext", "This door is locked.", lockedText );
+
+	if ( !door->IsLocked() || ( requires.Length() && gameLocal.RequirementMet( this, requires, 0 ) ) ) {
+		door->ProcessEvent( &EV_Activate, this );
+	} else if ( requires.Length() ) {
+		requires.Insert( "You need a ", 0 );
+		requires += " to open this door.";
+		ShowTip( "Door Locked", requires, true );
+	} else {
+		ShowTip( "Door Locked", lockedText, true );
 	}
 }
 

@@ -378,6 +378,12 @@ public:
 	// localization) and shows its icon on the HUD at once. Used by mkObjective's addmsg/rmmsg.
 	void					addItemText( const idItemInfo &info );
 
+	// chextrek: spec #16/#40 (decomp-so/reference/door-opening.md). Bound to the stock
+	// "<unused>" IMPULSE_16 (PerformImpulse, Player.cpp). Traces g_doorTraceDist units along the
+	// view direction; if it hits an idDoor, opens it when unlocked (or locked with a "requires"
+	// item the player has), otherwise shows a "Door Locked" tip.
+	void					tryOpen( void );
+
 	// chextrek: spec #16/#33 (decomp-so/reference/end-level-stats.md). [0] monsters, [1] items,
 	// [2] secrets, [3] level time. Filled in idPlayer::Spawn (idGameLocal::GetLevelStats, the
 	// level's start time, and the 10 GUI state variable names); AddAIKill/GiveItem/
