@@ -1440,10 +1440,13 @@ idPlayer::idPlayer() {
 	// entity 0, worldspawn a much later entity number - so gameLocal.world isn't restored yet at
 	// this point in a load.)
 	//
-	// This constructor setting all five is a no-op on a normal spawn (Init() unconditionally
-	// overwrites mapControl/mapView/lastRevealOrigin/unknown1e5c again right after construction,
-	// and Spawn's initHudMap overwrites mapLevels again after that) - it only changes anything on
-	// the savegame-restore path, where nothing else ever sets them. mapLevels' defaults match
+	// This constructor setting all five is a no-op on a normal spawn: idPlayer::Spawn calls
+	// initHudMap() first, overwriting mapLevels with the world's real map_level_N values, and
+	// then (via SpawnFromSpawnSpot -> SpawnToPoint, or directly for a multiplayer snapshot spawn)
+	// calls Init(), which overwrites mapControl/mapView/lastRevealOrigin/unknown1e5c again - so
+	// every one of these five gets its real value before a normal spawn ever finishes. It only
+	// changes anything on the savegame-restore path, where nothing else ever sets them. mapLevels'
+	// defaults match
 	// initHudMap's own literal defaults for "no map_level_N key set" (Player.cpp, above): level 0
 	// at MIN_WORLD_COORD, 1-4 at MAX_WORLD_COORD (sys/platform.h) - i.e. every z is on level 0,
 	// the same fallback initHudMap uses when a map sets none of those keys.
@@ -2330,11 +2333,12 @@ void idPlayer::Save( idSaveGame *savefile ) const {
 	savefile->WriteFloat( pm_stamina.GetFloat() );
 
 	// chextrek: spec #16/#39 (decomp-so/reference/hud-map.md; edits-inside-stock-functions lead:
-	// idPlayer::Save writes these in this exact order, right before Restore's matching block -
-	// mapControl/mapView/lastRevealOrigin/mapLevels are not saved, matching the reference's own
-	// Save/Restore lead). hudmap_alpha is the fog-of-war global (Player.cpp, above), not per
-	// player - saving/restoring it here (once, off whichever idPlayer::Save runs, single player
-	// only) reproduces the binary's own behavior.
+	// idPlayer::Save writes these fields, in this exact order, matching idPlayer::Restore's own
+	// block below (which reads them back in the same order) - mapControl/mapView/
+	// lastRevealOrigin/mapLevels are not saved, matching the reference's own Save/Restore lead.
+	// hudmap_alpha is the fog-of-war global (Player.cpp, above), not per player - saving/
+	// restoring it here (once, off whichever idPlayer::Save runs, single player only) reproduces
+	// the binary's own behavior.
 	savefile->WriteFloat( mapScale );
 	savefile->WriteInt( mapRadius );
 	savefile->WriteInt( unknown1e5c );
@@ -2606,8 +2610,11 @@ void idPlayer::Restore( idRestoreGame *savefile ) {
 	savefile->ReadVec4( mapCoords );
 	savefile->ReadString( mapMaterial );
 	savefile->Read( hudmap_alpha, sizeof( hudmap_alpha ) );
-	// Not re-uploaded to the render texture here, same as Cmd_ShowMap_f (above): the restored fog
-	// of war shows on screen at the next updateHudMapAlpha reveal, not immediately on load.
+	// Not re-uploaded to the render texture here, same as Cmd_ShowMap_f (above) - only
+	// updateHudMapAlpha's own reveal does that. In practice that happens on the very next frame
+	// regardless: the constructor above zeroes lastRevealOrigin, so updateHudMapAlpha's distance
+	// check (Player.cpp) passes immediately post-load and runs a real reveal (which also uploads
+	// the texture) the first time idPlayer::Think calls updateMap after this Restore.
 
 	// create combat collision hull for exact collision detection
 	SetCombatModel();

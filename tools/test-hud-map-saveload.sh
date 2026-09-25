@@ -32,24 +32,32 @@
 # - `hud_map`'s `coverage` (chextrek_dump, #36): the fog-of-war global itself, revealed by walking
 #   (setviewpos, same technique tools/test-hud-map.sh uses) before the save - the AC's literal
 #   subject ("dump ... coverage match the pre-save values").
-#
-# Review finding fixed here: hudmap_alpha is a single process-wide global, and mapScale lives on
-# the one idPlayer object dhewm3 keeps in memory the whole time - savegame/loadgame both run
-# inside the same process, without recreating either. So a naive "dump before save, dump after
-# load, assert they match" check would pass even if idPlayer::Restore's reads of them
-# (Player.cpp) were deleted entirely: both would simply still hold their pre-save values,
-# untouched by anything. To actually exercise Restore, the script perturbs both between the
-# savegame and the loadgame: the real "showMap" console command (#38) fills every level's
-# hudmap_alpha with 0xff (coverage=16384, the full 128x128 image), and another map_zoom_in grows
-# mapScale further past its already-zoomed pre-save value - both asserted in one dump below,
-# proving the globals did change in between. Only the loadgame that follows can bring coverage and
-# mapScale back down to their pre-save values - if idPlayer::Restore's reads were missing or
-# broken, the post-load dump would still show the showMap/zoom-perturbed values, not the pre-save
-# ones.
 # - `map_pda`'s `scale` (chextrek_dump, #37): idPlayer::mapScale, changed away from its default (1)
 #   with the PDA's own map_zoom_in GUI command before the save, then frozen with map_stop so no
 #   further per-frame change happens between capturing the pre-save value and loading - proving the
 #   save/load round-trip, not just standing still, is what carries the value across.
+#
+# Review finding fixed here (an earlier version of this comment wrongly claimed a savegame load
+# keeps "the same idPlayer object" - it doesn't: idGameLocal::InitFromSaveGame calls MapShutdown()
+# then savegame.CreateObjects() (Game_local.cpp/gamesys/SaveGame.cpp), which allocates a brand-new
+# idPlayer via idTypeInfo::CreateInstance for the load, same as any other saved object). What
+# actually needed proving: `hudmap_alpha` is a process-wide global untouched by that
+# object-recreation (only Init()/a reveal/showMap/Restore ever write to it - none of which run
+# between the savegame and the loadgame otherwise), so a naive "dump before save, dump after load,
+# assert they match" check on `coverage` would pass even if idPlayer::Restore's own hudmap_alpha
+# read (Player.cpp) were deleted entirely - the array would simply still hold its pre-save values,
+# untouched. `mapScale` is different (a plain per-instance member, not saved by the constructor -
+# #39's own constructor fix only defaults mapControl/mapView/lastRevealOrigin/unknown1e5c/
+# mapLevels, not mapScale, since mapScale IS saved/restored, unlike those five): the fresh object a
+# load creates never sets it itself, so it would hold whatever the freed player's memory happened
+# to still contain if idPlayer::Restore's ReadFloat were missing - not guaranteed to differ from
+# the pre-save value, but not guaranteed to match it either, so asserting a plain "still equal to
+# X" isn't a real check of Restore's own work either way. Both weaknesses get the same fix: perturb
+# the value between the savegame and the loadgame (the real "showMap" console command, #38, fills
+# every level's hudmap_alpha with 0xff, coverage=16384; another map_zoom_in grows mapScale further
+# past its already-zoomed pre-save value), assert the perturbation actually landed (its own dump,
+# below), then assert the *post-load* dump reverts to the pre-save values, not the perturbed ones -
+# proving the load itself, not mere inaction or memory-reuse coincidence, produced them.
 #
 # Getting mapScale to actually change needs the PDA open with its own map page active, the same
 # "chextrek_test_pda_map_open"/"chextrek_test_map_cmd" dance #37's tools/test-pda-map.sh
@@ -71,6 +79,17 @@
 #
 # savegame/loadgame reused verbatim from #31's tools/test-objectives.sh (developer-only console
 # commands, per spec #28's testing decisions).
+#
+# Timing fix, found by a live run failing intermittently (mapScale reading back at exactly its
+# pre-zoom value, i.e. 0 zoom steps landed in the window): a "wait 5" after
+# chextrek_test_map_cmd map_zoom_in isn't reliably enough margin for updateMapUI's 1%-per-frame
+# zoom step (idPlayer::Think, Player.cpp) to tick even once - the same class of gameLocal.time-vs-
+# frame-count gap tools/test-pda-map.sh and tools/test-hud-map.sh's own header comments describe
+# for the hudmap_open/hudmap_close GUI timelines, just landing here on ordinary per-frame game
+# logic instead of a GUI timeline. Each map_zoom_in below is followed by "wait 60" instead (12x
+# the original margin) - unlike a GUI-timeline flip, this isn't a one-time event a single
+# well-placed re-assert can catch after the fact, so the fix is a longer wait up front, not a
+# denser sequence of samples.
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -99,10 +118,10 @@ wait 10
 
 chextrek_test_pda_map_open 1
 chextrek_test_map_cmd map_zoom_in
-wait 5
+wait 60
 chextrek_test_pda_map_open 1
 chextrek_test_map_cmd map_zoom_in
-wait 5
+wait 60
 chextrek_test_pda_map_open 1
 chextrek_test_map_cmd map_stop
 wait 5
@@ -119,7 +138,7 @@ wait 5
 showMap
 chextrek_test_pda_map_open 1
 chextrek_test_map_cmd map_zoom_in
-wait 5
+wait 60
 chextrek_dump
 
 loadgame chextrek_hud_map_saveload_test
