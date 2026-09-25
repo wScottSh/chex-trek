@@ -1765,6 +1765,401 @@ void idTarget_FadeSoundClass::Event_RestoreVolume() {
 /*
 ===============================================================================
 
+idCustomUI
+
+chextrek: spec #16/#33, ported from decomp-so/reference/custom-ui.md.
+
+===============================================================================
+*/
+
+// EV_Hide is the stock "hide" event from Entity.cpp. No new event is defined.
+ABSTRACT_DECLARATION( idEntity, idCustomUI )
+	EVENT( EV_Hide,		idCustomUI::Event_Hide )
+END_CLASS
+
+/*
+================
+idCustomUI::idCustomUI
+================
+*/
+idCustomUI::idCustomUI( void ) {
+	gui			= NULL;
+	registered	= false;
+}
+
+/*
+================
+idCustomUI::~idCustomUI
+================
+*/
+idCustomUI::~idCustomUI( void ) {
+}
+
+/*
+================
+idCustomUI::Save
+================
+*/
+void idCustomUI::Save( idSaveGame *savefile ) const {
+	savefile->WriteUserInterface( gui, false );
+	savefile->WriteBool( registered );
+}
+
+/*
+================
+idCustomUI::Restore
+================
+*/
+void idCustomUI::Restore( idRestoreGame *savefile ) {
+	savefile->ReadUserInterface( gui );
+	savefile->ReadBool( registered );
+	if ( registered ) {
+		RegisterGUI();
+	}
+}
+
+/*
+================
+idCustomUI::setGUI
+
+An empty name keeps the current gui. There is no NULL check on guiName.
+================
+*/
+void idCustomUI::setGUI( const char *guiName ) {
+	if ( guiName[ 0 ] != '\0' ) {
+		gui = uiManager->FindGui( guiName, true, false, true );
+	}
+	if ( gui ) {
+		gui->Activate( true, gameLocal.time );
+		return;
+	}
+	common->Warning( "idCustomUI::setGUI, set GUI failed" );
+}
+
+/*
+================
+idCustomUI::RegisterGUI
+
+Gives this GUI to the local player, which then shows it (idPlayer::ActiveGui returns it) and
+routes its commands back here.
+================
+*/
+void idCustomUI::RegisterGUI( void ) {
+	idPlayer *player = gameLocal.GetLocalPlayer();
+	if ( player && gui ) {
+		registered = true;
+		player->useCustomUI( gui, this );
+	}
+}
+
+/*
+================
+idCustomUI::UnregisterGUI
+================
+*/
+void idCustomUI::UnregisterGUI( void ) {
+	idPlayer *player = gameLocal.GetLocalPlayer();
+	if ( player ) {
+		player->clearCustomUI();
+		registered = false;
+	}
+	if ( gui ) {
+		gui->Activate( false, gameLocal.time );
+	}
+}
+
+/*
+================
+idCustomUI::HandleCustomGUICommand
+
+Handles the "unregister" GUI command. Returns true if the command was handled. entityGui is not
+used.
+================
+*/
+bool idCustomUI::HandleCustomGUICommand( idEntity *entityGui, idToken *token ) {
+	if ( token->Icmp( "unregister" ) == 0 ) {
+		UnregisterGUI();
+		return true;
+	}
+	return false;
+}
+
+/*
+================
+idCustomUI::Event_Hide
+================
+*/
+void idCustomUI::Event_Hide( void ) {
+	idEntity::Hide();
+	UnregisterGUI();
+}
+
+
+/*
+===============================================================================
+
+idTarget_EndLevelGUI
+
+chextrek: spec #16/#33, ported from decomp-so/reference/end-level-stats.md.
+
+===============================================================================
+*/
+
+// chextrek: spec #16/#33. g_statTicTime: time in ms between stats-screen tics.
+idCVar g_statTicTime( "g_statTicTime", "50", CVAR_GAME | CVAR_ARCHIVE | CVAR_INTEGER, "time in MS between tics" );
+
+// Internal event (the "<...>" name means scripts cannot call it): no arguments, no return value.
+const idEventDef EV_UpdateEndLevelStats( "<UpdateEndLevelStats>", NULL, 0 );
+
+CLASS_DECLARATION( idCustomUI, idTarget_EndLevelGUI )
+	EVENT( EV_Activate,				idTarget_EndLevelGUI::Event_Activate )
+	EVENT( EV_UpdateEndLevelStats,	idTarget_EndLevelGUI::Event_UpdateStats )
+END_CLASS
+
+/*
+================
+idTarget_EndLevelGUI::~idTarget_EndLevelGUI
+================
+*/
+idTarget_EndLevelGUI::~idTarget_EndLevelGUI( void ) {
+}
+
+/*
+================
+idTarget_EndLevelGUI::Spawn
+================
+*/
+void idTarget_EndLevelGUI::Spawn( void ) {
+	memset( displayStats, 0, sizeof( displayStats ) );
+	unknown2d4	= 0;
+	state		= -1;
+	timeStep	= 0;
+	// ticSound is not set here (nor in a constructor): it is set only by Event_Activate.
+}
+
+/*
+================
+idTarget_EndLevelGUI::Save
+================
+*/
+void idTarget_EndLevelGUI::Save( idSaveGame *savefile ) const {
+	savefile->Write( displayStats, sizeof( displayStats ) );
+	savefile->WriteInt( state );
+	savefile->WriteInt( unknown2d4 );
+	savefile->WriteInt( timeStep );
+}
+
+/*
+================
+idTarget_EndLevelGUI::Restore
+================
+*/
+void idTarget_EndLevelGUI::Restore( idRestoreGame *savefile ) {
+	savefile->Read( displayStats, sizeof( displayStats ) );
+	savefile->ReadInt( state );
+	savefile->ReadInt( unknown2d4 );
+	savefile->ReadInt( timeStep );
+
+	// Scheduled events are not saved, so restart the count if the screen was running.
+	if ( state != -1 ) {
+		CancelEvents( &EV_UpdateEndLevelStats );
+		PostEventMS( &EV_UpdateEndLevelStats, g_statTicTime.GetInteger() );
+	}
+}
+
+/*
+================
+idTarget_EndLevelGUI::Event_Activate
+================
+*/
+void idTarget_EndLevelGUI::Event_Activate( idEntity *activator ) {
+	idStr			guiName;
+	idStr			soundName;
+	idPlayer *		player;
+	playerStats_s *	stats;
+	int				levelTime;
+	int				i;
+
+	if ( gui ) {
+		// Already showing: pass the activation on to the GUI.
+		gui->Trigger( gameLocal.time );
+		return;
+	}
+
+	player = gameLocal.GetLocalPlayer();
+	if ( !player ) {
+		return;
+	}
+
+	// levelStats[3].total holds the level's start time (idPlayer::Spawn stores gameLocal.time
+	// there). Turn it into the time the level took.
+	levelTime = gameLocal.time - player->getLevelStats()[ 3 ].total;
+	player->getLevelStats()[ 3 ].total = levelTime;
+
+	// Count the shown time up in at most about 100 tics: the smallest step with
+	// timeStep * 100 >= levelTime, and 1 for levelTime <= 100.
+	timeStep = 1;
+	while ( timeStep * 100 < levelTime ) {
+		timeStep++;
+	}
+
+	if ( !spawnArgs.GetString( "gui", "", guiName ) ) {
+		return;
+	}
+	setGUI( guiName );
+	if ( spawnArgs.GetString( "s_shader", "", soundName ) ) {
+		ticSound = declManager->FindSound( soundName );
+	}
+	if ( !gui ) {
+		return;
+	}
+
+	stats = player->getLevelStats();
+	for ( i = 0; i < 3; i++ ) {
+		gui->SetStateInt( stats[ i ].foundVar, 0 );
+		gui->SetStateInt( stats[ i ].totalVar, stats[ i ].total );
+		gui->SetStateInt( stats[ i ].percentVar, 0 );
+	}
+	gui->SetStateString( stats[ 3 ].totalVar, "00:00:000" );
+	gui->SetStateString( "mapname", spawnArgs.GetString( "mapname" ) );
+	gui->StateChanged( gameLocal.time );
+
+	RegisterGUI();
+	PostEventMS( &EV_UpdateEndLevelStats, g_statTicTime.GetInteger() );
+}
+
+/*
+================
+idTarget_EndLevelGUI::updateStats
+
+Counts one stats line up by one percent. Returns true when the line is done. display->total is the
+percent shown, display->found the count shown.
+================
+*/
+bool idTarget_EndLevelGUI::updateStats( playerStats_s *stats, playerStats_s *display ) {
+	if ( stats->total == 0 ) {
+		// Nothing to find in this level: show 100%.
+		gui->SetStateInt( stats->percentVar, 100 );
+		gui->StateChanged( gameLocal.time );
+		return true;
+	}
+	if ( display->total < stats->found * 100 / stats->total ) {
+		display->total++;
+		// Raise the shown count until it matches the shown percent.
+		while ( display->found * 100 / stats->total < display->total ) {
+			display->found++;
+		}
+		gui->SetStateInt( stats->foundVar, display->found );
+		gui->SetStateInt( stats->percentVar, display->total );
+		gui->StateChanged( gameLocal.time );
+		return false;
+	}
+	return true;
+}
+
+/*
+================
+idTarget_EndLevelGUI::Event_UpdateStats
+
+One tic of the stats screen. Reposts itself every g_statTicTime ms, except in states 4 and 5.
+================
+*/
+void idTarget_EndLevelGUI::Event_UpdateStats( void ) {
+	if ( ticSound ) {
+		StartSoundShader( ticSound, SND_CHANNEL_ANY, 0, false, NULL );
+	}
+
+	idStr nextMap;
+
+	switch ( state ) {
+		case 0:		// monsters
+		case 1:		// items
+		case 2:		// secrets
+			if ( !updateStats( &gameLocal.GetLocalPlayer()->getLevelStats()[ state ], &displayStats[ state ] ) ) {
+				break;		// still counting this line
+			}
+			state++;
+			break;
+		case 3:		// level time
+			if ( displayStats[ 3 ].total < gameLocal.GetLocalPlayer()->getLevelStats()[ 3 ].total ) {
+				displayStats[ 3 ].total += timeStep;
+				gui->SetStateString( gameLocal.GetLocalPlayer()->getLevelStats()[ 3 ].totalVar,
+					idStr::FormatTime( "mm:ss:MMM", displayStats[ 3 ].total ) );
+				break;
+			}
+			state++;
+			break;
+		case 4:		// all shown: wait 3 s, then go on
+			PostEventMS( &EV_UpdateEndLevelStats, 3000 );
+			state++;
+			return;
+		case 5:		// leave the level, unless a script does it ("extHndNextMap")
+			if ( !spawnArgs.GetBool( "extHndNextMap", "0" ) ) {
+				UnregisterGUI();
+				if ( spawnArgs.GetString( "nextmap", "", nextMap ) ) {
+					gameLocal.sessionCommand = "map ";
+					gameLocal.sessionCommand += nextMap;
+				} else {
+					ActivateTargets( this );
+				}
+			}
+			return;
+		case -1:	// not started
+			state = 0;
+			break;
+		default:
+			break;
+	}
+	PostEventMS( &EV_UpdateEndLevelStats, g_statTicTime.GetInteger() );
+}
+
+/*
+================
+idTarget_EndLevelGUI::HandleCustomGUICommand
+
+GUI commands: "nextmap" (leave now), "skip" (show the current line's final value), "unregister"
+(close). Returns true if the command was handled. entityGui is not used.
+================
+*/
+bool idTarget_EndLevelGUI::HandleCustomGUICommand( idEntity *entityGui, idToken *token ) {
+	playerStats_s *	stats;
+	int				percent;
+
+	if ( token->Icmp( "nextmap" ) == 0 ) {
+		state = 5;		// taken by the next tic of Event_UpdateStats
+		return true;
+	}
+	if ( token->Icmp( "skip" ) == 0 ) {
+		stats = gameLocal.GetLocalPlayer()->getLevelStats();
+		if ( state >= 0 ) {
+			if ( state < 3 ) {
+				gui->SetStateInt( stats[ state ].foundVar, stats[ state ].found );
+				percent = 100;
+				if ( stats[ state ].total ) {
+					percent = stats[ state ].found * 100 / stats[ state ].total;
+				}
+				gui->SetStateInt( stats[ state ].percentVar, percent );
+				state++;
+			} else if ( state == 3 ) {
+				gui->SetStateString( stats[ 3 ].totalVar, idStr::FormatTime( "mm:ss:MMM", stats[ 3 ].total ) );
+				state++;
+			}
+		}
+		gui->StateChanged( gameLocal.time );
+		return true;
+	}
+	if ( token->Icmp( "unregister" ) == 0 ) {
+		CancelEvents( &EV_UpdateEndLevelStats );
+		UnregisterGUI();
+		return true;
+	}
+	return false;
+}
+
+
+/*
+===============================================================================
+
 mkObjective
 
 chextrek: spec #16/#31, ported from decomp-so/reference/objectives.md.

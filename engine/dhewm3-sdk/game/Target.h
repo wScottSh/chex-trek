@@ -32,6 +32,11 @@ If you have questions concerning this license or the applicable additional terms
 #include "idlib/math/Interpolate.h"
 
 #include "Entity.h"
+// chextrek: spec #16/#33 (decomp-so/reference/end-level-stats.md). idTarget_EndLevelGUI's
+// displayStats member is playerStats_s by value (declared in Player.h, next to idPlayer::
+// levelStats, which needs the full definition too - see the comment there for why it lives there
+// rather than here).
+#include "Player.h"
 
 /*
 ===============================================================================
@@ -564,6 +569,87 @@ public:
 private:
 	void				Event_Activate( idEntity *activator );
 	void				Event_RestoreVolume();
+};
+
+
+/*
+===============================================================================
+
+idCustomUI
+
+chextrek: spec #16/#33, ported from decomp-so/reference/custom-ui.md. Abstract. An entity that
+shows a GUI to the local player and routes that GUI's commands back to itself. Its one subclass is
+idTarget_EndLevelGUI, below.
+
+===============================================================================
+*/
+
+class idCustomUI : public idEntity {
+public:
+	ABSTRACT_PROTOTYPE( idCustomUI );
+
+						idCustomUI( void );
+						~idCustomUI( void );
+
+	void				Save( idSaveGame *savefile ) const;
+	void				Restore( idRestoreGame *savefile );
+
+	void				setGUI( const char *guiName );
+	void				RegisterGUI( void );
+	void				UnregisterGUI( void );
+
+	// New virtual (not on idEntity). The stock idPlayer::HandleSingleGuiCommand edit (Player.cpp)
+	// calls this on player->customUIEntity when player->customUI is also non-NULL.
+	virtual bool		HandleCustomGUICommand( idEntity *entityGui, idToken *token );
+
+	idUserInterface *	gui;
+	bool				registered;
+
+private:
+	void				Event_Hide( void );	// replaces idEntity::Event_Hide for EV_Hide
+};
+
+
+/*
+===============================================================================
+
+idTarget_EndLevelGUI
+
+chextrek: spec #16/#33, ported from decomp-so/reference/end-level-stats.md. Shows the end-of-level
+stats GUI (entityDef target_endLevelGUI, def/endlevelgui.def) to the local player, counts each
+line up on it, then starts the next map (or triggers its targets).
+
+===============================================================================
+*/
+
+class idTarget_EndLevelGUI : public idCustomUI {
+public:
+	CLASS_PROTOTYPE( idTarget_EndLevelGUI );
+
+						~idTarget_EndLevelGUI( void );
+
+	void				Spawn( void );
+	void				Save( idSaveGame *savefile ) const;
+	void				Restore( idRestoreGame *savefile );
+
+	// Overrides idCustomUI's: re-implements "unregister" instead of calling it.
+	virtual bool		HandleCustomGUICommand( idEntity *entityGui, idToken *token );
+
+private:
+	// The counts shown so far, one per line of the screen (same order as idPlayer::levelStats).
+	// Only total and found are used here, and not with the player's meaning: total holds the
+	// percent shown ([3]: the time shown, in ms) and found the count shown. The name pointers stay
+	// NULL.
+	playerStats_s		displayStats[ 4 ];
+	int					unknown2d4;			// zeroed in Spawn, saved and restored, read nowhere else
+	int					timeStep;			// ms added to the shown time per tic
+	const idSoundShader *ticSound;			// "s_shader", played every tic. Not saved.
+	int					state;				// -1 idle, 0-2 counting stats[state], 3 time, 4 pause, 5 next map
+
+	bool				updateStats( playerStats_s *stats, playerStats_s *display );
+
+	void				Event_Activate( idEntity *activator );
+	void				Event_UpdateStats( void );
 };
 
 

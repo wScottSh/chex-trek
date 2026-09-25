@@ -44,6 +44,24 @@ class idAI;
 // mkObjective *, declared in Target.h/Target.cpp; forward-declared here so idPlayer doesn't need
 // to include Target.h.
 class mkObjective;
+// chextrek: spec #16/#33 (decomp-so/reference/custom-ui.md). idPlayer::customUIEntity holds
+// idCustomUI *, declared in Target.h/Target.cpp; forward-declared here so idPlayer doesn't need
+// to include Target.h.
+class idCustomUI;
+
+// chextrek: spec #16/#33 (decomp-so/reference/end-level-stats.md). One line of the end-level
+// stats screen: a count and the names of the GUI state variables that show it. idPlayer keeps
+// four (levelStats): [0] monsters, [1] items, [2] secrets, [3] level time. Declared here (not in
+// Target.h, where idTarget_EndLevelGUI also uses it) because idPlayer holds levelStats by value,
+// so the full definition has to be visible before the idPlayer class below - matching the
+// reference's own note that it "had to be declared before idPlayer" in the original source.
+struct playerStats_s {
+	int						total;			// how many the level has. [3]: the level time in ms
+	int						found;			// how many the player got. [3]: not used
+	const char *			totalVar;		// GUI state variable for total ("ai_total", ...)
+	const char *			foundVar;		// GUI state variable for found ("ai_killed", ...). [3]: NULL
+	const char *			percentVar;		// GUI state variable for found/total in %. [3]: NULL
+};
 
 /*
 ===============================================================================
@@ -290,6 +308,25 @@ public:
 	// Queues info in the pickup-message list (bypassing idInventory::AddPickupName's dedup/
 	// localization) and shows its icon on the HUD at once. Used by mkObjective's addmsg/rmmsg.
 	void					addItemText( const idItemInfo &info );
+
+	// chextrek: spec #16/#33 (decomp-so/reference/end-level-stats.md). [0] monsters, [1] items,
+	// [2] secrets, [3] level time. Filled in idPlayer::Spawn (idGameLocal::GetLevelStats, the
+	// level's start time, and the 10 GUI state variable names); AddAIKill/GiveItem/
+	// incSecretsFound raise [0]/[1]/[2].found (edits-inside-stock-functions leads below).
+	playerStats_s			levelStats[ 4 ];
+
+	void					incSecretsFound( void );
+	playerStats_s *			getLevelStats( void );
+
+	// chextrek: spec #16/#33 (decomp-so/reference/custom-ui.md). The idCustomUI currently shown to
+	// this (local) player and its GUI, set by idCustomUI::RegisterGUI/UnregisterGUI. Read by the
+	// edits-inside-stock-functions lead in HandleSingleGuiCommand (Player.cpp) that routes a GUI
+	// command to customUIEntity->HandleCustomGUICommand when both are non-NULL.
+	idCustomUI *			customUIEntity;
+	idUserInterface *		customUI;
+
+	void					useCustomUI( idUserInterface *ui, idCustomUI *uiEntity );
+	void					clearCustomUI( void );
 
 	int						weapon_soulcube;
 	int						weapon_pda;

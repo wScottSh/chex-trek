@@ -11,6 +11,13 @@
 
 #include "ChexTrekDump.h"
 
+// chextrek: spec #33. idTarget_EndLevelGUI's private state (displayStats/state/...) isn't
+// readable from outside the class, and it's the only idCustomUI subclass in the mod. Rather than
+// add getters to game code purely for a test dump, ChexTrek_Dump_f asks each spawned entity
+// whether it's the local player's registered idCustomUI (idPlayer::customUIEntity) and prints just
+// what idPlayer/idCustomUI already expose publicly (registered, and whether its gui is up) - see
+// the dump's "customui:" line below.
+
 // The harness greps the game log for this exact line to prove chextrek.dll (not base.dll)
 // loaded, independent of anything else the command goes on to print. Keep it stable: don't
 // change the text or the "v1" tag without updating the harness and docs/dev-setup.md.
@@ -49,6 +56,7 @@ idCVar chextrek_test_str5( "chextrek_test_str5", "\"chextrek_footprint_actor\"",
 idCVar chextrek_test_str6( "chextrek_test_str6", "\"player1\"", CVAR_GAME, "chextrek: test-only string-literal holder for AFK harness scenarios (spec #30) - see ChexTrekDump.cpp" );
 idCVar chextrek_test_str7( "chextrek_test_str7", "\"projectile_minizorchblast_nodamage\"", CVAR_GAME, "chextrek: test-only string-literal holder for AFK harness scenarios (spec #30) - see ChexTrekDump.cpp" );
 idCVar chextrek_test_str8( "chextrek_test_str8", "\"classname\"", CVAR_GAME, "chextrek: test-only string-literal holder for AFK harness scenarios (spec #30) - see ChexTrekDump.cpp" );
+idCVar chextrek_test_str9( "chextrek_test_str9", "\"damage_rocketSplash\"", CVAR_GAME, "chextrek: test-only string-literal holder for AFK harness scenarios (spec #33) - see ChexTrekDump.cpp" );
 
 /*
 ==================
@@ -103,6 +111,22 @@ depending on PDA/HUD GUI state.
 ChexTrek_NoteItemTextShown) and `item_text_last` (the name it queued the last time, or "none" if
 it has never run), so a scenario can assert that picking up an item showed its item text without
 depending on HUD GUI state or racing the queue idPlayer::UpdateHud drains within a frame or two.
+
+#33 adds:
+- `level_stats: monsters=<found>/<total> items=<found>/<total> secrets=<found>/<total>`
+  (idPlayer::levelStats[0..2], decomp-so/reference/end-level-stats.md), so a scenario can assert a
+  kill/pickup/secret raised the right counter by exactly one without depending on the stats screen
+  being up at all.
+- `customui: <none|inactive|active>` - "none" when the local player has no idCustomUI registered
+  (idPlayer::customUIEntity NULL), "inactive"/"active" (idCustomUI::registered) otherwise - and,
+  only when active, `customui_gui_<name>: <value>` for each of the stats screen's own GUI state
+  variables (ai_killed, ai_percent, items_found, items_percent, secrets_found, secrets_percent,
+  level_time - decomp-so/reference/end-level-stats.md's Notes list the full set; ai_total/
+  items_total/secrets_total/mapname are set once at Event_Activate and not re-asserted here), read
+  straight from idUserInterface::State() (the same idDict idTarget_EndLevelGUI::updateStats writes
+  through SetStateInt/SetStateString) - so a scenario can assert the screen counted up without
+  depending on idTarget_EndLevelGUI's private displayStats/state members, which nothing outside the
+  class can read.
 ==================
 */
 void ChexTrek_Dump_f( const idCmdArgs &args ) {
@@ -123,6 +147,38 @@ void ChexTrek_Dump_f( const idCmdArgs &args ) {
 			gameLocal.Printf( "objective_slot_%d: %s\n", i + 1, obj->title.c_str() );
 		} else {
 			gameLocal.Printf( "objective_slot_%d: empty\n", i + 1 );
+		}
+	}
+
+	// chextrek: spec #33 (decomp-so/reference/end-level-stats.md). idPlayer::levelStats[0..2]'s
+	// found/total, so a scenario can assert a kill/pickup/secret raised the right counter by
+	// exactly one - independent of whether the end-level stats screen is even up.
+	if ( player ) {
+		playerStats_s *stats = player->getLevelStats();
+		gameLocal.Printf( "level_stats: monsters=%d/%d items=%d/%d secrets=%d/%d\n",
+			stats[ 0 ].found, stats[ 0 ].total,
+			stats[ 1 ].found, stats[ 1 ].total,
+			stats[ 2 ].found, stats[ 2 ].total );
+	} else {
+		gameLocal.Printf( "level_stats: none\n" );
+	}
+
+	// chextrek: spec #33 (decomp-so/reference/custom-ui.md, end-level-stats.md). The local
+	// player's registered idCustomUI (only idTarget_EndLevelGUI in this mod) and, while active, the
+	// stats screen's own GUI state variables - see the ChexTrek_Dump_f header comment above.
+	if ( !player || !player->customUIEntity ) {
+		gameLocal.Printf( "customui: none\n" );
+	} else {
+		gameLocal.Printf( "customui: %s\n", player->customUIEntity->registered ? "active" : "inactive" );
+		if ( player->customUI ) {
+			const idDict &guiState = player->customUI->State();
+			static const char *statVars[] = {
+				"ai_killed", "ai_percent", "items_found", "items_percent",
+				"secrets_found", "secrets_percent", "level_time"
+			};
+			for ( int i = 0; i < (int)( sizeof( statVars ) / sizeof( statVars[ 0 ] ) ); i++ ) {
+				gameLocal.Printf( "customui_gui_%s: %s\n", statVars[ i ], guiState.GetString( statVars[ i ], "" ) );
+			}
 		}
 	}
 }

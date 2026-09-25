@@ -249,6 +249,12 @@ public:
 	idStr &				StripFileExtension( void );						// remove any file extension
 	idStr &				StripAbsoluteFileExtension( void );				// remove any file extension looking from front (useful if there are multiple .'s)
 	idStr &				DefaultFileExtension( const char *extension );	// if there's no file extension use the default
+
+	// chextrek: spec #16/#33 (decomp-so/reference/end-level-stats.md). Formats ms by a pattern such
+	// as "mm:ss:MMM": runs of h/m/s/M are hours/minutes/seconds/milliseconds, zero-padded to the
+	// run's length. Used only by idTarget_EndLevelGUI (the end-level stats screen's level-time
+	// line). Static: the binary passes only the return slot, format and time (no this).
+	static idStr		FormatTime( const char *format, int ms );
 	idStr &				DefaultPath( const char *basepath );			// if there's no path use the default
 	void				AppendPath( const char *text );					// append a partial path
 	idStr &				StripFilename( void );							// remove the filename from a path

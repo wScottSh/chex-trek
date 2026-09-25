@@ -79,6 +79,10 @@ class idTypeInfo;
 class idThread;
 class idEditEntities;
 class idLocationEntity;
+// chextrek: spec #16/#33 (decomp-so/reference/end-level-stats.md). Declared (as a struct) in
+// Player.h, where idPlayer needs the full definition; forward-declared here since GetLevelStats
+// below only takes a pointer to it.
+struct playerStats_s;
 
 //============================================================================
 extern const int NUM_RENDER_PORTAL_BITS;
@@ -425,6 +429,13 @@ public:
 	// corners); every stock caller still uses the 7-argument overload above.
 	void					ProjectDecal( const idVec3 &origin, const idVec3 &dir, float depth, bool parallel, float size, const char *material, const idVec3 *decalWinding, float angle );
 	void					BloodSplat( const idVec3 &origin, const idVec3 &dir, float size, const char *material );
+
+	// chextrek: spec #16/#33 (decomp-so/reference/end-level-stats.md). Counts the level's
+	// monsters, items and secrets (spawnArgs "level_monster"/"level_item"/"secret") into
+	// stats[0..2].total. Called only from idPlayer::Spawn, with the player's levelStats
+	// (playerStats_s, declared in Player.h - forward-declared here so this header doesn't need to
+	// include Player.h; only used by pointer).
+	void					GetLevelStats( playerStats_s *stats );
 
 	void					CallFrameCommand( idEntity *ent, const function_t *frameCommand );
 	void					CallObjectFrameCommand( idEntity *ent, const char *frameCommand );

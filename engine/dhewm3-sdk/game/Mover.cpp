@@ -2807,6 +2807,23 @@ void idMover_Binary::Use_BinaryMover( idEntity *activator ) {
 	activatedBy = activator;
 
 	if ( moverState == MOVER_POS1 ) {
+		// chextrek: spec #16/#33 (decomp-so/reference/end-level-stats.md; edits-inside-stock-
+		// functions lead). The reference's Notes say only "idMover_Binary::Use_BinaryMover is the
+		// only caller of incSecretsFound" - the exact call site inside it isn't in the exported
+		// decompilation (no decompiler tooling was available to pin it down further here). Credits
+		// the secret the first time a mover flagged "secret" "1" starts opening (this branch, not
+		// the POS2/2TO1/1TO2 ones below) - matching the level-design convention (7 secret-flagged
+		// func_doors across e1m1/e1m1_2/sf_923.map) of a secret being "found" by opening the door/
+		// mover that guards it, counted once (the flag is cleared after crediting) rather than once
+		// per open/close cycle.
+		if ( spawnArgs.GetBool( "secret", "0" ) ) {
+			idPlayer *secretPlayer = gameLocal.GetLocalPlayer();
+			if ( secretPlayer ) {
+				secretPlayer->incSecretsFound();
+			}
+			spawnArgs.Set( "secret", "0" );
+		}
+
 		// FIXME: start moving USERCMD_MSEC later, because if this was player
 		// triggered, gameLocal.time hasn't been advanced yet
 		MatchActivateTeam( MOVER_1TO2, gameLocal.time + USERCMD_MSEC );

@@ -37,6 +37,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "ai/AI.h"
 #include "WorldSpawn.h"
 #include "Player.h"
+#include "Target.h"				// chextrek: spec #16/#33, idCustomUI::HandleCustomGUICommand
 #include "Camera.h"
 #include "ChexTrekDump.h"		// chextrek: spec #32, ChexTrek_NoteItemTextShown
 #include "Fx.h"
@@ -806,6 +807,53 @@ void idPlayer::addItemText( const idItemInfo &info ) {
 
 /*
 ==============
+idPlayer::incSecretsFound
+
+chextrek: spec #16/#33 (decomp-so/reference/end-level-stats.md). Called only from
+idMover_Binary::Use_BinaryMover (edits-inside-stock-functions lead, Mover.cpp).
+==============
+*/
+void idPlayer::incSecretsFound( void ) {
+	levelStats[ 2 ].found++;
+}
+
+/*
+==============
+idPlayer::getLevelStats
+
+chextrek: spec #16/#33 (decomp-so/reference/end-level-stats.md).
+==============
+*/
+playerStats_s *idPlayer::getLevelStats( void ) {
+	return levelStats;
+}
+
+/*
+==============
+idPlayer::useCustomUI
+
+chextrek: spec #16/#33 (decomp-so/reference/custom-ui.md).
+==============
+*/
+void idPlayer::useCustomUI( idUserInterface *ui, idCustomUI *uiEntity ) {
+	customUI		= ui;
+	customUIEntity	= uiEntity;
+}
+
+/*
+==============
+idPlayer::clearCustomUI
+
+chextrek: spec #16/#33 (decomp-so/reference/custom-ui.md).
+==============
+*/
+void idPlayer::clearCustomUI( void ) {
+	customUI		= NULL;
+	customUIEntity	= NULL;
+}
+
+/*
+==============
 idInventory::Give
 ==============
 */
@@ -1062,6 +1110,15 @@ idPlayer::idPlayer() {
 		objectives[ i ] = NULL;
 	}
 	nextObjective			= 0;
+
+	// chextrek: spec #16/#33 (decomp-so/reference/end-level-stats.md; edits-inside-stock-functions
+	// lead: both idPlayer constructors memset the 0x50 bytes of levelStats).
+	memset( levelStats, 0, sizeof( levelStats ) );
+
+	// chextrek: spec #16/#33 (decomp-so/reference/custom-ui.md; edits-inside-stock-functions lead:
+	// both constructor clones write both members).
+	customUIEntity			= NULL;
+	customUI				= NULL;
 
 	heartRate				= BASE_HEARTRATE;
 	heartInfo.Init( 0, 0, 0, 0 );
@@ -1560,6 +1617,23 @@ void idPlayer::Spawn( void ) {
 		objectiveSystem = uiManager->FindGui( "guis/pda.gui", true, false, true );
 		objectiveSystemOpen = false;
 	}
+
+	// chextrek: spec #16/#33 (decomp-so/reference/end-level-stats.md; edits-inside-stock-functions
+	// lead: idPlayer::Spawn calls gameLocal.GetLevelStats(levelStats), stores gameLocal.time in
+	// levelStats[3].total (turned into the level's elapsed time by
+	// idTarget_EndLevelGUI::Event_Activate) and sets the 10 GUI state variable names).
+	gameLocal.GetLevelStats( levelStats );
+	levelStats[ 3 ].total			= gameLocal.time;
+	levelStats[ 0 ].totalVar		= "ai_total";
+	levelStats[ 0 ].foundVar		= "ai_killed";
+	levelStats[ 0 ].percentVar		= "ai_percent";
+	levelStats[ 1 ].totalVar		= "items_total";
+	levelStats[ 1 ].foundVar		= "items_found";
+	levelStats[ 1 ].percentVar		= "items_percent";
+	levelStats[ 2 ].totalVar		= "secrets_total";
+	levelStats[ 2 ].foundVar		= "secrets_found";
+	levelStats[ 2 ].percentVar		= "secrets_percent";
+	levelStats[ 3 ].totalVar		= "level_time";
 
 	SetLastHitTime( 0 );
 
@@ -3058,6 +3132,13 @@ bool idPlayer::GiveItem( idItem *item ) {
 		inventory.AddPickupName( item->spawnArgs.GetString( "inv_name" ), item->spawnArgs.GetString( "inv_icon" ) );
 	}
 
+	// chextrek: spec #16/#33 (decomp-so/reference/end-level-stats.md; edits-inside-stock-functions
+	// lead: idPlayer::GiveItem(idItem *) increments levelStats[1].found) - only when the item was
+	// actually given.
+	if ( gave ) {
+		levelStats[ 1 ].found++;
+	}
+
 	return gave;
 }
 
@@ -3894,6 +3975,13 @@ idPlayer::ActiveGui
 ===============
 */
 idUserInterface *idPlayer::ActiveGui( void ) {
+	// chextrek: spec #16/#33 (decomp-so/reference/custom-ui.md; edits-inside-stock-functions
+	// lead). A registered idCustomUI (e.g. the end-level stats screen) takes priority over
+	// everything else this function would otherwise return.
+	if ( customUI ) {
+		return customUI;
+	}
+
 	if ( objectiveSystemOpen ) {
 		return objectiveSystem;
 	}
@@ -4264,6 +4352,15 @@ bool idPlayer::HandleSingleGuiCommand( idEntity *entityGui, idLexer *src ) {
 
 	if ( token == ";" ) {
 		return false;
+	}
+
+	// chextrek: spec #16/#33 (decomp-so/reference/custom-ui.md; edits-inside-stock-functions
+	// lead). When a idCustomUI (e.g. the end-level stats screen) is registered, it gets first
+	// crack at every GUI command through its virtual HandleCustomGUICommand.
+	if ( customUI && customUIEntity ) {
+		if ( customUIEntity->HandleCustomGUICommand( entityGui, &token ) ) {
+			return true;
+		}
 	}
 
 	if ( token.Icmp( "addhealth" ) == 0 ) {
@@ -7476,6 +7573,12 @@ idPlayer::AddAIKill
 void idPlayer::AddAIKill( void ) {
 	int max_souls;
 	int ammo_souls;
+
+	// chextrek: spec #16/#33 (decomp-so/reference/end-level-stats.md; edits-inside-stock-functions
+	// lead: idPlayer::AddAIKill increments levelStats[0].found). Unconditional (before the
+	// soul-cube-ammo early return below): every AI kill counts toward the level's stats, whether or
+	// not the player has picked up the soul cube weapon yet.
+	levelStats[ 0 ].found++;
 
 	if ( ( weapon_soulcube < 0 ) || ( inventory.weapons & ( 1 << weapon_soulcube ) ) == 0 ) {
 		return;

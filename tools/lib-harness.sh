@@ -180,12 +180,12 @@ chextrek_run_console_script() {
 	# matches anything (Game_local.cpp warns "Could not spawn '<classname>'.  Class '<spawnclass>' not
 	# found..." instead - grep confirms "Unknown spawnclass" isn't a string this engine build ever
 	# prints), so this check was silently unable to fire before now. Matching the real message
-	# turns up one pre-existing, out-of-scope-for-#30 gap on `e1m1`: `idTarget_EndLevelGUI` isn't
-	# implemented yet (spec #28's own step 3, "Custom UI and end-level stats" - a later sub-issue's
-	# job, not #30's). Narrowly allowlisting that one class (not spawn failures in general) keeps
-	# the check able to catch a real regression without blocking on a documented, tracked gap.
+	# turned up one pre-existing gap on `e1m1`/`sf_923`, `idTarget_EndLevelGUI` not being
+	# implemented (spec #28's own step 3, "Custom UI and end-level stats"), allowlisted by #30/#31/
+	# #32 by class name until it landed. #33 ports idTarget_EndLevelGUI, so the allowlist is gone:
+	# `target_endlevelgui_1`/`_2` must now spawn cleanly on both maps (#33's AC3).
 	local ERROR_LINES
-	ERROR_LINES="$(grep -nE "^ERROR:|Unknown event|Could not spawn|Error: file .*\.script" "$CHEXTREK_LOCAL_LOG" | grep -v "Class 'idTarget_EndLevelGUI' not found" || true)"
+	ERROR_LINES="$(grep -nE "^ERROR:|Unknown event|Could not spawn|Error: file .*\.script" "$CHEXTREK_LOCAL_LOG" || true)"
 	if [ -n "$ERROR_LINES" ]; then
 		echo "RED: engine log reports an error:"
 		echo "$ERROR_LINES" | tail -5

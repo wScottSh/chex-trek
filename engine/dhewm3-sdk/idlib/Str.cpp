@@ -855,6 +855,100 @@ idStr &idStr::DefaultFileExtension( const char *extension ) {
 
 /*
 ==================
+idStr::FormatTime
+
+chextrek: spec #16/#33, ported from decomp-so/reference/end-level-stats.md. Counts each field's
+letters over the whole pattern (not per run), splits ms into hours/minutes/seconds/leftover-ms in
+that order (only for fields the pattern actually has), then re-walks the pattern building the
+zero-padded output; any character that isn't h/m/s/M (including the run's own trailing repeats and
+the terminating '\0') is copied through as-is - so fields must be separated in the pattern (e.g.
+"mm:ss:MMM"), matching the reference's own caveat.
+==================
+*/
+idStr idStr::FormatTime( const char *format, int ms ) {
+	idStr	result;
+	int		hCount = 0;
+	int		mCount = 0;
+	int		sCount = 0;
+	int		msCount = 0;
+	int		hours;
+	int		minutes;
+	int		seconds;
+	int		i;
+	char	c;
+
+	i = 0;
+	do {
+		c = format[ i++ ];
+		if ( c == 'h' ) {
+			hCount++;
+		} else if ( c == 'm' ) {
+			mCount++;
+		} else if ( c == 's' ) {
+			sCount++;
+		} else if ( c == 'M' ) {
+			msCount++;
+		}
+	} while ( c != '\0' );
+
+	hours = 0;
+	if ( hCount ) {
+		hours = ms / 3600000;
+		ms %= 3600000;
+	}
+	minutes = 0;
+	if ( mCount ) {
+		minutes = ms / 60000;
+		ms %= 60000;
+	}
+	seconds = 0;
+	if ( sCount ) {
+		seconds = ms / 1000;
+		ms %= 1000;
+	}
+	// What is left of ms is the milliseconds field.
+
+	idStr spec;		// the printf spec for one field, e.g. "%02i"
+	i = 0;
+	do {
+		spec.FreeData();
+		spec = "%0";
+		c = format[ i++ ];
+		if ( c == 'h' ) {
+			spec += va( "%i", hCount );
+			spec += 'i';
+			result += va( spec, hours );
+			while ( ( c = format[ i++ ] ) == 'h' ) {
+			}
+		} else if ( c == 'm' ) {
+			spec += va( "%i", mCount );
+			spec += 'i';
+			result += va( spec, minutes );
+			while ( ( c = format[ i++ ] ) == 'm' ) {
+			}
+		} else if ( c == 's' ) {
+			spec += va( "%i", sCount );
+			spec += 'i';
+			result += va( spec, seconds );
+			while ( ( c = format[ i++ ] ) == 's' ) {
+			}
+		} else if ( c == 'M' ) {
+			spec += va( "%i", msCount );
+			spec += 'i';
+			result += va( spec, ms );
+			while ( ( c = format[ i++ ] ) == 'M' ) {
+			}
+		}
+		// The character after a field (or any other character) is copied as is. This also
+		// appends the final '\0', so Length() is one more than strlen() (in the binary too).
+		result += c;
+	} while ( c != '\0' );
+
+	return result;
+}
+
+/*
+==================
 idStr::DefaultPath
 ==================
 */

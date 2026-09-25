@@ -3497,6 +3497,35 @@ int idGameLocal::EntitiesWithinRadius( const idVec3 org, float radius, idEntity 
 }
 
 /*
+================
+idGameLocal::GetLevelStats
+
+chextrek: spec #16/#33 (decomp-so/reference/end-level-stats.md). Counts the level's monsters,
+items and secrets into stats[0].total, [1] and [2]. An entity counts once: "secret" wins over
+"level_item", which wins over "level_monster". Called only from idPlayer::Spawn, with the
+player's levelStats.
+================
+*/
+void idGameLocal::GetLevelStats( playerStats_s *stats ) {
+	stats[ 0 ].total = 0;
+	stats[ 1 ].total = 0;
+	stats[ 2 ].total = 0;
+	for ( int i = 0; i < num_entities; i++ ) {
+		idEntity *ent = entities[ i ];
+		if ( !ent ) {
+			continue;
+		}
+		if ( ent->spawnArgs.GetBool( "secret", "0" ) ) {
+			stats[ 2 ].total++;
+		} else if ( ent->spawnArgs.GetBool( "level_item", "0" ) ) {
+			stats[ 1 ].total++;
+		} else if ( ent->spawnArgs.GetBool( "level_monster", "0" ) ) {
+			stats[ 0 ].total++;
+		}
+	}
+}
+
+/*
 =================
 idGameLocal::KillBox
 
