@@ -171,11 +171,16 @@ else
 		FAIL=1
 	fi
 
+	TRYOPEN_COUNT_VALUES_SF923="$(chextrek_line_field_values "$LOCAL_LOG_SF923" door_tryopen_count)"
+	TRYOPEN_COUNT_BASELINE_SF923="$(echo "$TRYOPEN_COUNT_VALUES_SF923" | sed -n '1p')"
+	TRYOPEN_COUNT_AFTER_SF923="$(echo "$TRYOPEN_COUNT_VALUES_SF923" | sed -n '2p')"
 	TRYOPEN_LAST_SF923="$(chextrek_line_field_values "$LOCAL_LOG_SF923" door_tryopen_last | sed -n '2p')"
-	if [ "$TRYOPEN_LAST_SF923" = "hbdoor1" ]; then
-		echo "PASS: the use-key trace reached hbdoor1 (door_tryopen_last=hbdoor1)"
+	if [ -n "$TRYOPEN_COUNT_BASELINE_SF923" ] && [ -n "$TRYOPEN_COUNT_AFTER_SF923" ] \
+		&& [ "$TRYOPEN_COUNT_AFTER_SF923" -eq $(( TRYOPEN_COUNT_BASELINE_SF923 + 1 )) ] \
+		&& [ "$TRYOPEN_LAST_SF923" = "hbdoor1" ]; then
+		echo "PASS: the use-key trace reached hbdoor1 (door_tryopen_count ${TRYOPEN_COUNT_BASELINE_SF923} -> ${TRYOPEN_COUNT_AFTER_SF923}, last=hbdoor1)"
 	else
-		echo "FAIL: expected door_tryopen_last=hbdoor1, got '${TRYOPEN_LAST_SF923}'"
+		echo "FAIL: expected door_tryopen_count to rise by exactly 1 and door_tryopen_last=hbdoor1, got count='${TRYOPEN_COUNT_BASELINE_SF923}'->'${TRYOPEN_COUNT_AFTER_SF923}' last='${TRYOPEN_LAST_SF923}'"
 		FAIL=1
 	fi
 
