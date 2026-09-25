@@ -216,10 +216,20 @@ Recorded deviation from spec #28's Implementation Decisions, which describe the 
 as "the only test code in the library": this is a second one, needed because #34's AC can't be
 proven through spec #28's console-only command list otherwise (see above) - the same class of gap
 the state-dump command itself exists to close (observing/driving state those commands can't reach),
-just on the driving side instead of the observing side. Gated the same way idGameLocal's other
-state-changing debug commands are (Cmd_Trigger_f, Cmd_Spawn_f, gamesys/SysCmds.cpp):
-CMD_FL_CHEAT plus an explicit CheatsOk() check, so it needs the same "developer 1"/cheats-enabled
-state the harness already runs under (spec #28 story 34: "developer-only").
+just on the driving side instead of the observing side. CMD_FL_CHEAT (gamesys/SysCmds.cpp) plus its
+own CheatsOk( false ) check matches idGameLocal's other state-changing debug commands
+(Cmd_Trigger_f, Cmd_Spawn_f) - "false" (don't require a live player) is fine here since reaching
+past the customUIEntity check below already implies one. This is honestly a weaker gate than "only
+runs with developer 1" (spec #28 story 34 calls the state-dump command "developer-only"):
+CheatsOk()/CMD_FL_CHEAT only block non-cheat multiplayer clients, not single-player without
+"developer 1" (Game_local.cpp) - an explicit developer.GetBool() check was tried here too and
+reverted after it broke the harness scenario for a reason not tracked down (the harness always runs
+with "developer 1" set, both via the launch command line and this command's own console script -
+tools/test-end-level-nextmap.sh - so the cvar not reading true where other game code's own
+developer.GetBool() calls, e.g. Light.cpp, presumably do work needs more investigation before
+relying on it). Single-player-only is still a real, if narrower, restriction: this command can only
+ever change anything meaningful when a player-triggered idCustomUI (only idTarget_EndLevelGUI in
+this mod) is already registered.
 ==================
 */
 void ChexTrek_CustomUICmd_f( const idCmdArgs &args ) {

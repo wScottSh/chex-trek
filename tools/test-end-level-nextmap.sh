@@ -227,12 +227,32 @@ else
 	FAIL=1
 fi
 
+# I_FOUND/S_FOUND > 0 is asserted explicitly (not just left implicit in the equality checks
+# below): if the earlier pickup/secret-trigger setup silently failed to raise level_stats (a
+# regression in #33's own code, not #34's), I_FOUND/S_FOUND would be "0", ITEMS_FOUND_AFTER_SKIP/
+# SECRETS_FOUND_AFTER_SKIP would also read "0" (skip jumping to a level_stats value of 0 is still
+# "jumping to the final value" mechanically), and the equality checks below would pass trivially
+# without actually having exercised a nonzero jump.
+if [ -n "$I_FOUND" ] && [ "$I_FOUND" -gt 0 ]; then
+	echo "PASS: the item pickup actually raised level_stats' items-found above zero (${I_FOUND}/${I_TOTAL}) before 'skip' is asked to jump to it"
+else
+	echo "FAIL: expected level_stats items-found > 0 after #33's pickup setup, got '${I_FOUND}' - the 'skip' check below would pass trivially on 0"
+	FAIL=1
+fi
+
 ITEMS_FOUND_AFTER_SKIP="$(echo "$ITEMS_FOUND_VALUES" | sed -n '3p')"
 ITEMS_PERCENT_AFTER_SKIP="$(echo "$ITEMS_PERCENT_VALUES" | sed -n '3p')"
 if [ "$ITEMS_FOUND_AFTER_SKIP" = "$I_FOUND" ] && [ "$ITEMS_PERCENT_AFTER_SKIP" = "$I_PERCENT_EXPECTED" ]; then
 	echo "PASS: 'skip' jumped the items line straight to its final value (items_found=${ITEMS_FOUND_AFTER_SKIP}, items_percent=${ITEMS_PERCENT_AFTER_SKIP}%, matching level_stats ${I_FOUND}/${I_TOTAL})"
 else
 	echo "FAIL: expected items_found=${I_FOUND} and items_percent=${I_PERCENT_EXPECTED}% after the second 'skip', got items_found='${ITEMS_FOUND_AFTER_SKIP}' items_percent='${ITEMS_PERCENT_AFTER_SKIP}'"
+	FAIL=1
+fi
+
+if [ -n "$S_FOUND" ] && [ "$S_FOUND" -gt 0 ]; then
+	echo "PASS: the secret door trigger actually raised level_stats' secrets-found above zero (${S_FOUND}/${S_TOTAL}) before 'skip' is asked to jump to it"
+else
+	echo "FAIL: expected level_stats secrets-found > 0 after #33's secret-door setup, got '${S_FOUND}' - the 'skip' check below would pass trivially on 0"
 	FAIL=1
 fi
 
@@ -247,12 +267,25 @@ fi
 
 # The 4th skip call (state 3, level time) sets the GUI's level_time state string to
 # idStr::FormatTime( "mm:ss:MMM", stats[3].total ) - the level's real elapsed time, not "00:00:000"
-# (Event_Activate's own initial value, still showing in dump #3's occurrence).
+# (Event_Activate's own initial value, still showing in dump #3's occurrence). There's no separate
+# dump line exposing stats[3].total in raw milliseconds to compare against exactly, so this checks
+# the format and a sanity range instead of an exact value: given the console script's own `wait`
+# budget up to this point (well under 2 real-time seconds of sim time), a real elapsed time here
+# is on the order of 1-2 seconds, comfortably inside a generous [1ms, 30000ms) bound - the initial
+# "00:00:000" (0ms) and any absurdly large value (e.g. a units bug) both fall outside it.
 LEVEL_TIME_AFTER_SKIP="$(echo "$LEVEL_TIME_VALUES" | sed -n '5p')"
-if echo "$LEVEL_TIME_AFTER_SKIP" | grep -qE '^[0-9]{2}:[0-9]{2}:[0-9]{3}$' && [ "$LEVEL_TIME_AFTER_SKIP" != "00:00:000" ]; then
-	echo "PASS: 'skip' jumped the level-time line straight to its final formatted value (level_time=${LEVEL_TIME_AFTER_SKIP})"
+if echo "$LEVEL_TIME_AFTER_SKIP" | grep -qE '^[0-9]{2}:[0-9]{2}:[0-9]{3}$'; then
+	LT_MIN="${LEVEL_TIME_AFTER_SKIP:0:2}"
+	LT_SEC="${LEVEL_TIME_AFTER_SKIP:3:2}"
+	LT_MS="${LEVEL_TIME_AFTER_SKIP:6:3}"
+	LT_TOTAL_MS=$(( 10#$LT_MIN * 60000 + 10#$LT_SEC * 1000 + 10#$LT_MS ))
 else
-	echo "FAIL: expected a real 'mm:ss:MMM' level_time (not the initial '00:00:000') after the fourth 'skip', got '${LEVEL_TIME_AFTER_SKIP}'"
+	LT_TOTAL_MS=-1
+fi
+if [ "$LT_TOTAL_MS" -gt 0 ] && [ "$LT_TOTAL_MS" -lt 30000 ]; then
+	echo "PASS: 'skip' jumped the level-time line straight to its final formatted value (level_time=${LEVEL_TIME_AFTER_SKIP}, ${LT_TOTAL_MS}ms)"
+else
+	echo "FAIL: expected a real 'mm:ss:MMM' level_time between 1ms and 30000ms (not the initial '00:00:000', and not some implausibly large value) after the fourth 'skip', got '${LEVEL_TIME_AFTER_SKIP}'"
 	FAIL=1
 fi
 
