@@ -55,14 +55,17 @@ void ChexTrek_NoteItemTextShown( const char *name );
 void ChexTrek_CustomUICmd_f( const idCmdArgs &args );
 
 // chextrek: spec #35, test-only. Registered as the "chextrek_test_gui_completion" console command
-// by idGameLocal::InitConsoleCommands. AC2 ("g_PDA exists with GUI-name completion") needs
-// idCmdSystem::ArgCompletion_GuiName (framework/CmdSystem.h) to actually run and list guis/*.gui
-// files, but tab-completion itself isn't reachable from a console script (spec #28's harness only
-// drives the game through queued commands, not interactive keystrokes) - the same class of gap
-// chextrek_customui_cmd (spec #34) closes for a GUI button click. This command calls
-// ArgCompletion_GuiName directly with "g_PDA" as the completed command name and prints how many
-// results it produced plus each one, so a scenario can assert the callback actually ran and that
-// one result names the mod's default PDA GUI (g_PDA's default, "guis/pda_chex.gui").
+// by idGameLocal::InitConsoleCommands. AC2 ("g_PDA exists with GUI-name completion") needs g_PDA's
+// own registered value-completion function to actually run and list guis/*.gui files, but
+// tab-completion itself isn't reachable from a console script (spec #28's harness only drives the
+// game through queued commands, not interactive keystrokes) - the same class of gap
+// chextrek_customui_cmd (spec #34) closes for a GUI button click, though this one is read-only
+// (no CMD_FL_CHEAT, like chextrek_dump - it changes no cvar or game state, just calls a function
+// pointer and prints what it returns). This command looks g_PDA up via cvarSystem->Find, reads its
+// idCVar::GetValueCompletion(), confirms it's actually idCmdSystem::ArgCompletion_GuiName (not
+// just non-NULL) and calls it with "g_PDA" as the completed command name, printing how many
+// results it produced plus each one, so a scenario can assert the cvar is really wired to that
+// function and that one result names the mod's default PDA GUI ("guis/pda_chex.gui").
 void ChexTrek_TestGuiCompletion_f( const idCmdArgs &args );
 
 #endif /* !__CHEXTREK_DUMP_H__ */

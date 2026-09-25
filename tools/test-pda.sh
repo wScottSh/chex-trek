@@ -7,10 +7,16 @@
 # --- AC1 ---
 # idPlayer::Spawn (Player.cpp) loads idPlayer::objectiveSystem from g_PDA's value instead of stock's
 # hardcoded "guis/pda.gui" - the edit-inside-stock-function lead this sub-issue ports. g_PDA's
-# default is "guis/pda_chex.gui" (guis/pda_chex.gui exists in this repo's data), so a fresh spawn
-# should already have the mod's own PDA GUI loaded as objectiveSystem, whether or not the PDA is
-# ever opened. chextrek_dump's new `pda_gui`/`pda_open` lines (ChexTrekDump.cpp) read
-# idPlayer::objectiveSystem->Name() (the gui's own qpath) and idPlayer::objectiveSystemOpen.
+# default already happens to be "guis/pda_chex.gui" (the mod's own PDA GUI, which exists in this
+# repo's data), so asserting the dump shows that value after a plain `map` wouldn't distinguish
+# "idPlayer::Spawn reads g_PDA" from "idPlayer::Spawn still hardcodes guis/pda_chex.gui" - both
+# would produce the same log line. To actually prove the cvar drives it, this scenario explicitly
+# `set`s g_PDA to a *different* existing gui (stock's own guis/pda.gui, also present in this repo's
+# data, guis/pda.gui) before `map`, and asserts idPlayer::objectiveSystem loads *that* value, not
+# the mod's default - the AC's literal "with g_PDA set" wording, and the only way to tell the edit
+# apart from a coincidental hardcoded match. chextrek_dump's new `pda_gui`/`pda_open` lines
+# (ChexTrekDump.cpp) read idPlayer::objectiveSystem->Name() (the gui's own qpath) and
+# idPlayer::objectiveSystemOpen.
 #
 # "Opening the PDA" (idPlayer::TogglePDA) requires the player to actually own a PDA
 # (inventory.pdas.Num() > 0) - it just shows a "no PDA" tip otherwise (Player.cpp). Neither e1m1 nor
@@ -29,12 +35,15 @@
 # --- AC2 ---
 # idCmdSystem::ArgCompletion_GuiName (framework/CmdSystem.h) isn't reachable from a console script -
 # it only ever runs from interactive tab-completion, which the console-only harness (spec #28) can't
-# drive. `chextrek_test_gui_completion` (test-only, ChexTrekDump.cpp/.h, spec #35) closes that gap
-# the same way chextrek_customui_cmd (#34) does for a GUI button click: it calls
-# idCmdSystem::ArgCompletion_GuiName directly with "g_PDA" as the completed command name and dumps
-# every result. A scenario can then assert the callback actually ran and that one of its results
-# names guis/pda_chex.gui (g_PDA's own default value, proving the completion function that's wired
-# to the cvar really does look at guis/*.gui, not just that *some* function got called).
+# drive. Calling ArgCompletion_GuiName directly (with a hardcoded command name) would only prove
+# that function exists, not that g_PDA is actually wired to it. `chextrek_test_gui_completion`
+# (test-only, ChexTrekDump.cpp/.h, spec #35) closes that gap the same way chextrek_customui_cmd
+# (#34) does for a GUI button click: it looks g_PDA up via cvarSystem->Find, reads its own
+# idCVar::GetValueCompletion() - the exact function pointer real tab-completion would call - and
+# prints whether the cvar was found, whether that pointer equals idCmdSystem::ArgCompletion_GuiName
+# by address, and (calling it through that pointer) every result it produces. A scenario can then
+# assert the cvar exists, is really wired to that function (not just some non-NULL one), and that
+# one of the results names guis/pda_chex.gui (the mod's own default PDA gui).
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -50,6 +59,7 @@ fi
 CONSOLE_SCRIPT="${SCRATCH_DIR}/pda.cfg"
 cat > "$CONSOLE_SCRIPT" <<'EOF'
 developer 1
+set g_PDA "guis/pda.gui"
 map e1m1
 wait 20
 chextrek_dump
@@ -91,7 +101,9 @@ else
 	FAIL=1
 fi
 
-# --- AC1a: idPlayer::Spawn already loaded the mod's PDA GUI from g_PDA, before the PDA is opened ---
+# --- AC1a: idPlayer::Spawn loaded objectiveSystem from g_PDA's explicitly-set value (not the
+# mod's own default and not stock's hardcoded literal), proving the cvar - not a coincidental
+# match - drives it ---
 PDA_GUI_VALUES="$(grep -oE '^pda_gui: .*$' "$LOCAL_LOG" | sed 's/^pda_gui: //')"
 PDA_OPEN_VALUES="$(grep -oE '^pda_open: [01]$' "$LOCAL_LOG" | grep -oE '[01]$')"
 PDA_GUI_BASELINE="$(echo "$PDA_GUI_VALUES" | sed -n '1p')"
@@ -99,10 +111,10 @@ PDA_GUI_AFTER="$(echo "$PDA_GUI_VALUES" | sed -n '2p')"
 PDA_OPEN_BASELINE="$(echo "$PDA_OPEN_VALUES" | sed -n '1p')"
 PDA_OPEN_AFTER="$(echo "$PDA_OPEN_VALUES" | sed -n '2p')"
 
-if [ "$PDA_GUI_BASELINE" = "guis/pda_chex.gui" ]; then
-	echo "PASS: idPlayer::objectiveSystem is already loaded from g_PDA's default (guis/pda_chex.gui) right after spawn, before the PDA is ever opened"
+if [ "$PDA_GUI_BASELINE" = "guis/pda.gui" ]; then
+	echo "PASS: idPlayer::objectiveSystem was loaded from g_PDA's explicitly-set value (guis/pda.gui, not the mod's own default guis/pda_chex.gui), right after spawn and before the PDA is ever opened - proving idPlayer::Spawn actually reads the cvar"
 else
-	echo "FAIL: expected pda_gui=guis/pda_chex.gui at baseline, got '${PDA_GUI_BASELINE}'"
+	echo "FAIL: expected pda_gui=guis/pda.gui (the value 'set g_PDA' was given) at baseline, got '${PDA_GUI_BASELINE}'"
 	FAIL=1
 fi
 
@@ -113,7 +125,7 @@ else
 	FAIL=1
 fi
 
-# --- AC1b: giving the player a PDA opens it, still showing the mod's own PDA GUI ---
+# --- AC1b: giving the player a PDA opens it, still showing the g_PDA-driven GUI ---
 if [ "$PDA_OPEN_AFTER" = "1" ]; then
 	echo "PASS: triggering the spawned item_pda opened the PDA (pda_open=0 -> 1)"
 else
@@ -121,17 +133,31 @@ else
 	FAIL=1
 fi
 
-if [ "$PDA_GUI_AFTER" = "guis/pda_chex.gui" ]; then
-	echo "PASS: the active PDA GUI is still the mod's own (guis/pda_chex.gui), not stock's guis/pda.gui"
+if [ "$PDA_GUI_AFTER" = "guis/pda.gui" ]; then
+	echo "PASS: the active PDA GUI when opened is still the one g_PDA named (guis/pda.gui)"
 else
-	echo "FAIL: expected pda_gui=guis/pda_chex.gui after opening the PDA, got '${PDA_GUI_AFTER}'"
+	echo "FAIL: expected pda_gui=guis/pda.gui after opening the PDA, got '${PDA_GUI_AFTER}'"
 	FAIL=1
 fi
 
-# --- AC2: g_PDA has GUI-name completion wired up ---
+# --- AC2: g_PDA exists and its value-completion is actually idCmdSystem::ArgCompletion_GuiName ---
+if grep -qE '^g_pda_found: 1$' "$LOCAL_LOG"; then
+	echo "PASS: g_PDA is a registered cvar (cvarSystem->Find succeeded)"
+else
+	echo "FAIL: expected g_pda_found: 1"
+	FAIL=1
+fi
+
+if grep -qE '^g_pda_completion_wired: 1$' "$LOCAL_LOG"; then
+	echo "PASS: g_PDA's own idCVar::GetValueCompletion() is idCmdSystem::ArgCompletion_GuiName"
+else
+	echo "FAIL: expected g_pda_completion_wired: 1 (g_PDA's registered completion function should be idCmdSystem::ArgCompletion_GuiName)"
+	FAIL=1
+fi
+
 COMPLETION_COUNT="$(grep -oE '^gui_completion_count: [0-9]+$' "$LOCAL_LOG" | grep -oE '[0-9]+$' | sed -n '1p')"
 if [ -n "$COMPLETION_COUNT" ] && [ "$COMPLETION_COUNT" -gt 0 ]; then
-	echo "PASS: idCmdSystem::ArgCompletion_GuiName produced ${COMPLETION_COUNT} completion(s) for g_PDA"
+	echo "PASS: calling g_PDA's own completion function produced ${COMPLETION_COUNT} result(s)"
 else
 	echo "FAIL: expected gui_completion_count > 0, got '${COMPLETION_COUNT}'"
 	FAIL=1
@@ -146,7 +172,7 @@ fi
 
 echo
 if [ $FAIL -eq 0 ]; then
-	echo "PASS: #35 PDA scenario - g_PDA loads and shows the mod's PDA GUI, with GUI-name completion"
+	echo "PASS: #35 PDA scenario - g_PDA drives which PDA GUI is loaded and shown when opened, with GUI-name completion actually wired to it"
 	exit 0
 else
 	echo "FAIL: #35 PDA scenario - see above"

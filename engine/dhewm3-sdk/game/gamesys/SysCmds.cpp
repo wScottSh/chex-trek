@@ -2311,10 +2311,12 @@ void idGameLocal::InitConsoleCommands( void ) {
 	// debug commands (trigger, spawn, below) - see ChexTrek_CustomUICmd_f's own comment in
 	// ChexTrekDump.cpp for exactly what this does and doesn't gate.
 	cmdSystem->AddCommand( "chextrek_customui_cmd",	ChexTrek_CustomUICmd_f,		CMD_FL_GAME|CMD_FL_CHEAT,	"chextrek: sends a command to the local player's registered idCustomUI (test harness only)" );
-	// chextrek: spec #35, test-only. Proves g_PDA's ArgCompletion_GuiName is actually wired up -
-	// see ChexTrek_TestGuiCompletion_f's own comment in ChexTrekDump.cpp for why a console command
-	// has to stand in for what tab-completion would otherwise show interactively.
-	cmdSystem->AddCommand( "chextrek_test_gui_completion", ChexTrek_TestGuiCompletion_f, CMD_FL_GAME, "chextrek: dumps g_PDA's ArgCompletion_GuiName results (test harness only)" );
+	// chextrek: spec #35, test-only. Proves g_PDA's value-completion is actually wired to
+	// idCmdSystem::ArgCompletion_GuiName - see ChexTrek_TestGuiCompletion_f's own comment in
+	// ChexTrekDump.cpp for why a console command has to stand in for what tab-completion would
+	// otherwise show interactively. No CMD_FL_CHEAT (matches chextrek_dump, not
+	// chextrek_customui_cmd below): read-only, changes no cvar or game state.
+	cmdSystem->AddCommand( "chextrek_test_gui_completion", ChexTrek_TestGuiCompletion_f, CMD_FL_GAME, "chextrek: dumps g_PDA's value-completion results (test harness only)" );
 	cmdSystem->AddCommand( "listTypeInfo",			ListTypeInfo_f,				CMD_FL_GAME,				"list type info" );
 	cmdSystem->AddCommand( "writeGameState",		WriteGameState_f,			CMD_FL_GAME,				"write game state" );
 	cmdSystem->AddCommand( "testSaveGame",			TestSaveGame_f,				CMD_FL_GAME|CMD_FL_CHEAT,	"test a save game for a level" );

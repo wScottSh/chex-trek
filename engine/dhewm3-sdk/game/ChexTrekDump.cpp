@@ -130,10 +130,12 @@ depending on HUD GUI state or racing the queue idPlayer::UpdateHud drains within
   class can read.
 
 #35 adds `pda_gui: <name|none>` (idPlayer::objectiveSystem's idUserInterface::Name(), the gui file
-it was loaded from - g_PDA's value once #35's edit-inside-idPlayer::Spawn lead lands, "guis/pda.gui"
-if that edit were somehow missing, "none" if no local player) and `pda_open: <0|1>`
-(idPlayer::objectiveSystemOpen), so a scenario can assert opening the PDA (impulse 0/TogglePDA) made
-the mod's own PDA GUI (not stock's) the active one, without depending on any GUI rendering.
+it was loaded from - this sub-issue's edit makes idPlayer::Spawn read that from g_PDA instead of
+stock's hardcoded "guis/pda.gui"; "none" if there's no local player or no objectiveSystem) and
+`pda_open: <0|1>` (idPlayer::objectiveSystemOpen), so a scenario can assert opening the PDA
+(idPlayer::TogglePDA, reached here via idPlayer::GivePDA's own call to it on the player's first
+PDA, not an impulse - see tools/test-pda.sh) made the mod's own PDA GUI (not stock's) the active
+one, without depending on any GUI rendering.
 ==================
 */
 void ChexTrek_Dump_f( const idCmdArgs &args ) {
@@ -290,12 +292,16 @@ void ChexTrek_CustomUICmd_f( const idCmdArgs &args ) {
 ChexTrek_TestGuiCompletion_f
 
 Test-only, spec #35. See ChexTrek_TestGuiCompletion_f's comment in ChexTrekDump.h for why a
-console command has to stand in for interactive tab-completion here. Builds a fake idCmdArgs whose
-Argv(0) is "g_PDA" (the only real registration site of idCmdSystem::ArgCompletion_GuiName in the
-binary, decomp-so/reference/custom-ui.md), calls it directly with a callback that collects every
-string the engine's ArgCompletion_FolderExtension produces, and prints the count plus each result
-so a scenario can assert completion actually ran and lists guis/*.gui files, including the mod's
-own default PDA gui.
+console command has to stand in for interactive tab-completion here. Rather than call
+idCmdSystem::ArgCompletion_GuiName directly (which would only prove that function exists, not that
+g_PDA is actually wired to it), this looks g_PDA up through cvarSystem->Find and reads its own
+idCVar::GetValueCompletion() - the exact function pointer the engine's interactive tab-completion
+would call for this cvar - prints whether it's non-NULL and whether it equals
+idCmdSystem::ArgCompletion_GuiName by address (so a scenario can assert the cvar's completion is
+*that* function, not merely *a* function), then calls it through that pointer with a callback that
+collects every string the engine's ArgCompletion_FolderExtension produces, printing the count plus
+each result so a scenario can also assert it lists guis/*.gui files, including the mod's own
+default PDA gui.
 ==================
 */
 static idList<idStr> chextrekGuiCompletions;
@@ -307,9 +313,26 @@ static void ChexTrek_GuiCompletionCallback( const char *s ) {
 void ChexTrek_TestGuiCompletion_f( const idCmdArgs &args ) {
 	chextrekGuiCompletions.Clear();
 
+	idCVar *pdaCvar = cvarSystem->Find( "g_PDA" );
+	if ( !pdaCvar ) {
+		gameLocal.Printf( "g_pda_found: 0\n" );
+		gameLocal.Printf( "g_pda_completion_wired: 0\n" );
+		gameLocal.Printf( "gui_completion_count: 0\n" );
+		return;
+	}
+	gameLocal.Printf( "g_pda_found: 1\n" );
+
+	argCompletion_t completion = pdaCvar->GetValueCompletion();
+	gameLocal.Printf( "g_pda_completion_wired: %d\n", completion == idCmdSystem::ArgCompletion_GuiName ? 1 : 0 );
+
+	if ( !completion ) {
+		gameLocal.Printf( "gui_completion_count: 0\n" );
+		return;
+	}
+
 	idCmdArgs fakeArgs;
 	fakeArgs.TokenizeString( "g_PDA", false );
-	idCmdSystem::ArgCompletion_GuiName( fakeArgs, ChexTrek_GuiCompletionCallback );
+	completion( fakeArgs, ChexTrek_GuiCompletionCallback );
 
 	gameLocal.Printf( "gui_completion_count: %d\n", chextrekGuiCompletions.Num() );
 	for ( int i = 0; i < chextrekGuiCompletions.Num(); i++ ) {
