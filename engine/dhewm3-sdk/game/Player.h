@@ -323,8 +323,8 @@ public:
 	// mapControl (set by the edited stock idPlayer::HandleSingleGuiCommand, #37, from the PDA's
 	// map_* GUI commands). Fog of war (hudmap_alpha, extern above, before this class) is revealed
 	// as the player walks. Only initHudMap/updateMap/updateMapUI/updateHudMapAlpha/MapImageCoords
-	// and HudMapLevel's real body are #36; the "showMap" console command is #38, and saving/
-	// restoring this state is #39.
+	// and HudMapLevel's real body are #36; the "showMap" console command is #38; saving/restoring
+	// this state across a save/load (Save/Restore, Player.cpp) is #39.
 	void					initHudMap( void );
 	void					updateMap( void );
 	void					updateMapUI( idUserInterface *gui, int level, bool isHud );
@@ -338,18 +338,26 @@ public:
 	// (gamesys/SysCmds.cpp).
 	static void				Cmd_ShowMap_f( const idCmdArgs &args );
 
-	int						mapControl;			// MAP_* bits, set by HandleSingleGuiCommand (#37). Not saved (#39).
-	float					mapScale;				// PDA zoom, "map_scale" (default 1), 0.1 .. 9. Not saved here (#39).
+	// chextrek: spec #39 (decomp-so/reference/hud-map.md, its Save/Restore lead). idPlayer::Save/
+	// Restore (Player.cpp) persist mapScale/mapRadius/unknown1e5c/revealDistance/mapWidth/
+	// mapHeight/mapCoords/mapMaterial, then the whole hudmap_alpha fog-of-war global, in that
+	// order - matching the reference's own Save/Restore lead. mapControl/mapView/
+	// lastRevealOrigin/mapLevels are NOT saved (also per that lead): mapControl/mapView/
+	// lastRevealOrigin are transient PDA/reveal-tracking state Init() re-zeroes, and mapLevels is
+	// re-read from the world's spawnArgs by initHudMap() every time idPlayer::Spawn runs (a fresh
+	// map load), never by a save/load.
+	int						mapControl;			// MAP_* bits, set by HandleSingleGuiCommand (#37). Not saved.
+	float					mapScale;				// PDA zoom, "map_scale" (default 1), 0.1 .. 9. Saved (#39).
 	idVec2					mapView;				// world x, y at the center of the map box. Not saved.
-	int						mapRadius;				// reveal radius in alpha texels, "map_radius" (default 8). Not saved here (#39).
-	float					mapWidth;				// map image width at scale 1, GUI units, "map_x" (default 640). Not saved here (#39).
-	float					mapHeight;				// map image height at scale 1, GUI units, "map_y" (default 480). Not saved here (#39).
-	float					revealDistance;			// distance to move before revealing again: one alpha texel. Not saved here (#39).
+	int						mapRadius;				// reveal radius in alpha texels, "map_radius" (default 8). Saved (#39).
+	float					mapWidth;				// map image width at scale 1, GUI units, "map_x" (default 640). Saved (#39).
+	float					mapHeight;				// map image height at scale 1, GUI units, "map_y" (default 480). Saved (#39).
+	float					revealDistance;			// distance to move before revealing again: one alpha texel. Saved (#39).
 	idVec3					lastRevealOrigin;		// origin at the last reveal. Init zeroes it. Not saved.
 	int						unknown1e5c;			// set to -1 by Init; saved/restored by the binary (#39), never read otherwise.
-	idStr					mapMaterial;			// "guis/hud_maps/<map name>": material name without the level. Not saved here (#39).
+	idStr					mapMaterial;			// "guis/hud_maps/<map name>": material name without the level. Saved (#39).
 	float					mapLevels[ 5 ];			// "map_level_0" ... "map_level_4": floor height of each map level. Not saved.
-	idVec4					mapCoords;				// "map_coords": left, top, right, bottom world coordinates of the map image. Not saved here (#39).
+	idVec4					mapCoords;				// "map_coords": left, top, right, bottom world coordinates of the map image. Saved (#39).
 
 	// Puts obj in the first free slot from nextObjective on (does not wrap around); sets level to
 	// the HUD map level of origin; returns the objective's number (slot + 1), or -1 if full.

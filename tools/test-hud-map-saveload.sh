@@ -1,0 +1,197 @@
+#!/usr/bin/env bash
+# Automated test for spec #39's acceptance criteria (decomp-so/reference/hud-map.md):
+#   AC: walk to reveal part of the map, save, load; dump map state and coverage match the
+#       pre-save values
+#
+# Ported edit-inside-stock-function lead (Player.cpp): idPlayer::Save now writes
+# mapScale/mapRadius/unknown1e5c/revealDistance/mapWidth/mapHeight/mapCoords/mapMaterial, then the
+# whole hudmap_alpha fog-of-war global, in that exact order (idPlayer::Restore reads them back in
+# the same order) - matching decomp-so/reference/hud-map.md's own Save/Restore lead
+# (idPlayer::Save @ 0x152d88-0x152e8f writes those fields then the fog-of-war global one byte at a
+# time; idPlayer::Restore @ 0x168b19-0x168bdd reads them back the same way - this port uses a
+# single bulk savefile->Write/Read for the fog-of-war global instead of one WriteByte/ReadByte per
+# byte, same bytes in the same order, matching the SDK's own existing convention for byte-array
+# members, e.g. Target.cpp's idTarget_EndLevelGUI::Save/Restore of displayStats). Per that same
+# lead, mapControl/mapView/lastRevealOrigin/mapLevels are NOT saved: mapControl/mapView/
+# lastRevealOrigin are transient PDA/reveal-tracking state idPlayer::Init re-zeroes, and mapLevels
+# is re-read from the world's spawnArgs by initHudMap() every time idPlayer::Spawn runs (a fresh
+# map load) - never by a save/load, which doesn't call Spawn.
+#
+# This scenario proves two of the newly-saved fields survive a real save/load round-trip:
+# - `hud_map`'s `coverage` (chextrek_dump, #36): the fog-of-war global itself, revealed by walking
+#   (setviewpos, same technique tools/test-hud-map.sh uses) before the save - the AC's literal
+#   subject ("dump ... coverage match the pre-save values").
+# - `map_pda`'s `scale` (chextrek_dump, #37): idPlayer::mapScale, changed away from its default (1)
+#   with the PDA's own map_zoom_in GUI command before the save, then frozen with map_stop so no
+#   further per-frame change happens between capturing the pre-save value and loading - proving the
+#   save/load round-trip, not just standing still, is what carries the value across.
+#
+# Getting mapScale to actually change needs the PDA open with its own map page active, the same
+# "chextrek_test_pda_map_open"/"chextrek_test_map_cmd" dance #37's tools/test-pda-map.sh
+# establishes (see that script's own header comment for the full rationale): idPlayer::updateMap
+# only applies mapControl's zoom bit to the PDA's map page (idPlayer::updateMapUI's `!isHud`
+# branch) while objectiveSystemOpen is true AND the PDA gui's own "HudMap" state variable is true.
+# The PDA itself is opened the same way #35's tools/test-pda.sh does: spawn+trigger a fresh
+# item_pda (neither e1m1 nor sf_923 places one reachable from spawn), since idPlayer::GivePDA
+# (stock, unedited) calls TogglePDA() on the player's first PDA with no impulse/mouse input needed.
+#
+# Unlike #37's own scenario, this one doesn't need to fight guis/pda_chex.gui's ~400ms
+# "hudmap_close" timing quirk (see tools/test-pda-map.sh's header comment for the full story): once
+# "map_stop" clears mapControl back to 0 (both zooms set only MAP_ZOOM_IN, no MAP_CENTER, so
+# map_stop's "no zoom bit alongside MAP_CENTER" branch applies), idPlayer::mapScale stops changing
+# every frame regardless of what the PDA gui's own "HudMap" flag does afterward - updateMapUI's
+# zoom step only runs while a zoom bit is actually set in mapControl. So the value captured right
+# after "map_stop" is stable through everything that follows (the setviewpos walk, the savegame,
+# the loadgame), with no re-send-the-flag dance needed once it's frozen.
+#
+# savegame/loadgame reused verbatim from #31's tools/test-objectives.sh (developer-only console
+# commands, per spec #28's testing decisions).
+set -uo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRATCH_DIR="$(mktemp -d)"
+trap 'rm -rf "$SCRATCH_DIR"' EXIT
+
+# shellcheck source=tools/lib-harness.sh
+source "${SCRIPT_DIR}/lib-harness.sh"
+
+echo "=== #39 HUD map save/load test: build ==="
+if ! bash "${SCRIPT_DIR}/build-chextrek.sh"; then
+	echo "FAIL: build-chextrek.sh failed"
+	exit 1
+fi
+
+CONSOLE_SCRIPT="${SCRATCH_DIR}/hud_map_saveload.cfg"
+cat > "$CONSOLE_SCRIPT" <<'EOF'
+developer 1
+map e1m1
+wait 20
+noclip
+
+spawn item_pda name saveload_pda
+trigger saveload_pda
+wait 10
+
+chextrek_test_pda_map_open 1
+chextrek_test_map_cmd map_zoom_in
+wait 5
+chextrek_test_pda_map_open 1
+chextrek_test_map_cmd map_zoom_in
+wait 5
+chextrek_test_pda_map_open 1
+chextrek_test_map_cmd map_stop
+wait 5
+
+chextrek_dump
+
+setviewpos 300 -976 8 0
+wait 15
+chextrek_dump
+
+savegame chextrek_hud_map_saveload_test
+wait 10
+loadgame chextrek_hud_map_saveload_test
+wait 20
+
+chextrek_dump
+
+screenshot chextrek_hud_map_saveload
+wait 10
+quit
+EOF
+
+echo
+echo "=== #39 HUD map save/load test: scenario run ==="
+RUN_OUT="$(bash "${SCRIPT_DIR}/run-scenario.sh" chextrek_hud_map_saveload "$CONSOLE_SCRIPT" 120 2>&1)"
+RUN_EXIT=$?
+echo "$RUN_OUT"
+
+FAIL=0
+if [ $RUN_EXIT -ne 0 ]; then
+	echo "FAIL: expected the always-on harness checks to pass (chextrek.dll loaded, state-dump header, no ERROR/unknown-event/unknown-spawnclass/script-compile lines), but the run exited ${RUN_EXIT}"
+	FAIL=1
+fi
+
+LOCAL_LOG="$(echo "$RUN_OUT" | sed -n 's/^CHEXTREK_LOCAL_LOG=//p')"
+if [ -z "$LOCAL_LOG" ] || [ ! -f "$LOCAL_LOG" ]; then
+	echo "FAIL: couldn't find the archived log to check scenario-specific assertions"
+	exit 1
+fi
+
+# --- e1m1 finishes loading (spec #28 always-on check) ---
+if grep -qE '^ *[0-9]+ msec to load e1m1$' "$LOCAL_LOG"; then
+	echo "PASS: e1m1 finished loading"
+else
+	echo "FAIL: expected to see '<N> msec to load e1m1' in the log"
+	FAIL=1
+fi
+
+# There are 3 chextrek_dump calls: after zooming+map_stop (before the walk), after the setviewpos
+# walk (the pre-save state), and after the savegame/loadgame round-trip (the post-load state).
+COVERAGE_VALUES="$(chextrek_hud_map_coverage_values "$LOCAL_LOG")"
+C0="$(echo "$COVERAGE_VALUES" | sed -n '1p')"
+C1="$(echo "$COVERAGE_VALUES" | sed -n '2p')"
+C2="$(echo "$COVERAGE_VALUES" | sed -n '3p')"
+
+# map_pda: scale=<f> view_x=<f> view_y=<f> control=<N> - only "scale" is asserted here (saved by
+# #39); view_x/view_y/control are NOT saved (idPlayer::mapView/mapControl - see the header comment
+# above), so they're not expected to match after a load and aren't checked.
+SCALE_VALUES="$(grep -oE '^map_pda: scale=[0-9.]+' "$LOCAL_LOG" | grep -oE '[0-9.]+$')"
+S0="$(echo "$SCALE_VALUES" | sed -n '1p')"
+S1="$(echo "$SCALE_VALUES" | sed -n '2p')"
+S2="$(echo "$SCALE_VALUES" | sed -n '3p')"
+
+# --- pre-save setup sanity: zooming actually grew mapScale above its default (1), and it's frozen
+# (map_stop) before the walk, so S0 and S1 are the same, pre-save value ---
+if [ -n "$S0" ] && awk -v s="$S0" 'BEGIN { exit !(s > 1.0) }'; then
+	echo "PASS: map_zoom_in x2 grew mapScale above its default (scale=${S0})"
+else
+	echo "FAIL: expected mapScale > 1.0 after two map_zoom_in commands, got '${S0}'"
+	FAIL=1
+fi
+
+if [ -n "$S0" ] && [ -n "$S1" ] && [ "$S0" = "$S1" ]; then
+	echo "PASS: mapScale stayed frozen (map_stop) through the setviewpos walk (scale=${S1})"
+else
+	echo "FAIL: expected mapScale to stay frozen at ${S0} through the walk, got '${S1}'"
+	FAIL=1
+fi
+
+# --- walking (setviewpos) revealed more of the map before the save ---
+if [ -n "$C0" ] && [ "$C0" -gt 0 ]; then
+	echo "PASS: baseline coverage is already nonzero (${C0} texels), standing near the spawn point"
+else
+	echo "FAIL: expected nonzero baseline coverage, got '${C0}'"
+	FAIL=1
+fi
+
+if [ -n "$C1" ] && [ -n "$C0" ] && [ "$C1" -gt "$C0" ]; then
+	echo "PASS: the walk (setviewpos) grew coverage before the save (${C0} -> ${C1})"
+else
+	echo "FAIL: expected coverage to grow after the setviewpos walk, got ${C0} -> ${C1}"
+	FAIL=1
+fi
+
+# --- the AC itself: after save/load, the dump's map state and coverage match the pre-save values ---
+if [ -n "$C2" ] && [ -n "$C1" ] && [ "$C2" = "$C1" ]; then
+	echo "PASS: coverage after save/load matches the pre-save value (${C1} == ${C2}) - the revealed fog of war survived"
+else
+	echo "FAIL: expected coverage to still be ${C1} after save/load, got '${C2}'"
+	FAIL=1
+fi
+
+if [ -n "$S2" ] && [ -n "$S1" ] && [ "$S1" = "$S2" ]; then
+	echo "PASS: mapScale after save/load matches the pre-save value (${S1} == ${S2})"
+else
+	echo "FAIL: expected mapScale to still be ${S1} after save/load, got '${S2}'"
+	FAIL=1
+fi
+
+echo
+if [ $FAIL -eq 0 ]; then
+	echo "PASS: #39 HUD map save/load scenario - the revealed HUD map (fog-of-war coverage and mapScale) survives save/load"
+	exit 0
+else
+	echo "FAIL: #39 HUD map save/load scenario - see above"
+	exit 1
+fi

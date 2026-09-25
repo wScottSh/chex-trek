@@ -2295,6 +2295,22 @@ void idPlayer::Save( idSaveGame *savefile ) const {
 
 	savefile->WriteFloat( pm_stamina.GetFloat() );
 
+	// chextrek: spec #16/#39 (decomp-so/reference/hud-map.md; edits-inside-stock-functions lead:
+	// idPlayer::Save writes these in this exact order, right before Restore's matching block -
+	// mapControl/mapView/lastRevealOrigin/mapLevels are not saved, matching the reference's own
+	// Save/Restore lead). hudmap_alpha is the fog-of-war global (Player.cpp, above), not per
+	// player - saving/restoring it here (once, off whichever idPlayer::Save runs, single player
+	// only) reproduces the binary's own behavior.
+	savefile->WriteFloat( mapScale );
+	savefile->WriteInt( mapRadius );
+	savefile->WriteInt( unknown1e5c );
+	savefile->WriteFloat( revealDistance );
+	savefile->WriteFloat( mapWidth );
+	savefile->WriteFloat( mapHeight );
+	savefile->WriteVec4( mapCoords );
+	savefile->WriteString( mapMaterial );
+	savefile->Write( hudmap_alpha, sizeof( hudmap_alpha ) );
+
 	if ( hud ) {
 		hud->SetStateString( "message", common->GetLanguageDict()->GetString( "#str_02916" ) );
 		hud->HandleNamedEvent( "Message" );
@@ -2544,6 +2560,18 @@ void idPlayer::Restore( idRestoreGame *savefile ) {
 
 	savefile->ReadFloat( set );
 	pm_stamina.SetFloat( set );
+
+	// chextrek: spec #16/#39 (decomp-so/reference/hud-map.md; edits-inside-stock-functions lead).
+	// Same order Save wrote them in, above.
+	savefile->ReadFloat( mapScale );
+	savefile->ReadInt( mapRadius );
+	savefile->ReadInt( unknown1e5c );
+	savefile->ReadFloat( revealDistance );
+	savefile->ReadFloat( mapWidth );
+	savefile->ReadFloat( mapHeight );
+	savefile->ReadVec4( mapCoords );
+	savefile->ReadString( mapMaterial );
+	savefile->Read( hudmap_alpha, sizeof( hudmap_alpha ) );
 
 	// create combat collision hull for exact collision detection
 	SetCombatModel();
