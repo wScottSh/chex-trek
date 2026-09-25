@@ -661,21 +661,18 @@ class Records(unittest.TestCase):
         impl = verify.implementation_block(text)
         self.assertIn('const idEventDef AI_OpenDoors( "openDoors", "E" );', impl)
         self.assertIn("EVENT( AI_OpenDoors,", impl)
-        # binary: an idAI::eventCallbacks entry is { &AI_OpenDoors, &idAI::Event_OpenDoors, 0 }
-        symtab = {s.name: s for s in BINARY.elf.get_section_by_name(".symtab").iter_symbols()}
-        table = symtab["_ZN4idAI14eventCallbacksE"]
-        words = list(struct.unpack(f"<{table['st_size'] // 4}I", BINARY._bytes(table["st_value"], table["st_size"])))
-        dynsym = BINARY.elf.get_section_by_name(".dynsym")
-        for rel in BINARY.elf.get_section_by_name(".rel.dyn").iter_relocations():  # R_386_32 against a symbol
-            k = (rel["r_offset"] - table["st_value"]) // 4
-            if rel["r_info_sym"] and 0 <= k < len(words):
-                words[k] += dynsym.get_symbol(rel["r_info_sym"])["st_value"]
-        entries = [tuple(words[i:i + 3]) for i in range(0, len(words), 3)]
-        handler = BINARY.by_raw["_ZN4idAI15Event_OpenDoorsEP8idEntity"].vaddr
-        self.assertIn((symtab["AI_OpenDoors"]["st_value"], handler, 0), entries)
+        # binary: idAI::eventCallbacks entry 116 is { &AI_OpenDoors, &idAI::Event_OpenDoors },
+        # right after the stock AI_KickObstacles entry and before AI_GetObstacle
+        entries = BINARY.event_callbacks("_ZN4idAI14eventCallbacksE")
+        events = [e for e, _ in entries]
+        k = events.index(BINARY.symbol("AI_OpenDoors")[0])
+        self.assertEqual(k, 116)
+        self.assertEqual(entries[k][1], BINARY.by_raw["_ZN4idAI15Event_OpenDoorsEP8idEntity"].vaddr)
+        self.assertEqual(events[k - 1], BINARY.symbol("AI_KickObstacles")[0])
+        self.assertEqual(events[k + 1], BINARY.symbol("AI_GetObstacle")[0])
+        self.assertIn("entry 116", impl)
         # the event's name is in .rodata, and the mod's scripts declare it with one entity argument
-        ro_addr, ro = BINARY._rodata
-        self.assertIn(b"\0openDoors\0", ro)
+        self.assertTrue(BINARY.has_rodata_string("openDoors"))
         script = (verify.REPO_ROOT / "script" / "chex_events.script").read_text(encoding="utf-8")
         self.assertRegex(script, r"(?m)^scriptEvent\s+void\s+openDoors\(\s*entity\s+\w+\s*\);")
         self.assertIn("script/chex_events.script", text)

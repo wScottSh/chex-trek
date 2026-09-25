@@ -245,6 +245,30 @@ class Binary:
         ro = self.elf.get_section_by_name(".rodata")
         return ro["sh_addr"], ro.data()
 
+    def symbol(self, name: str) -> tuple[int, int]:
+        """(address, size) of a .symtab symbol of any type (functions, event defs, tables)."""
+        sym = next(s for s in self.elf.get_section_by_name(".symtab").iter_symbols() if s.name == name)
+        return sym["st_value"], sym["st_size"]
+
+    def has_rodata_string(self, text: str) -> bool:
+        """True if `text` is a whole NUL-terminated string in .rodata."""
+        return b"\0" + text.encode() + b"\0" in self._rodata[1]
+
+    def event_callbacks(self, symbol: str) -> list[tuple[int, int]]:
+        """A class's event table (`idAI::eventCallbacks`: CLASS_DECLARATION's idEventFunc array,
+        { const idEventDef *event; eventCallback_t function; } with the member pointer 8 bytes)
+        as (event def address, handler address) pairs, the terminating { NULL } included.
+        Pointers to global symbols are R_386_32 relocations (added to the stored addend); pointers
+        to local ones are stored as addresses."""
+        start, size = self.symbol(symbol)
+        words = list(struct.unpack(f"<{size // 4}I", self._bytes(start, size)))
+        dynsym = self.elf.get_section_by_name(".dynsym")
+        for rel in self.elf.get_section_by_name(".rel.dyn").iter_relocations():
+            k = (rel["r_offset"] - start) // 4
+            if rel["r_info_sym"] and start <= rel["r_offset"] < start + size:
+                words[k] += dynsym.get_symbol(rel["r_info_sym"])["st_value"]
+        return [(words[i], words[i + 1]) for i in range(0, len(words), 3)]
+
     @cached_property
     def _got(self) -> int:
         """_GLOBAL_OFFSET_TABLE_ (start of .got.plt): what the PIC register holds."""

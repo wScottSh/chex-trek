@@ -24,7 +24,8 @@ never reads is reported as mismatched, unless the function builds its text from 
 immediates: a string of IMMEDIATE_STRING_MIN or more characters whose bytes, NUL included,
 run through the function's `mov` immediates (binary.immediate_bytes), or whose bytes are exactly
 one whole run of byte-immediate stores (binary.immediate_byte_runs: the inline idStr::Insert
-copies its text without the NUL), is accepted and reported. Such a string is not required, since it cannot be told from integers without its source text.
+copies its text without the NUL), is accepted and reported. Such a string is not required,
+since it cannot be told from integers without its source text.
 Integer-load x87 operands (`fild`) are integers, not float constants, and are not checked.
 
 Check 3 -- compile. The group's header block and implementation block are compiled, 32-bit,
