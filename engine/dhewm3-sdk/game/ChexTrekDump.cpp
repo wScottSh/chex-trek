@@ -294,14 +294,14 @@ ChexTrek_TestGuiCompletion_f
 Test-only, spec #35. See ChexTrek_TestGuiCompletion_f's comment in ChexTrekDump.h for why a
 console command has to stand in for interactive tab-completion here. Rather than call
 idCmdSystem::ArgCompletion_GuiName directly (which would only prove that function exists, not that
-g_PDA is actually wired to it), this looks g_PDA up through cvarSystem->Find and reads its own
+g_PDA is actually wired to it), this looks g_PDA up through cvarSystem->Find (prints
+`g_pda_found`, whether that lookup succeeded at all) and reads its own
 idCVar::GetValueCompletion() - the exact function pointer the engine's interactive tab-completion
-would call for this cvar - prints whether it's non-NULL and whether it equals
-idCmdSystem::ArgCompletion_GuiName by address (so a scenario can assert the cvar's completion is
-*that* function, not merely *a* function), then calls it through that pointer with a callback that
-collects every string the engine's ArgCompletion_FolderExtension produces, printing the count plus
-each result so a scenario can also assert it lists guis/*.gui files, including the mod's own
-default PDA gui.
+would call for this cvar - prints whether it equals idCmdSystem::ArgCompletion_GuiName by address
+(`g_pda_completion_wired`, so a scenario can assert the cvar's completion is *that* function, not
+merely *a* function), then calls it through that pointer with a callback that collects every string
+the engine's ArgCompletion_FolderExtension produces, printing the count plus each result so a
+scenario can also assert it lists guis/*.gui files, including the mod's own default PDA gui.
 ==================
 */
 static idList<idStr> chextrekGuiCompletions;

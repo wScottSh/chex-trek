@@ -30,10 +30,11 @@
 # sf_923 places a PDA pickup reachable from spawn, so each phase spawns one directly:
 # def/items.def's item_pda (spawnclass idPDAItem) is exactly that - `spawn item_pda` is stock
 # behavior (Cmd_Spawn_f, gamesys/SysCmds.cpp; ArgCompletion_Decl<DECL_ENTITYDEF> lists it), not
-# anything ported by this sub-issue. It's given an explicit `name` so the later `trigger` doesn't
-# depend on Cmd_Spawn_f's auto-generated numbering (which would otherwise differ between phase 1
-# and phase 2, since neither map is reloaded from scratch - each phase's entity gets its own name
-# instead). `trigger <name>` (Cmd_Trigger_f) sends EV_Activate to the named entity with the local
+# anything ported by this sub-issue. It's given an explicit `name` (rather than relying on
+# Cmd_Spawn_f's auto-generated numbering, which restarts from the same counter on each fresh `map`
+# and would give both phases' item_pda the same auto-generated name) so each phase's `trigger`
+# unambiguously names its own phase's entity. `trigger <name>` (Cmd_Trigger_f) sends EV_Activate to
+# the named entity with the local
 # player as activator, synchronously, in the same frame - idItem::Event_Trigger treats a player
 # activator as a pickup (Pickup -> GiveToPlayer -> idPDAItem::GiveToPlayer -> idPlayer::GivePDA).
 # idPlayer::GivePDA itself calls TogglePDA() when this is the player's first PDA
