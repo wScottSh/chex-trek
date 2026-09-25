@@ -14,24 +14,30 @@
 # the full coverage left by showMap is visible in the dump immediately, with no wait for a reveal
 # to re-run.
 #
-# No wiring gap needed: showMap is a self-contained console command (decomp-so/reference/
-# hud-map.md's own Notes: "the registration's strings are read by the stock
-# idGameLocal::InitConsoleCommands ... they were read from the disassembly"), not one of a stock
-# function's edits-inside-stock-functions leads - so there is no "edit inside a stock function"
-# lead to record here, unlike #36/#37.
+# No wiring gap needed: unlike #36/#37, showMap is a self-contained console command, not one of a
+# stock function's edits-inside-stock-functions leads, so there is no such lead to record here.
 #
 # Scenario: on e1m1, a baseline chextrek_dump (standing at the spawn point, some but not all of
 # the map already revealed by the initial wait - the same partial-coverage baseline #36's own
-# scenario asserts) is followed by a plain "showMap" (no level argument, filling every level -
-# e1m1 is level 0, the only one occupied) and a second chextrek_dump, which must show
-# coverage=16384 (the full 128x128 fog-of-war image, spec #28's always-on "no ERROR" check plus
-# this scenario's own count). A third dump after "showMap 0" (the single-level argument form)
-# confirms that path too, still full.
+# scenario asserts) is followed by "showMap 1" (the single-level argument form, targeting level 1
+# - e1m1's own player is on level 0, so this must leave the player's current-level coverage
+# untouched) and a second chextrek_dump, which must still show the same partial coverage as the
+# baseline - proving the argument form only fills the level it names, not every level. A third
+# dump, after a plain "showMap" (no level argument, filling every level), must show
+# coverage=16384 (the full 128x128 fog-of-war image) for the player's own level - the AC this
+# scenario exists to prove. chextrek_dump's `hud_map` line only ever reports the *current* level
+# (idPlayer::HudMapLevel), so there's no way for this harness to directly inspect level 1's own
+# coverage after "showMap 1" and confirm it, specifically, went to 16384 - the two assertions above
+# (unaffected level 0, then full level 0 after the no-argument form) are what's actually
+# observable, and are what's checked below.
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SCRATCH_DIR="$(mktemp -d)"
 trap 'rm -rf "$SCRATCH_DIR"' EXIT
+
+# shellcheck source=tools/lib-harness.sh
+source "${SCRIPT_DIR}/lib-harness.sh"
 
 echo "=== #38 showMap test: build ==="
 if ! bash "${SCRIPT_DIR}/build-chextrek.sh"; then
@@ -47,11 +53,11 @@ wait 20
 
 chextrek_dump
 
-showMap
+showMap 1
 wait 5
 chextrek_dump
 
-showMap 0
+showMap
 wait 5
 chextrek_dump
 
@@ -86,8 +92,8 @@ else
 	FAIL=1
 fi
 
-# There are 3 chextrek_dump calls: baseline, after "showMap", after "showMap 0".
-COVERAGE_VALUES="$(grep -oE '^hud_map: level=[0-9]+ visible=[01] coverage=[0-9]+$' "$LOCAL_LOG" | grep -oE 'coverage=[0-9]+' | grep -oE '[0-9]+$')"
+# There are 3 chextrek_dump calls: baseline, after "showMap 1", after "showMap" (no argument).
+COVERAGE_VALUES="$(chextrek_hud_map_coverage_values "$LOCAL_LOG")"
 C0="$(echo "$COVERAGE_VALUES" | sed -n '1p')"
 C1="$(echo "$COVERAGE_VALUES" | sed -n '2p')"
 C2="$(echo "$COVERAGE_VALUES" | sed -n '3p')"
@@ -101,17 +107,19 @@ else
 	FAIL=1
 fi
 
-if [ -n "$C1" ] && [ "$C1" -eq "$FULL_COVERAGE" ]; then
-	echo "PASS: showMap (no level argument) revealed full coverage (${C1} of ${FULL_COVERAGE} texels)"
+# showMap 1 targets a level the player isn't on (e1m1's player is on level 0), so the player's own
+# level must be untouched - proving the single-level argument form doesn't spill onto every level.
+if [ -n "$C1" ] && [ "$C1" -eq "$C0" ]; then
+	echo "PASS: showMap 1 left the player's own level (0) coverage unchanged (${C1} of ${FULL_COVERAGE} texels)"
 else
-	echo "FAIL: expected coverage=${FULL_COVERAGE} after showMap, got '${C1}'"
+	echo "FAIL: expected showMap 1 to leave coverage at ${C0}, got '${C1}'"
 	FAIL=1
 fi
 
 if [ -n "$C2" ] && [ "$C2" -eq "$FULL_COVERAGE" ]; then
-	echo "PASS: showMap 0 (single-level argument) still shows full coverage (${C2} of ${FULL_COVERAGE} texels)"
+	echo "PASS: showMap (no level argument) revealed full coverage (${C2} of ${FULL_COVERAGE} texels)"
 else
-	echo "FAIL: expected coverage=${FULL_COVERAGE} after showMap 0, got '${C2}'"
+	echo "FAIL: expected coverage=${FULL_COVERAGE} after showMap, got '${C2}'"
 	FAIL=1
 fi
 

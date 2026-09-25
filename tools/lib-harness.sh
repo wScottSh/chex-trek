@@ -9,8 +9,26 @@
 # their own scenario-specific assertions on top of $CHEXTREK_LOCAL_LOG; the always-on checks alone
 # set $CHEXTREK_RUN_STATUS (0 pass, 1 fail).
 #
+# Also provides chextrek_hud_map_visible_values()/chextrek_hud_map_coverage_values() (#36/#38),
+# shared by tools/test-hud-map.sh and tools/test-show-map.sh so both don't repeat the same
+# `hud_map: level=<N> visible=<0|1> coverage=<N>` parsing pipeline.
+#
 # See docs/dev-setup.md for the environment variables this reads (DHEWM3_HOME, DOOM3_BASEPATH,
 # DHEWM3_DOCUMENTS_DIR) and for why the mount/save-path/timeout handling works the way it does.
+
+# chextrek_hud_map_visible_values LOG_FILE
+#
+# Prints each chextrek_dump `hud_map:` line's `visible` field, in log order, one per line.
+chextrek_hud_map_visible_values() {
+	grep -oE '^hud_map: level=[0-9]+ visible=[01] coverage=[0-9]+$' "$1" | grep -oE 'visible=[01]' | grep -oE '[01]$'
+}
+
+# chextrek_hud_map_coverage_values LOG_FILE
+#
+# Prints each chextrek_dump `hud_map:` line's `coverage` field, in log order, one per line.
+chextrek_hud_map_coverage_values() {
+	grep -oE '^hud_map: level=[0-9]+ visible=[01] coverage=[0-9]+$' "$1" | grep -oE 'coverage=[0-9]+' | grep -oE '[0-9]+$'
+}
 
 # chextrek_run_console_script REPO_ROOT CONSOLE_SCRIPT_BODY TIMEOUT_SECS RUN_LABEL
 #

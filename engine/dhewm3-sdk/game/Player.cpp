@@ -1037,9 +1037,7 @@ void idPlayer::Cmd_ShowMap_f( const idCmdArgs &args ) {
 	} else {
 		memset( hudmap_alpha, 0xff, sizeof( hudmap_alpha ) );
 	}
-	// Not uploaded here: the image changes on screen at the next reveal (updateHudMapAlpha). The
-	// change is visible at once in chextrek_dump's "coverage" count (ChexTrekDump.cpp), which
-	// reads hudmap_alpha directly rather than the uploaded render texture.
+	// Not uploaded here: the image changes on screen at the next reveal (updateHudMapAlpha).
 }
 
 /*

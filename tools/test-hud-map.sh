@@ -76,6 +76,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SCRATCH_DIR="$(mktemp -d)"
 trap 'rm -rf "$SCRATCH_DIR"' EXIT
 
+# shellcheck source=tools/lib-harness.sh
+source "${SCRIPT_DIR}/lib-harness.sh"
+
 echo "=== #36 HUD map test: build ==="
 if ! bash "${SCRIPT_DIR}/build-chextrek.sh"; then
 	echo "FAIL: build-chextrek.sh failed"
@@ -159,8 +162,8 @@ fi
 # There are 13 chextrek_dump calls total: baseline, after the first impulse 23 (open), eight
 # samples taken 20 frames apart after the second impulse 23 (close - see the comment above the
 # console script for why eight samples instead of one), then after each of the 3 setviewpos moves.
-VISIBLE_VALUES="$(grep -oE '^hud_map: level=[0-9]+ visible=[01] coverage=[0-9]+$' "$LOCAL_LOG" | grep -oE 'visible=[01]' | grep -oE '[01]$')"
-COVERAGE_VALUES="$(grep -oE '^hud_map: level=[0-9]+ visible=[01] coverage=[0-9]+$' "$LOCAL_LOG" | grep -oE 'coverage=[0-9]+' | grep -oE '[0-9]+$')"
+VISIBLE_VALUES="$(chextrek_hud_map_visible_values "$LOCAL_LOG")"
+COVERAGE_VALUES="$(chextrek_hud_map_coverage_values "$LOCAL_LOG")"
 
 V0="$(echo "$VISIBLE_VALUES" | sed -n '1p')"
 V1="$(echo "$VISIBLE_VALUES" | sed -n '2p')"
@@ -184,11 +187,23 @@ fi
 
 # The close transition (hud.gui's hudmap_close, onTime 400) is one-time and monotonic once it
 # fires, so it's enough for any of the eight samples to already show 0 - see the console-script
-# comment above for why a single fixed-length wait isn't reliable here.
+# comment above for why a single fixed-length wait isn't reliable here. The *last* sample must
+# also be 0 (not just any of them): once closed, nothing in this scenario reopens the map, so a
+# last sample that somehow read back 1 (e.g. a regression that reopens or double-toggles the map)
+# would mean the map didn't actually stay closed, even if an earlier sample happened to catch it
+# mid-transition at 0.
+LAST_CLOSE_SAMPLE="$(echo "$CLOSE_SAMPLES" | tail -n1)"
 if echo "$CLOSE_SAMPLES" | grep -qx '0'; then
 	echo "PASS: a second impulse 23 hid the HUD map again (visible 1 -> 0, seen in: $(echo "$CLOSE_SAMPLES" | tr '\n' ' '))"
 else
 	echo "FAIL: expected visible=0 in at least one of the eight post-close samples, got: $(echo "$CLOSE_SAMPLES" | tr '\n' ' ')"
+	FAIL=1
+fi
+
+if [ "$LAST_CLOSE_SAMPLE" = "0" ]; then
+	echo "PASS: the HUD map is still hidden at the last post-close sample (stayed closed)"
+else
+	echo "FAIL: expected the last post-close sample to be visible=0 (stayed closed), got '${LAST_CLOSE_SAMPLE}'"
 	FAIL=1
 fi
 
