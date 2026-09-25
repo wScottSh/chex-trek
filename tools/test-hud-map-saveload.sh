@@ -22,13 +22,30 @@
 # straight from a savegame held whatever garbage was already in that memory (Mem_Alloc doesn't
 # zero it) - confirmed live here, a garbage mapLevels[0] landing above the player's own z fired
 # "Location below lowest MapLevel" warnings after every save/load round-trip this scenario ran, so
-# the scenario also asserts that warning's absence below (a scenario-revealed gap, filled and
-# recorded next to this same lead per spec #28's gap-filling process).
+# the scenario also asserts that warning's absence below (a scenario-revealed gap, filled here and
+# recorded in docs/harness-coverage.md, matching #36-#38's own precedent of recording gap-filling
+# edits there rather than in the frozen, formally-checked decomp-so/reference/hud-map.md itself -
+# per spec #28's gap-filling process. This also answers that reference's own open question,
+# "whether idPlayer::Spawn (hence initHudMap) runs on a load was not checked": it doesn't).
 #
 # This scenario proves two of the newly-saved fields survive a real save/load round-trip:
 # - `hud_map`'s `coverage` (chextrek_dump, #36): the fog-of-war global itself, revealed by walking
 #   (setviewpos, same technique tools/test-hud-map.sh uses) before the save - the AC's literal
 #   subject ("dump ... coverage match the pre-save values").
+#
+# Review finding fixed here: hudmap_alpha is a single process-wide global, and mapScale lives on
+# the one idPlayer object dhewm3 keeps in memory the whole time - savegame/loadgame both run
+# inside the same process, without recreating either. So a naive "dump before save, dump after
+# load, assert they match" check would pass even if idPlayer::Restore's reads of them
+# (Player.cpp) were deleted entirely: both would simply still hold their pre-save values,
+# untouched by anything. To actually exercise Restore, the script perturbs both between the
+# savegame and the loadgame: the real "showMap" console command (#38) fills every level's
+# hudmap_alpha with 0xff (coverage=16384, the full 128x128 image), and another map_zoom_in grows
+# mapScale further past its already-zoomed pre-save value - both asserted in one dump below,
+# proving the globals did change in between. Only the loadgame that follows can bring coverage and
+# mapScale back down to their pre-save values - if idPlayer::Restore's reads were missing or
+# broken, the post-load dump would still show the showMap/zoom-perturbed values, not the pre-save
+# ones.
 # - `map_pda`'s `scale` (chextrek_dump, #37): idPlayer::mapScale, changed away from its default (1)
 #   with the PDA's own map_zoom_in GUI command before the save, then frozen with map_stop so no
 #   further per-frame change happens between capturing the pre-save value and loading - proving the
@@ -97,7 +114,14 @@ wait 15
 chextrek_dump
 
 savegame chextrek_hud_map_saveload_test
-wait 10
+wait 5
+
+showMap
+chextrek_test_pda_map_open 1
+chextrek_test_map_cmd map_zoom_in
+wait 5
+chextrek_dump
+
 loadgame chextrek_hud_map_saveload_test
 wait 20
 
@@ -134,30 +158,34 @@ else
 	FAIL=1
 fi
 
-# There are 3 chextrek_dump calls: after zooming+map_stop (before the walk), after the setviewpos
-# walk (the pre-save state), and after the savegame/loadgame round-trip (the post-load state).
+# There are 4 chextrek_dump calls: after zooming+map_stop (before the walk), after the setviewpos
+# walk (the pre-save state), after showMap (post-save, pre-load - proves hudmap_alpha actually
+# changed in between, see the header comment above), and after the savegame/loadgame round-trip
+# (the post-load state).
 COVERAGE_VALUES="$(chextrek_hud_map_coverage_values "$LOCAL_LOG")"
 C0="$(echo "$COVERAGE_VALUES" | sed -n '1p')"
 C1="$(echo "$COVERAGE_VALUES" | sed -n '2p')"
-C2="$(echo "$COVERAGE_VALUES" | sed -n '3p')"
+C_SHOWMAP="$(echo "$COVERAGE_VALUES" | sed -n '3p')"
+C2="$(echo "$COVERAGE_VALUES" | sed -n '4p')"
 
-# hud_map: level=<N> visible=<0|1> coverage=<N> - "level" (idPlayer::HudMapLevel( NULL )) is
-# asserted too, matching the same pre-save value, even though on e1m1 (all level 0) it would
-# happen to read 0 either way (HudMapLevel falls back to 0 and warns when z lands below
-# mapLevels[0] - see the FAIL: below for the assertion that actually would have caught a garbage
-# mapLevels[0], since the "level" value alone can't distinguish a correct level 0 from that
-# fallback).
-LEVEL_VALUES="$(grep -oE '^hud_map: level=[0-9]+' "$LOCAL_LOG" | grep -oE '[0-9]+$')"
+# "level" (idPlayer::HudMapLevel( NULL )) is asserted too, matching the same pre-save value, even
+# though on e1m1 (all level 0) it would happen to read 0 either way (HudMapLevel falls back to 0
+# and warns when z lands below mapLevels[0] - see the "Location below lowest MapLevel" check below
+# for the assertion that actually would have caught a garbage mapLevels[0], since the "level"
+# value alone can't distinguish a correct level 0 from that fallback).
+LEVEL_VALUES="$(chextrek_hud_map_level_values "$LOCAL_LOG")"
 L1="$(echo "$LEVEL_VALUES" | sed -n '2p')"
-L2="$(echo "$LEVEL_VALUES" | sed -n '3p')"
+L2="$(echo "$LEVEL_VALUES" | sed -n '4p')"
 
 # map_pda: scale=<f> view_x=<f> view_y=<f> control=<N> - only "scale" is asserted here (saved by
 # #39); view_x/view_y/control are NOT saved (idPlayer::mapView/mapControl - see the header comment
-# above), so they're not expected to match after a load and aren't checked.
-SCALE_VALUES="$(grep -oE '^map_pda: scale=[0-9.]+' "$LOCAL_LOG" | grep -oE '[0-9.]+$')"
+# above), so they're not expected to match after a load and aren't checked. Regex matches
+# tools/test-pda-map.sh's own (scientific notation/sign, even though mapScale itself is never
+# negative here) for consistency.
+SCALE_VALUES="$(grep -oE '^map_pda: scale=[0-9.eE+-]+' "$LOCAL_LOG" | grep -oE '[0-9.eE+-]+$')"
 S0="$(echo "$SCALE_VALUES" | sed -n '1p')"
 S1="$(echo "$SCALE_VALUES" | sed -n '2p')"
-S2="$(echo "$SCALE_VALUES" | sed -n '3p')"
+S2="$(echo "$SCALE_VALUES" | sed -n '4p')"
 
 # --- pre-save setup sanity: zooming actually grew mapScale above its default (1), and it's frozen
 # (map_stop) before the walk, so S0 and S1 are the same, pre-save value ---
@@ -190,7 +218,29 @@ else
 	FAIL=1
 fi
 
-# --- the AC itself: after save/load, the dump's map state and coverage match the pre-save values ---
+# --- proves hudmap_alpha and mapScale actually changed between the save and the load (see the
+# header comment above): without this, a post-load value that merely equals the pre-save value
+# would be ambiguous - both could just have sat there untouched the whole time, savegame/loadgame
+# running in the same process on the same idPlayer object. ---
+FULL_COVERAGE=16384 # 128 x 128 fog-of-war texels
+S_PERTURB="$(echo "$SCALE_VALUES" | sed -n '3p')"
+
+if [ -n "$C_SHOWMAP" ] && [ "$C_SHOWMAP" -eq "$FULL_COVERAGE" ]; then
+	echo "PASS: showMap (between the savegame and the loadgame) filled coverage to ${FULL_COVERAGE} - proves the global actually changed before the load"
+else
+	echo "FAIL: expected showMap to raise coverage to ${FULL_COVERAGE}, got '${C_SHOWMAP}'"
+	FAIL=1
+fi
+
+if [ -n "$S_PERTURB" ] && [ -n "$S1" ] && awk -v a="$S_PERTURB" -v b="$S1" 'BEGIN { exit !(a > b) }'; then
+	echo "PASS: another map_zoom_in (between the savegame and the loadgame) grew mapScale past its pre-save value (${S1} -> ${S_PERTURB}) - proves it actually changed before the load"
+else
+	echo "FAIL: expected mapScale to grow past ${S1} after the extra map_zoom_in, got '${S_PERTURB}'"
+	FAIL=1
+fi
+
+# --- the AC itself: after save/load, the dump's map state and coverage match the pre-save values,
+# not the showMap-filled value the load has to overwrite ---
 if [ -n "$C2" ] && [ -n "$C1" ] && [ "$C2" = "$C1" ]; then
 	echo "PASS: coverage after save/load matches the pre-save value (${C1} == ${C2}) - the revealed fog of war survived"
 else

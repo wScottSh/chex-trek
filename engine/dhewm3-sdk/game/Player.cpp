@@ -1419,39 +1419,43 @@ idPlayer::idPlayer() {
 
 	// chextrek: spec #16/#36/#39 (decomp-so/reference/hud-map.md; edits-inside-stock-functions
 	// lead: both idPlayer constructors construct mapMaterial - idStr's own default constructor
-	// already does this, nothing to add here besides the comment). mapControl/mapView/
-	// lastRevealOrigin/unknown1e5c are also zeroed by Init(), and mapLevels is also set by
-	// Spawn's initHudMap - but neither Init() nor Spawn() runs on the idPlayer object a
-	// savegame load restores into (idGameLocal::InitFromSaveGame, Game_local.cpp, restores
-	// entities straight from the savegame's serialized objects; it never calls LoadMap's normal
-	// entity-spawn path, idGameLocal::MapPopulate/SpawnMapEntities). Left unset here (matching
-	// only Mem_Alloc's own, non-zeroing allocation, gamesys/Class.cpp), these five members would
-	// hold whatever garbage was in that freshly-allocated memory after a load - not merely
-	// "stale", since these fields are also never restored (mapLevels is deliberately not saved
-	// either, per this same lead: it's re-read from the world's spawnArgs by initHudMap every
-	// map load, and idGameLocal::InitFromSaveGame's own LoadMap call happens before this player
-	// object is restored, not after, so re-running initHudMap here isn't an option). Confirmed
-	// live while writing #39's tools/test-hud-map-saveload.sh: without this, HudMapLevel's
-	// z < mapLevels[0] check fired "Location below lowest MapLevel" warnings after every
-	// savegame/loadgame round-trip that scenario's own console script ran, garbage mapLevels[0]
-	// having landed above the player's actual z. So this constructor now sets all five to the
-	// same defaults Init()/initHudMap would otherwise set them to on a normal spawn (this is a
-	// no-op there: Init() unconditionally overwrites mapControl/mapView/lastRevealOrigin/
-	// unknown1e5c again right after construction, and Spawn's initHudMap overwrites mapLevels
-	// again after that) - it only changes anything on the savegame-restore path, where nothing
-	// else ever sets them. mapLevels' defaults are initHudMap's own literal defaults for "no
-	// map_level_N key set" (Player.cpp, above): level 0 at -131072 (MIN_WORLD_COORD), 1-4 at
-	// 131072 (MAX_WORLD_COORD) - i.e. every z is on level 0, the same fallback initHudMap uses
-	// when a map sets none of those keys.
+	// already does this, nothing to add here besides the comment).
+	//
+	// mapControl/mapView/lastRevealOrigin are zeroed and unknown1e5c is set to -1 by Init(), and
+	// mapLevels is set by Spawn's initHudMap - matching the reference's own claim that "the
+	// binary's constructors don't set them either", only Init/Spawn do. But neither Init() nor
+	// Spawn() runs on the idPlayer object a savegame load restores into
+	// (idGameLocal::InitFromSaveGame, Game_local.cpp, restores entities straight from the
+	// savegame's serialized objects; it never calls LoadMap's normal entity-spawn path,
+	// idGameLocal::MapPopulate/SpawnMapEntities). None of these five members are saved either
+	// (this group's own Save/Restore, below), so - unlike the binary, a deliberate, recorded
+	// departure from it here - this constructor now also sets them, so a load doesn't leave them
+	// holding whatever garbage was already in that freshly-allocated, non-zeroing memory
+	// (Mem_Alloc, gamesys/Class.cpp). Confirmed live while writing #39's
+	// tools/test-hud-map-saveload.sh: without this, HudMapLevel's z < mapLevels[0] check fired
+	// "Location below lowest MapLevel" warnings after every savegame/loadgame round-trip that
+	// scenario's own console script ran, garbage mapLevels[0] having landed above the player's
+	// actual z. (Re-running initHudMap here isn't an option either: it needs the world's
+	// spawnArgs, and idGameLocal saves/restores entities in entity-number order - the player is
+	// entity 0, worldspawn a much later entity number - so gameLocal.world isn't restored yet at
+	// this point in a load.)
+	//
+	// This constructor setting all five is a no-op on a normal spawn (Init() unconditionally
+	// overwrites mapControl/mapView/lastRevealOrigin/unknown1e5c again right after construction,
+	// and Spawn's initHudMap overwrites mapLevels again after that) - it only changes anything on
+	// the savegame-restore path, where nothing else ever sets them. mapLevels' defaults match
+	// initHudMap's own literal defaults for "no map_level_N key set" (Player.cpp, above): level 0
+	// at MIN_WORLD_COORD, 1-4 at MAX_WORLD_COORD (sys/platform.h) - i.e. every z is on level 0,
+	// the same fallback initHudMap uses when a map sets none of those keys.
 	mapControl				= 0;
 	mapView.Zero();
 	lastRevealOrigin.Zero();
 	unknown1e5c				= -1;
-	mapLevels[ 0 ]			= -131072.0f;
-	mapLevels[ 1 ]			= 131072.0f;
-	mapLevels[ 2 ]			= 131072.0f;
-	mapLevels[ 3 ]			= 131072.0f;
-	mapLevels[ 4 ]			= 131072.0f;
+	mapLevels[ 0 ]			= MIN_WORLD_COORD;
+	mapLevels[ 1 ]			= MAX_WORLD_COORD;
+	mapLevels[ 2 ]			= MAX_WORLD_COORD;
+	mapLevels[ 3 ]			= MAX_WORLD_COORD;
+	mapLevels[ 4 ]			= MAX_WORLD_COORD;
 
 	heartRate				= BASE_HEARTRATE;
 	heartInfo.Init( 0, 0, 0, 0 );
