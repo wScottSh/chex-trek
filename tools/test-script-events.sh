@@ -59,6 +59,7 @@ chextrek_dump
 
 spawn monster_chex_biped name chextrek_footprint_actor footprint_on_sound 1
 wait 30
+chextrek_dump
 script sys.getEntity( $chextrek_test_str5 ).leftFoot()
 wait 10
 chextrek_dump
@@ -135,13 +136,14 @@ else
 fi
 
 # --- footPrint: the footprints counter (ChexTrekDump.cpp) rises across the trigger, not just
-# "ends up above zero" (which the AI's own idle behavior could satisfy on its own without proving
-# our leftFoot() call did anything). The scenario's 5th and 6th chextrek_dump calls are,
-# respectively, the baseline right before chextrek_footprint_actor is even spawned and the
-# reading right after triggering its leftFoot() - see the console script above.
+# "ends up above zero" (which the AI's own idle behavior - e.g. its own walk anim's footprint
+# frame commands - could satisfy on its own without proving our leftFoot() call did anything).
+# There are 6 chextrek_dump calls total (see the console script above); the 4th is taken right
+# after chextrek_footprint_actor is spawned and settles (wait 30) but *before* leftFoot() is
+# called - as late as possible while still being a true baseline - and the 5th right after.
 FOOTPRINTS_COUNTS="$(grep -oE '^footprints: [0-9]+' "$LOCAL_LOG" | grep -oE '[0-9]+$')"
-FOOTPRINTS_BASELINE="$(echo "$FOOTPRINTS_COUNTS" | sed -n '3p')"
-FOOTPRINTS_AFTER="$(echo "$FOOTPRINTS_COUNTS" | sed -n '4p')"
+FOOTPRINTS_BASELINE="$(echo "$FOOTPRINTS_COUNTS" | sed -n '4p')"
+FOOTPRINTS_AFTER="$(echo "$FOOTPRINTS_COUNTS" | sed -n '5p')"
 if [ -n "$FOOTPRINTS_BASELINE" ] && [ -n "$FOOTPRINTS_AFTER" ] && [ "$FOOTPRINTS_AFTER" -gt "$FOOTPRINTS_BASELINE" ]; then
 	echo "PASS: footPrint - a decal was projected (chextrek_dump's footprints counter went from ${FOOTPRINTS_BASELINE} to ${FOOTPRINTS_AFTER})"
 else
@@ -150,15 +152,15 @@ else
 fi
 
 # --- remove: a script's remove() call actually shrinks the live entity count ---
-# Same 5 chextrek_dump calls as above: the 4th is right before chextrek_removeme.remove(), the
-# 5th right after.
+# Same 6 chextrek_dump calls as above: the 5th is right before chextrek_removeme.remove(), the
+# 6th right after.
 ENTITY_COUNTS="$(grep -oE '^entities: [0-9]+' "$LOCAL_LOG" | grep -oE '[0-9]+$')"
-BEFORE_REMOVE="$(echo "$ENTITY_COUNTS" | sed -n '4p')"
-AFTER_REMOVE="$(echo "$ENTITY_COUNTS" | sed -n '5p')"
+BEFORE_REMOVE="$(echo "$ENTITY_COUNTS" | sed -n '5p')"
+AFTER_REMOVE="$(echo "$ENTITY_COUNTS" | sed -n '6p')"
 if [ -n "$BEFORE_REMOVE" ] && [ -n "$AFTER_REMOVE" ] && [ "$AFTER_REMOVE" -eq $(( BEFORE_REMOVE - 1 )) ]; then
 	echo "PASS: remove - entities went from ${BEFORE_REMOVE} to ${AFTER_REMOVE} after chextrek_removeme.remove()"
 else
-	echo "FAIL: remove - expected the 5th entity count to be exactly one less than the 4th, got '${BEFORE_REMOVE}' then '${AFTER_REMOVE}'"
+	echo "FAIL: remove - expected the 6th entity count to be exactly one less than the 5th, got '${BEFORE_REMOVE}' then '${AFTER_REMOVE}'"
 	FAIL=1
 fi
 

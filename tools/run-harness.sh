@@ -44,5 +44,5 @@ wait
 quit"
 
 chextrek_run_console_script "$REPO_ROOT" "$CONSOLE_SCRIPT" "$TIMEOUT_SECS" "chextrek_harness"
-echo "CHEXTREK_LOCAL_LOG=${CHEXTREK_LOCAL_LOG}"
+echo "CHEXTREK_LOCAL_LOG=${CHEXTREK_LOCAL_LOG:-}"
 exit $CHEXTREK_RUN_STATUS

@@ -123,17 +123,15 @@ chextrek_run_console_script() {
 	fi
 
 	# --- archive this run's artifacts (log + any screenshot), still outside the repo ---
-	# `screenshot <name>` ignores the given name: the engine writes an auto-numbered
-	# "shot00001.tga" under a "screenshots/" subfolder instead (found on #30's first green run -
-	# see docs/dev-setup.md). But a scenario's console script (caller-authored, not this function)
-	# can also pick its own `screenshot <name>` text, which then lands as a plain, extensionless
-	# file named exactly <name> straight in MOD_SAVE_DIR (confirmed: test-script-events.sh's
-	# "screenshot chextrek_script_events" writes "chextrek_script_events", not
-	# "chextrek_script_events_<runid>*" - the SHOT_NAME guess below never matched it, so that
-	# scenario's screenshot was silently never archived). Since MOD_SAVE_DIR is wiped to empty
-	# before every run (above), anything left in it or under screenshots/ afterward - other than
-	# our own cfg - is this run's own output, so archive all of it rather than guessing a name
-	# pattern; never asserted on (spec #28: "saved as artifacts, never asserted"), so this stays
+	# `screenshot <name>` writes a plain, extensionless file named exactly <name> straight into
+	# MOD_SAVE_DIR (confirmed on #30's scenario runs: "screenshot chextrek_script_events" writes
+	# "chextrek_script_events"; see docs/dev-setup.md - this corrects #29's guess that the name is
+	# ignored in favor of an auto-numbered "screenshots/shot00001.tga", which isn't what this
+	# engine build actually does). Rather than hardcode a name pattern here - which would have to
+	# track whatever name each caller's console script happens to pick - archive everything: since
+	# MOD_SAVE_DIR is wiped to empty before every run (above), anything left in it (or under a
+	# screenshots/ subfolder, just in case) afterward, other than our own cfg, is this run's own
+	# output. Never asserted on (spec #28: "saved as artifacts, never asserted"), so this stays
 	# best-effort.
 	CHEXTREK_ARTIFACT_DIR="${SAVE_ROOT}/chextrek-harness-artifacts/${RUN_ID}"
 	mkdir -p "$CHEXTREK_ARTIFACT_DIR"
@@ -175,7 +173,7 @@ chextrek_run_console_script() {
 
 	# Always-on checks (spec #28): no ERROR, no unknown event/spawnclass/script-compile lines.
 	# "Unknown spawnclass" was the #29 guess at how the engine reports this; it never actually
-	# matches anything (Game_local.cpp warns "Could not spawn '<name>'.  Class '<classname>' not
+	# matches anything (Game_local.cpp warns "Could not spawn '<classname>'.  Class '<spawnclass>' not
 	# found..." instead - grep confirms "Unknown spawnclass" isn't a string this engine build ever
 	# prints), so this check was silently unable to fire before now. Matching the real message
 	# turns up one pre-existing, out-of-scope-for-#30 gap on `e1m1`: `idTarget_EndLevelGUI` isn't
