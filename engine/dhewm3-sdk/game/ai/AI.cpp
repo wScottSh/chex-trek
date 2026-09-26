@@ -2736,10 +2736,10 @@ void idAI::AnimMove( void ) {
 		// physicsObj.GetSlideMoveEntity() ... blockEnt = physicsObj.GetSlideMoveEntity(); if
 		// (canOpenDoors) OpenDoors(blockEnt); just before the stock idMoveable kick test"). Runs
 		// before the stock kick-obstacles test below, matching the reference's ordering.
-		// chextrek: spec #42, test-only, added after review. Unconditional (unlike the
-		// canOpenDoors-gated OpenDoors call below) so a scenario with canopendoors 0 can still tell
-		// what the AI's own blocked-movement physics actually bumped into. See ChexTrek_NoteAIBlocked
-		// in ChexTrekDump.h.
+		// chextrek: spec #42, test-only. Unconditional (unlike the canOpenDoors-gated OpenDoors
+		// call below) so a scenario with canopendoors 0 can still tell what the AI's own
+		// blocked-movement physics actually bumped into. See ChexTrek_NoteAIBlocked in
+		// ChexTrekDump.h.
 		ChexTrek_NoteAIBlocked( blockEnt ? blockEnt->name.c_str() : "none" );
 		if ( canOpenDoors ) {
 			OpenDoors( blockEnt );
@@ -2875,10 +2875,10 @@ void idAI::SlideMove( void ) {
 		// physicsObj.GetSlideMoveEntity() ... blockEnt = physicsObj.GetSlideMoveEntity(); if
 		// (canOpenDoors) OpenDoors(blockEnt); just before the stock idMoveable kick test"). Runs
 		// before the stock kick-obstacles test below, matching the reference's ordering.
-		// chextrek: spec #42, test-only, added after review. Unconditional (unlike the
-		// canOpenDoors-gated OpenDoors call below) so a scenario with canopendoors 0 can still tell
-		// what the AI's own blocked-movement physics actually bumped into. See ChexTrek_NoteAIBlocked
-		// in ChexTrekDump.h.
+		// chextrek: spec #42, test-only. Unconditional (unlike the canOpenDoors-gated OpenDoors
+		// call below) so a scenario with canopendoors 0 can still tell what the AI's own
+		// blocked-movement physics actually bumped into. See ChexTrek_NoteAIBlocked in
+		// ChexTrekDump.h.
 		ChexTrek_NoteAIBlocked( blockEnt ? blockEnt->name.c_str() : "none" );
 		if ( canOpenDoors ) {
 			OpenDoors( blockEnt );
@@ -3136,10 +3136,10 @@ void idAI::FlyMove( void ) {
 		// physicsObj.GetSlideMoveEntity() ... blockEnt = physicsObj.GetSlideMoveEntity(); if
 		// (canOpenDoors) OpenDoors(blockEnt); just before the stock idMoveable kick test"). Runs
 		// before the stock kick-obstacles test below, matching the reference's ordering.
-		// chextrek: spec #42, test-only, added after review. Unconditional (unlike the
-		// canOpenDoors-gated OpenDoors call below) so a scenario with canopendoors 0 can still tell
-		// what the AI's own blocked-movement physics actually bumped into. See ChexTrek_NoteAIBlocked
-		// in ChexTrekDump.h.
+		// chextrek: spec #42, test-only. Unconditional (unlike the canOpenDoors-gated OpenDoors
+		// call below) so a scenario with canopendoors 0 can still tell what the AI's own
+		// blocked-movement physics actually bumped into. See ChexTrek_NoteAIBlocked in
+		// ChexTrekDump.h.
 		ChexTrek_NoteAIBlocked( blockEnt ? blockEnt->name.c_str() : "none" );
 		if ( canOpenDoors ) {
 			OpenDoors( blockEnt );

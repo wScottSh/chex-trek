@@ -249,12 +249,11 @@ AnimMove/FlyMove/SlideMove wiring (idAI::canOpenDoors, read from the "canopendoo
 default "1"), which calls OpenDoors whenever a monster's own blocked-movement physics reports the
 entity it bumped into. These two lines let a scenario tell "a monster's own movement wiring opened
 this door" from "the door happened to already be open" independent of the door's own isOpen()
-state, the same technique #40/#41's door_tryopen_count/_last use for idPlayer::tryOpen. A later
-review round added `ai_blocked_last` (via ChexTrek_NoteAIBlocked), read unconditionally from
-GetSlideMoveEntity() before the canOpenDoors check runs: with "canopendoors 0", OpenDoors never
-runs at all, so ai_opendoor_count/_last alone can't tell "the monster was blocked by func_door_1
-specifically" from "the monster stopped for some unrelated reason" - the gap that scenario needs
-closed for its own "canopendoors 0" acceptance criterion.
+state, the same technique #40/#41's door_tryopen_count/_last use for idPlayer::tryOpen.
+`ai_blocked_last` (via ChexTrek_NoteAIBlocked) reads GetSlideMoveEntity() unconditionally, before
+the canOpenDoors check runs: with "canopendoors 0", OpenDoors never runs at all, so
+ai_opendoor_count/_last alone can't tell "the monster was blocked by func_door_1 specifically" from
+"the monster stopped for some unrelated reason".
 ==================
 */
 void ChexTrek_Dump_f( const idCmdArgs &args ) {

@@ -142,13 +142,12 @@ void ChexTrek_NoteTryOpenDoor( const char *doorName );
 // change what OpenDoors does.
 void ChexTrek_NoteAIOpenDoor( const char *doorName );
 
-// chextrek: spec #42, added after review found `ai_opendoor_count`/`_last` alone can't prove
-// what's blocking a monster when `canopendoors 0` stops `idAI::OpenDoors` from ever running (the
-// `canopendoors 0` acceptance criterion needs exactly that: "the monster is blocked and the door
-// stays shut", not just "the door stays shut"). AnimMove/FlyMove/SlideMove (AI.cpp) each call this
-// right after computing `blockEnt = physicsObj.GetSlideMoveEntity()`, unconditionally - before the
-// `if ( canOpenDoors )` check - passing that entity's name (or "none" if blockEnt is NULL). This
-// is the only script-visible read of `GetSlideMoveEntity()`: no scriptEvent exposes it, and
+// chextrek: spec #42. `ai_opendoor_count`/`_last` above are gated by `canOpenDoors`, so they can't
+// tell what's blocking a monster when `canopendoors 0` stops `idAI::OpenDoors` from ever running.
+// AnimMove/FlyMove/SlideMove (AI.cpp) each call this right after computing
+// `blockEnt = physicsObj.GetSlideMoveEntity()`, unconditionally - before the `if ( canOpenDoors )`
+// check - passing that entity's name (or "none" if blockEnt is NULL). This is the only
+// script-visible read of `GetSlideMoveEntity()`: no scriptEvent exposes it, and
 // `idAI::moveStatus()` was tried as a substitute and found not to reflect it (it's driven by a
 // separate AAS-level obstacle-avoidance system, not this direct physics-collision signal).
 void ChexTrek_NoteAIBlocked( const char *entName );
