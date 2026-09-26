@@ -63,7 +63,14 @@
 #      "reaches" that nominal target point, which is exactly what triggers `GetSlideMoveEntity()`
 #      returning the door and this sub-issue's wiring firing - confirmed directly via
 #      `ai_opendoor_count`/`ai_opendoor_last` on an actual run, in both the open (AC1) and blocked
-#      (AC2) cases, with both ending at essentially the same final position (~-237 182) either way.
+#      (AC2) cases, with both ending at essentially the same final `distanceToPoint()` reading
+#      (~67 units from the -256 184 64 target, down from ~76 at spawn) either way - asserted below,
+#      not just observed manually (a prior review round found the manual-only version of this
+#      claim was wrong: an earlier draft of this comment guessed the final position at ~-237 182,
+#      ~19 units from the target; the actual measured distanceToPoint() is ~67 units, i.e. only
+#      ~9 units of net progress before the monster's own bounding volume is stopped by the door's
+#      solid brush - the assertions below use that real, relative ~9-unit drop, not the guessed
+#      absolute one).
 #
 # `chextrek_test_str14` (ChexTrekDump.cpp, this sub-issue) holds the spawned monster's own name,
 # quoted, for the same reason `chextrek_test_str10`/`_11`/etc. hold door names - see
@@ -105,6 +112,17 @@
 # independent of exactly when that 3-second window lands relative to the poll cadence. AC2 polls
 # on the same schedule (markers 46100/46200/.../47400) and requires *every* one of them to read
 # closed.
+#
+# A prior review round found AC2 could pass even if the console-spawned monster never moved at all
+# (canopendoors 0 blocking the door and a monster sitting still both read as "every poll closed").
+# Both ACs now also print distanceToPoint() against the same moveToPosition target - once right
+# after spawn (baseline, ~76 units: the monster spawns at "-180 184 64", the target is
+# "-256 184 64") and once after the last poll (see the header above for the actual measured drop,
+# ~9 units, whether the door opened or stayed shut) - proving the monster actually walked toward
+# and got blocked at the door in both cases, not merely that it held still. AC1 uses markers 90000
+# (baseline)/91000 (final); AC2 uses 93000/94000 - all four ranges sit well clear of the
+# 43000/44100-45400/46100-47400 isOpen() marker ranges above (distanceToPoint returns
+# double-digit-to-low-hundreds units here, so none of these can collide).
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -129,12 +147,13 @@ developer 1
 map sf_923
 wait 20
 chextrek_dump
-script sys.println( 44000 + sys.getEntity( $chextrek_test_str10 ).isOpen() )
+script sys.println( 43000 + sys.getEntity( $chextrek_test_str10 ).isOpen() )
 
 spawn monster_chex_biped name chextrek_test_ai_monster origin "-180 184 64" angle "180" neverDormant "1"
 wait 30
-script sys.getEntity( $chextrek_test_str14 ).setMoveType( 2 )
 set chextrek_test_str15 "'-256 184 64'"
+script sys.println( 90000 + sys.getEntity( $chextrek_test_str14 ).distanceToPoint( $chextrek_test_str15 ) )
+script sys.getEntity( $chextrek_test_str14 ).setMoveType( 2 )
 script sys.getEntity( $chextrek_test_str14 ).moveToPosition( $chextrek_test_str15 )
 
 wait 400
@@ -165,6 +184,7 @@ wait 400
 script sys.println( 45300 + sys.getEntity( $chextrek_test_str10 ).isOpen() )
 wait 400
 script sys.println( 45400 + sys.getEntity( $chextrek_test_str10 ).isOpen() )
+script sys.println( 91000 + sys.getEntity( $chextrek_test_str14 ).distanceToPoint( $chextrek_test_str15 ) )
 
 chextrek_dump
 screenshot chextrek_ai_door_open_ac1
@@ -195,11 +215,11 @@ else
 		FAIL=1
 	fi
 
-	COUNT_44000="$(grep -c '^44000$' "$LOCAL_LOG_AC1")"
-	if [ "$COUNT_44000" -ge 1 ]; then
-		echo "PASS: AC1 - func_door_1.isOpen() reports closed (44000) before the monster moves"
+	COUNT_43000="$(grep -c '^43000$' "$LOCAL_LOG_AC1")"
+	if [ "$COUNT_43000" -ge 1 ]; then
+		echo "PASS: AC1 - func_door_1.isOpen() reports closed (43000) before the monster moves"
 	else
-		echo "FAIL: expected to see '44000' in the AC1 log before the monster moves"
+		echo "FAIL: expected to see '43000' in the AC1 log before the monster moves"
 		FAIL=1
 	fi
 
@@ -227,6 +247,24 @@ else
 		echo "FAIL: expected at least one of the 14 isOpen() polls after the walk to read open, got none"
 		FAIL=1
 	fi
+
+	# A prior review round found this scenario could pass even if the monster never moved at all
+	# (an already-open-door reading and a never-moved monster look identical to the isOpen()
+	# checks above). distanceToPoint() against the moveToPosition target proves actual movement: it
+	# must start far (>50 units - confirmed ~76 on an actual run) and then drop by a meaningful
+	# margin (>5 units) once blocked at the door - a relative check rather than a fixed final
+	# distance, since an actual run measured the SlideMove-blocked resting distance at ~67 units
+	# (~9 unit net progress before the monster's own bounding volume is stopped by the door's solid
+	# brush), not the ~19 units the header's manual-run note above guessed at.
+	DIST_BASELINE_AC1="$(grep -E '^90[0-9]+(\.[0-9]+)?$' "$LOCAL_LOG_AC1" | head -1)"
+	DIST_FINAL_AC1="$(grep -E '^91[0-9]+(\.[0-9]+)?$' "$LOCAL_LOG_AC1" | head -1)"
+	if [ -n "$DIST_BASELINE_AC1" ] && [ -n "$DIST_FINAL_AC1" ] \
+		&& awk -v b="$DIST_BASELINE_AC1" -v f="$DIST_FINAL_AC1" 'BEGIN{exit !((b-90000)>50 && ((b-90000)-(f-91000))>5)}'; then
+		echo "PASS: AC1 - the monster actually walked toward func_door_1 (distanceToPoint ${DIST_BASELINE_AC1} -> ${DIST_FINAL_AC1})"
+	else
+		echo "FAIL: expected distanceToPoint to start >50 and drop by >5, got baseline='${DIST_BASELINE_AC1}' final='${DIST_FINAL_AC1}'"
+		FAIL=1
+	fi
 fi
 
 # --- AC2: canopendoors 0 - the monster is blocked and the door stays shut ---
@@ -240,8 +278,9 @@ script sys.println( 45000 + sys.getEntity( $chextrek_test_str10 ).isOpen() )
 
 spawn monster_chex_biped name chextrek_test_ai_monster origin "-180 184 64" angle "180" canopendoors "0" neverDormant "1"
 wait 30
-script sys.getEntity( $chextrek_test_str14 ).setMoveType( 2 )
 set chextrek_test_str15 "'-256 184 64'"
+script sys.println( 93000 + sys.getEntity( $chextrek_test_str14 ).distanceToPoint( $chextrek_test_str15 ) )
+script sys.getEntity( $chextrek_test_str14 ).setMoveType( 2 )
 script sys.getEntity( $chextrek_test_str14 ).moveToPosition( $chextrek_test_str15 )
 
 wait 400
@@ -272,6 +311,7 @@ wait 400
 script sys.println( 47300 + sys.getEntity( $chextrek_test_str10 ).isOpen() )
 wait 400
 script sys.println( 47400 + sys.getEntity( $chextrek_test_str10 ).isOpen() )
+script sys.println( 94000 + sys.getEntity( $chextrek_test_str14 ).distanceToPoint( $chextrek_test_str15 ) )
 
 chextrek_dump
 screenshot chextrek_ai_door_open_ac2
@@ -330,6 +370,20 @@ else
 		echo "PASS: AC2 - func_door_1.isOpen() read closed on all 14 polls across the blocked monster's attempt"
 	else
 		echo "FAIL: expected all 14 isOpen() polls to read closed and none open, got ${CLOSED_POLL_COUNT_AC2} closed / ${OPEN_POLL_COUNT_AC2} open"
+		FAIL=1
+	fi
+
+	# Same rationale and thresholds as AC1's distance check above: without this, "canopendoors 0
+	# blocked the door" and "the monster never moved" both read as "every poll closed" above. Prove
+	# the monster still walked toward and got blocked at func_door_1 even with door-opening
+	# disabled (a relative drop, not a fixed final distance - see the AC1 comment for why).
+	DIST_BASELINE_AC2="$(grep -E '^93[0-9]+(\.[0-9]+)?$' "$LOCAL_LOG_AC2" | head -1)"
+	DIST_FINAL_AC2="$(grep -E '^94[0-9]+(\.[0-9]+)?$' "$LOCAL_LOG_AC2" | head -1)"
+	if [ -n "$DIST_BASELINE_AC2" ] && [ -n "$DIST_FINAL_AC2" ] \
+		&& awk -v b="$DIST_BASELINE_AC2" -v f="$DIST_FINAL_AC2" 'BEGIN{exit !((b-93000)>50 && ((b-93000)-(f-94000))>5)}'; then
+		echo "PASS: AC2 - the monster still walked toward func_door_1 and was blocked by it (distanceToPoint ${DIST_BASELINE_AC2} -> ${DIST_FINAL_AC2})"
+	else
+		echo "FAIL: expected distanceToPoint to start >50 and drop by >5, got baseline='${DIST_BASELINE_AC2}' final='${DIST_FINAL_AC2}'"
 		FAIL=1
 	fi
 fi
