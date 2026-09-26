@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Automated test for spec #43's acceptance criteria (decomp-so/reference/trails.md, ported this
-# sub-issue into game/Trail.h/.cpp plus the "edits inside stock functions" leads spliced into
+# Automated test for spec #43's acceptance criteria (decomp-so/reference/trails.md, ported in
+# #43 into game/Trail.h/.cpp plus the "edits inside stock functions" leads spliced into
 # Actor.cpp's Spawn/~idActor and Game_local.cpp's RunFrame/BabySitTrail/RemoveTrail):
 #   AC1: spawn a flemoid and let it move; the dump trail count rises, then returns to zero after
 #        the fade (tested as "returns to its pre-existing baseline", not literally 0 - see below,
@@ -43,13 +43,14 @@
 # "Trails appear where they should" is asserted on the map's own flemoids, as a nonzero baseline
 # `anchors` count: mkTrail::addNewAnchor only adds an anchor where its trace down from the actor's
 # position hits ground within maxSurfDist, so every counted anchor sits on the ground under the
-# actor. (The count, not each anchor's position, is what the dump exposes.) This scenario's own spawned trail is NOT asserted to lay
-# anchors: mkTrail::lastPos is never initialized (reference Notes; an original-mod bug spec #28
-# leaves alone since it doesn't crash). An in-game check (a temporary log line in
-# mkTrail::addNewAnchor) showed about half of sf_923's trails start with a garbage lastPos (NaN, or
-# values ~1e38 whose squared length overflows): Think's `LengthFast() > updateDist` test is then
-# always false, so those trails never update or anchor for the whole level. Whether the spawned
-# one does depends on heap contents, so its anchor count is reported as INFO only.
+# actor. (The count, not each anchor's position, is what the dump exposes.) This scenario's own
+# spawned trail is NOT asserted to lay anchors: mkTrail::lastPos is never initialized (reference
+# Notes; an original-mod bug spec #28 leaves alone since it doesn't crash). An in-game check (a
+# temporary log line in mkTrail::addNewAnchor) showed about half of sf_923's trails start with a
+# garbage lastPos (NaN, or values ~1e38 whose squared length overflows): Think's `LengthFast() >
+# updateDist` test is then always false, so those trails never update or anchor for the whole level.
+# Whether the spawned one does depends on heap contents, so its anchor count is reported as INFO
+# only.
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -129,10 +130,10 @@ else
 	# (already nonzero - see the header comment above), (2) right after spawn, (3) after the walk,
 	# (4) right after remove, (5)-(9) five more polls, ~300 wait-ticks apart, well past the
 	# fixture's 2-second fadeTime by the last one (a "wait" tick is one rendered frame, a few ms of
-	# game time that varies by run - see docs/harness-coverage.md - so staggered dumps give margin). chextrek_line_field_values returns one
-	# value per dump, in order; the LAST one is what "once the fade finished" checks. Every check
-	# below is a delta against the baseline, since the map's own pre-placed flemoids' trails are
-	# part of every one of these counts too.
+	# game time that varies by run - see docs/harness-coverage.md - so staggered dumps give margin).
+	# chextrek_line_field_values returns one value per dump, in order; the LAST one is what "once
+	# the fade finished" checks. Every check below is a delta against the baseline, since the map's
+	# own pre-placed flemoids' trails are part of every one of these counts too.
 	TRAILS_VALUES="$(chextrek_line_field_values "$LOCAL_LOG" trails)"
 	ANCHORS_VALUES="$(chextrek_line_field_values "$LOCAL_LOG" anchors)"
 	TRAILS_BASELINE="$(echo "$TRAILS_VALUES" | sed -n '1p')"

@@ -56,8 +56,8 @@
 # the real, already-placed exit entity's own nextMap wiring works. `trigger target_endlevel_3`
 # fires that real, unmodified stock entity directly (the same `Cmd_Trigger_f` -> `ProcessEvent(
 # &EV_Activate, player )` technique every other scenario in this suite already uses to fire a
-# specific real entity, e.g. #33's `trigger func_door_16`), which is confirmed live (this
-# sub-issue) to load e1m1 clean.
+# specific real entity, e.g. #33's `trigger func_door_16`), which is confirmed live (#46)
+# to load e1m1 clean.
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

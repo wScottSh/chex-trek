@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Automated test for spec #41's acceptance criteria (decomp-so/reference/door-opening.md,
-# idPlayer::tryOpen's locked-door branches, ported as part of #40's whole-function port; this
-# sub-issue is the scenario coverage for those branches - see docs/harness-coverage.md).
+# idPlayer::tryOpen's locked-door branches, ported as part of #40's whole-function port; #41 is
+# the scenario coverage for those branches - see docs/harness-coverage.md).
 #   AC1 (sf_923): use a door with lockedtext (no "requires"); the text is shown (log)
 #   AC2 (e1m1): use a Blue Key door without the key; tip shown, door stays shut; give the key,
 #     use again; the door opens
