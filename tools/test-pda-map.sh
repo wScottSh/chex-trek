@@ -28,7 +28,7 @@
 # (as opposed to the always-centered HUD corner map) while the PDA is open AND the PDA gui's own
 # "HudMap" state variable is true - a variable only a mouse click on guis/pda_chex.gui's "Data" tab
 # sets in the real game (resetTime "hudmap_open" "0", which sets "gui::HudMap" "1" at its own
-# onTime 5), not anything idPlayer's C++ (this sub-issue's scope) drives, and out of the
+# onTime 5), not anything idPlayer's C++ (#37's scope) drives, and out of the
 # console-only harness's reach the same way the map_* commands themselves are. The new test-only
 # `chextrek_test_pda_map_open <0|1>` sets that same GUI state variable directly through
 # idUserInterface::SetStateBool - the same underlying engine call the GUI script's own

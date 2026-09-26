@@ -40,9 +40,10 @@
 # RemoveTrail drops it from gameLocal.trails) 2 s of game time later. The "script" lines reach the
 # monster through $chextrek_test_str14, whose compiled-in value is its name (see ChexTrekDump.cpp).
 #
-# "Trails appear where they should" (anchors on the ground under the actor) is asserted on the
-# map's own flemoids: their trails lay an anchor below the actor when first presented, so the
-# baseline `anchors` count must be nonzero. This scenario's own spawned trail is NOT asserted to lay
+# "Trails appear where they should" is asserted on the map's own flemoids, as a nonzero baseline
+# `anchors` count: mkTrail::addNewAnchor only adds an anchor where its trace down from the actor's
+# position hits ground within maxSurfDist, so every counted anchor sits on the ground under the
+# actor. (The count, not each anchor's position, is what the dump exposes.) This scenario's own spawned trail is NOT asserted to lay
 # anchors: mkTrail::lastPos is never initialized (reference Notes; an original-mod bug spec #28
 # leaves alone since it doesn't crash). An in-game check (a temporary log line in
 # mkTrail::addNewAnchor) showed about half of sf_923's trails start with a garbage lastPos (NaN, or
@@ -127,12 +128,8 @@ else
 	# Nine chextrek_dump calls in the script above, in order: (1) baseline, right after map load
 	# (already nonzero - see the header comment above), (2) right after spawn, (3) after the walk,
 	# (4) right after remove, (5)-(9) five more polls, ~300 wait-ticks apart, well past the
-	# fixture's 2-second fadeTime by the last one - a live run measured this build's "wait" tick at
-	# only ~2.5-3.5ms of simulated game time each (not the ~16.7ms/tick #42's door-open scenario
-	# measured on its own map/frame-rate conditions - "wait" ticks are real rendered frames, and this
-	# engine renders as fast as it can with no cap, so the ms-per-tick ratio isn't a fixed constant),
-	# so five staggered dumps (rather than one single long wait) give plenty of margin without
-	# gambling the whole scenario on one guessed wait count. chextrek_line_field_values returns one
+	# fixture's 2-second fadeTime by the last one (a "wait" tick is one rendered frame, a few ms of
+	# game time that varies by run - see docs/harness-coverage.md - so staggered dumps give margin). chextrek_line_field_values returns one
 	# value per dump, in order; the LAST one is what "once the fade finished" checks. Every check
 	# below is a delta against the baseline, since the map's own pre-placed flemoids' trails are
 	# part of every one of these counts too.

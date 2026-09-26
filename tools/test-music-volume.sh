@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Automated test for spec #45's acceptance criterion (decomp-so/reference/worldspawn.md, ported
-# this sub-issue into the existing stock game/WorldSpawn.h/.cpp: idWorldspawn::Save/Think plus the
+# in #45 into the existing stock game/WorldSpawn.h/.cpp: idWorldspawn::Save/Think plus the
 # "edit inside the stock Spawn" lead that sets g_MusicVolume modified and turns thinking on):
 #   AC: change g_MusicVolume; log/dump shows the music volume follows it
 #

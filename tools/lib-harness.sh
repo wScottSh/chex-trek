@@ -7,6 +7,8 @@
 #     a timeout, archives the run's log/screenshots/cfg outside the repo, and asserts the spec #28
 #     always-on checks (chextrek.dll loaded, state-dump header present, no ERROR/unknown-event/
 #     unknown-spawnclass/script-compile lines, no timeout kill).
+#   chextrek_log_has_no_display / chextrek_exit_no_display - the no-display environment stop
+#     (exit 3) the run makes when this Windows session has no display.
 #
 # Scenario-script helpers (tools/test-*.sh):
 #   chextrek_build_or_exit      - builds chextrek.dll once (skipped under CHEXTREK_SKIP_BUILD=1).
@@ -91,7 +93,7 @@ chextrek_hud_map_coverage_values() {
 
 # chextrek_hud_map_level_values LOG_FILE
 #
-# Prints each chextrek_dump `hud_map:` line's `level` field, in log order, one per line. (#39)
+# Prints each chextrek_dump `hud_map:` line's `level` field, in log order, one per line.
 chextrek_hud_map_level_values() {
 	grep -oE '^hud_map: level=[0-9]+ visible=[01] coverage=[0-9]+$' "$1" | grep -oE '^hud_map: level=[0-9]+' | grep -oE '[0-9]+$'
 }
@@ -226,7 +228,11 @@ chextrek_run_console_script() {
 	# path, which dhewm3 searches ahead of the mod folder, so they never live in the shipped mod
 	# data. CHEXTREK_FIXTURE_DIR is a directory laid out like the mod folder (e.g. def/x.def).
 	if [ -n "${CHEXTREK_FIXTURE_DIR:-}" ]; then
-		cp -R "${CHEXTREK_FIXTURE_DIR}/." "$MOD_SAVE_DIR/"
+		if ! cp -R "${CHEXTREK_FIXTURE_DIR}/." "$MOD_SAVE_DIR/"; then
+			echo "error: couldn't copy scenario fixtures from ${CHEXTREK_FIXTURE_DIR}" >&2
+			CHEXTREK_RUN_STATUS=1
+			return 1
+		fi
 	fi
 
 	local RUN_ID

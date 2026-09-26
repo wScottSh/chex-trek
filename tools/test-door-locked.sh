@@ -19,7 +19,7 @@
 # reading any `<field>: <rest of line>` chextrek_dump line's value, so the assertions below don't
 # each repeat the same grep/sed pipeline - see lib-harness.sh's own header comment.
 #
-# `hud_tip_up`/`hud_tip_title`/`hud_tip_text` (ChexTrekDump.cpp, this sub-issue) read
+# `hud_tip_up`/`hud_tip_title`/`hud_tip_text` (ChexTrekDump.cpp, #41) read
 # idPlayer::ShowTip's own HUD gui state directly (idPlayer::IsTipVisible(), hud->GetStateString
 # "tiptitle"/"tip") - tryOpen's locked branches call the already-stock ShowTip, which logs
 # nothing itself, so this is the only way a scenario can see the tip text/title from the log,

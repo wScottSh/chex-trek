@@ -213,7 +213,7 @@ depending on HUD GUI state or racing the queue idPlayer::UpdateHud drains within
   class can read.
 
 #35 adds `pda_gui: <name|none>` (idPlayer::objectiveSystem's idUserInterface::Name(), the gui file
-it was loaded from - this sub-issue's edit makes idPlayer::Spawn read that from g_PDA instead of
+it was loaded from - #35's edit makes idPlayer::Spawn read that from g_PDA instead of
 stock's hardcoded "guis/pda.gui"; "none" if there's no local player or no objectiveSystem) and
 `pda_open: <0|1>` (idPlayer::objectiveSystemOpen), so a scenario can assert opening the PDA
 (idPlayer::TogglePDA, reached here via idPlayer::GivePDA's own call to it on the player's first
@@ -261,7 +261,7 @@ own code.
 
 #42 adds `ai_opendoor_count`/`ai_opendoor_last` (decomp-so/reference/door-opening.md's
 idAI::OpenDoors, AI.cpp, via ChexTrek_NoteAIOpenDoor). idAI::OpenDoors logs nothing itself, and it
-has two callers: the already-covered "openDoors" script event (spec #30) and this sub-issue's new
+has two callers: the already-covered "openDoors" script event (spec #30) and #42's new
 AnimMove/FlyMove/SlideMove wiring (idAI::canOpenDoors, read from the "canopendoors" spawnArg,
 default "1"), which calls OpenDoors whenever a monster's own blocked-movement physics reports the
 entity it bumped into. These two lines let a scenario tell "a monster's own movement wiring opened

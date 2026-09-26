@@ -78,8 +78,7 @@
 # always sets state = 5, even before the first tic), so it's sent right after triggering. The next
 # tic (state 5's branch, Event_UpdateStats) then runs `gameLocal.sessionCommand = "map e1m1"` on
 # its own, without any further console command - the harness only proves that map actually loads
-# (the log's "<N> msec to load e1m1" line), the same evidence tools/test-script-events.sh and
-# friends already use for a map finishing loading.
+# (the log's "<N> msec to load e1m1" line, chextrek_assert_map_loaded).
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -317,12 +316,8 @@ else
 	FAIL=1
 fi
 
-if grep -qE '^ *[0-9]+ msec to load e1m1$' "$LOCAL_LOG2"; then
-	echo "PASS: 'nextmap' from sf_923's stats screen loaded e1m1"
-else
-	echo "FAIL: expected to see '<N> msec to load e1m1' in the log after sending 'nextmap' to the stats screen"
-	FAIL=1
-fi
+# The e1m1 load after 'nextmap' is what proves the command worked.
+chextrek_assert_map_loaded "$LOCAL_LOG2" e1m1 || FAIL=1
 
 echo
 if [ $FAIL -eq 0 ]; then

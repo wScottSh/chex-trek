@@ -273,7 +273,7 @@ void mkTrail::Think( void ) {
 
 	if ( fadeStart ) {
 		// fadeEnd == fadeStart (a "fadeTime" of 0) divides by zero here - a documented, preserved
-		// reference open question (decomp-so/reference/trails.md's Notes); not this sub-issue's
+		// reference open question (decomp-so/reference/trails.md's Notes); not #43's
 		// scenario, which uses a nonzero fadeTime.
 		float frac = (float)( gameLocal.time - fadeStart ) / (float)( fadeEnd - fadeStart );
 		if ( frac < 0.0f ) {

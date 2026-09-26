@@ -6,7 +6,7 @@
 #
 # --- AC1 ---
 # idPlayer::Spawn (Player.cpp) loads idPlayer::objectiveSystem from g_PDA's value instead of stock's
-# hardcoded "guis/pda.gui" - the edit-inside-stock-function lead this sub-issue ports. Two things
+# hardcoded "guis/pda.gui" - the edit-inside-stock-function lead #35 ports. Two things
 # need proving, and neither alone is enough:
 #   1. idPlayer::Spawn actually reads g_PDA (not a hardcoded literal of any kind).
 #   2. With g_PDA at its own default, opening the PDA shows the mod's actual PDA GUI (the AC's
@@ -30,7 +30,7 @@
 # sf_923 places a PDA pickup reachable from spawn, so each phase spawns one directly:
 # def/items.def's item_pda (spawnclass idPDAItem) is exactly that - `spawn item_pda` is stock
 # behavior (Cmd_Spawn_f, gamesys/SysCmds.cpp; ArgCompletion_Decl<DECL_ENTITYDEF> lists it), not
-# anything ported by this sub-issue. It's given an explicit `name` (rather than relying on
+# anything ported by #35. It's given an explicit `name` (rather than relying on
 # Cmd_Spawn_f's auto-generated numbering, which restarts from the same counter on each fresh `map`
 # and would give both phases' item_pda the same auto-generated name) so each phase's `trigger`
 # unambiguously names its own phase's entity. `trigger <name>` (Cmd_Trigger_f) sends EV_Activate to

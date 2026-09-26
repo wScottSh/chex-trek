@@ -34,7 +34,7 @@ If you have questions concerning this license or the applicable additional terms
 // mkTrail is a ribbon of quads laid on the ground behind a moving actor (a slime trail). It derives
 // from idClass, not idEntity: it has no physics and isn't in gameLocal.entities[]; idGameLocal's
 // own idGameLocal::trails list is what idGameLocal::RunFrame walks to Think() each live trail (the
-// same wiring lead this sub-issue ports into Game_local.cpp).
+// same wiring lead #43 ports into Game_local.cpp).
 
 // ---------------------------------------------------------------------------
 // trailAnchor_t (Trail.h)

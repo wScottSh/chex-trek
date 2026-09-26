@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Automated test for spec #44's acceptance criterion (decomp-so/reference/env-shots.md, ported
-# this sub-issue into a new game/func_envshot.h/.cpp, matching the game/Trail.h/.cpp pattern #43
+# in #44 into a new game/func_envshot.h/.cpp, matching the game/Trail.h/.cpp pattern #43
 # used for a mod-added file not in stock dhewm3-sdk):
 #   AC: spawn a func_envshot, run takeEnvShots; the log shows its envShot commands and the images
 #       are written
@@ -98,7 +98,7 @@ else
 fi
 
 # --- the log itself shows the images were written (the stock engine's own "envShot" command's
-# write-confirmation line, one per invocation - not something this sub-issue's code prints) ---
+# write-confirmation line, one per invocation - not something #44's code prints) ---
 if grep -qE '^Wrote env/chextrek_test_envshot_[a-z]+\.tga, etc$' "$LOCAL_LOG"; then
 	echo "PASS: log shows the engine's own 'Wrote env/...' confirmation that the cube faces were written"
 else

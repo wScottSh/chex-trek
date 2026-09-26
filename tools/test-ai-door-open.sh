@@ -2,7 +2,7 @@
 # Automated test for spec #42's acceptance criteria (decomp-so/reference/door-opening.md's
 # idAI::OpenDoors Notes: idAI::Spawn's "canopendoors" spawnArg (default 1) and the
 # AnimMove/FlyMove/SlideMove wiring that calls OpenDoors( GetSlideMoveEntity() ) whenever a
-# monster's own movement is blocked by something, ported this sub-issue). See
+# monster's own movement is blocked by something, ported in #42). See
 # docs/harness-coverage.md.
 #   AC1: a spawned monster pathing through a closed door opens it (log/dump)
 #   AC2: same with canopendoors 0; the door stays shut
@@ -10,7 +10,7 @@
 # idAI::OpenDoors/Event_OpenDoors and the "openDoors" script event themselves already landed with
 # spec #30 (tools/test-script-events.sh exercises them via an explicit
 # monster.openDoors(doorEnt) script call) - this scenario never calls that script event. The only
-# thing that can open the door here is the automatic C++ wiring this sub-issue adds (the identical
+# thing that can open the door here is the automatic C++ wiring #42 adds (the identical
 # `if ( canOpenDoors ) { OpenDoors( blockEnt ); }` block spliced into AnimMove, FlyMove and
 # SlideMove), so any observed open is proof of that wiring, not of the already-covered script
 # event.
@@ -40,7 +40,7 @@
 #      itself uses directly via already-ported, stock script events: `setMoveType( 2 )`
 #      (MOVETYPE_SLIDE - stock idAI::Event_SetMoveType) then `moveToPosition` (idAI::MoveToPosition,
 #      also stock). This is not a synthetic path: SlideMove contains the exact same
-#      `if ( canOpenDoors ) { OpenDoors( blockEnt ); } ` this sub-issue added to AnimMove/FlyMove
+#      `if ( canOpenDoors ) { OpenDoors( blockEnt ); } ` #42 added to AnimMove/FlyMove
 #      too, so exercising it through SlideMove proves the ported wiring, just via a movement type a
 #      console script can reliably drive without needing the AI's own combat AI to spontaneously
 #      engage.
@@ -61,7 +61,7 @@
 #      velocity-seeking movement (a damped spring toward the goal, not an instant snap) reliably
 #      carries the AI's own bounding volume into the closed door's solid brush well before it
 #      "reaches" that nominal target point, which is exactly what triggers `GetSlideMoveEntity()`
-#      returning the door and this sub-issue's wiring firing - confirmed directly via
+#      returning the door and #42's wiring firing - confirmed directly via
 #      `ai_blocked_last` on an actual run, in both the open (AC1, where `ai_opendoor_count`/
 #      `_last` confirm it too) and blocked (AC2, where `canopendoors 0` keeps `ai_opendoor_count`/
 #      `_last` from ever moving, so `ai_blocked_last` is AC2's only such proof) cases, with both
@@ -69,12 +69,12 @@
 #      -256 184 64 target, down from ~76 at spawn) either way - asserted below, not just observed
 #      manually.
 #
-# `chextrek_test_str14` (ChexTrekDump.cpp, this sub-issue) holds the spawned monster's own name,
+# `chextrek_test_str14` (ChexTrekDump.cpp, #42) holds the spawned monster's own name,
 # quoted, for the same reason `chextrek_test_str10`/`_11`/etc. hold door names - see
 # tools/test-door-open.sh's header for the full "console tokenizer strips quotes"/"$name is cvar
 # expansion, not doom-script's $entityName" story.
 #
-# `chextrek_test_str15` (ChexTrekDump.cpp, this sub-issue) holds a whole single-quoted doom-script
+# `chextrek_test_str15` (ChexTrekDump.cpp, #42) holds a whole single-quoted doom-script
 # vector literal as its cvar *value*, set at runtime via the stock `set` console command
 # (`set chextrek_test_str15 "'-256 184 64'"` - the outer double quotes are the console's own
 # argument grouping, stripped during tokenization same as any other console argument; the inner
@@ -90,7 +90,7 @@
 # those quote characters at all - see ChexTrekDump.cpp's comment above chextrek_test_str15 for the
 # fuller story.
 #
-# `ai_opendoor_count`/`ai_opendoor_last` (ChexTrekDump.cpp, this sub-issue) record every time
+# `ai_opendoor_count`/`ai_opendoor_last` (ChexTrekDump.cpp, #42) record every time
 # idAI::OpenDoors actually activated a door (the unlocked-and-at-rest branch), independent of the
 # door's own isOpen() state - the only way this scenario can tell "the AI's own blocked-movement
 # wiring opened this door" from "the door happened to already be open for some other reason",
@@ -131,7 +131,7 @@
 # independent of that gating. `idAI::moveStatus()` looked like a candidate but doesn't work: an
 # actual run showed it's driven by SlideMove's own AAS-level CheckObstacleAvoidance call, a
 # different subsystem from the direct physics collision this scenario exercises, and it never left
-# MOVE_STATUS_MOVING/_DONE here. `ai_blocked_last` (ChexTrekDump.cpp, this sub-issue) is what
+# MOVE_STATUS_MOVING/_DONE here. `ai_blocked_last` (ChexTrekDump.cpp, #42) is what
 # actually closes this: it reads `physicsObj.GetSlideMoveEntity()` unconditionally, before the
 # `if ( canOpenDoors )` check, so it fires the same way regardless of canopendoors.
 #
@@ -139,7 +139,7 @@
 # monster short of the target, as opposed to something else in the way: `idAI::MoveToPosition`'s
 # own AAS-reachability refusal (see point 3 above) rules out "it just stopped because the AAS said
 # so", but no script event exposes `physicsObj.GetSlideMoveEntity()` (the actual blocking-entity
-# accessor this sub-issue's C++ wiring reads) or an equivalent signal that reliably reads back the
+# accessor #42's C++ wiring reads) or an equivalent signal that reliably reads back the
 # blocking entity from the console independent of ai_opendoor_count/_last (which AC2, by
 # definition, can't rely on - canopendoors 0 means idAI::OpenDoors, and therefore
 # ai_opendoor_count/_last, never runs at all). idAI::moveStatus() looked promising but doesn't

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Automated test for spec #40's acceptance criteria (decomp-so/reference/door-opening.md,
-# idPlayer::tryOpen, ported this sub-issue): the player opens an unlocked door with the use key
+# idPlayer::tryOpen, ported in #40): the player opens an unlocked door with the use key
 # (impulse 16), within g_doorTraceDist. See docs/harness-coverage.md.
 #   AC1: face an unlocked door within range, use impulse; log/dump shows it opened
 #   AC2: out of g_doorTraceDist range the door doesn't open; raising the cvar makes it open
@@ -46,7 +46,7 @@
 # or teleporting near them can't start them moving through stock touch-triggering either - the
 # use-key impulse below is the only thing that can.
 #
-# `door_tryopen_count`/`door_tryopen_last` (ChexTrekDump.cpp, this sub-issue) record every time
+# `door_tryopen_count`/`door_tryopen_last` (ChexTrekDump.cpp, #40) record every time
 # tryOpen's trace actually resolved to an idDoor, independent of that door's lock/open state -
 # the only way this scenario can tell "the trace reached the door" from "it didn't reach
 # anything" (AC2's range check) rather than inferring it from some other coincidence. Whether a

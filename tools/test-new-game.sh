@@ -5,7 +5,7 @@
 # "e1m1" entity already placed in sf_923's own map data) loads e1m1, which plays clean for N
 # frames (e1m1 has "endOfGame" "1"). See docs/harness-coverage.md.
 #
-# By the time this sub-issue lands, every blocker its own issue text names (trigger_objective and
+# By the time #46 lands, every blocker its own issue text names (trigger_objective and
 # target_endlevelgui on sf_923, target_endlevelgui on both maps, locked/"requires" doors on both
 # maps, flemoids with trailDef on both maps) is already ported and separately scenario-tested
 # (#31/#33/#34/#41/#43 respectively) - #46's own job is the end-to-end run: both real maps, in the
@@ -17,7 +17,7 @@
 # guis/mainmenu.gui's own New Game button flow (windowDef AnimNewGame's "onTime 2400 { set "cmd"
 # "startgame sf_923" ; }") issues "startgame sf_923" as a GUI "cmd" pseudo-command. That is NOT a
 # registered idCmdSystem console command: typing "startgame sf_923" into a console script here
-# reproducibly logs "Unknown command 'startgame'" (confirmed live, this sub-issue) - GUI "cmd"
+# reproducibly logs "Unknown command 'startgame'" (confirmed live, #46) - GUI "cmd"
 # strings like "startgame"/"loadGame"/"loadMod"/"startMultiplayer" are intercepted by the engine's
 # own GUI-event dispatcher before they'd ever reach idCmdSystem, and that dispatcher only runs for
 # GUI-originated events (a real mouse click), which - like every other mouse-only interaction this
@@ -28,7 +28,7 @@
 # line - so this scenario boots to the main menu (proving AC1's own "from the main
 # menu" half: no map is loaded and chextrek_dump's level_stats/hud_map/customui lines all read
 # "none" at that point) and then uses the same `map sf_923` every other scenario uses, rather than
-# guessing at further GUI-only plumbing this sub-issue's AC doesn't ask for. (What "startgame"
+# guessing at further GUI-only plumbing #46's AC doesn't ask for. (What "startgame"
 # itself does beyond that - e.g. whether it also touches `g_skill` from the menu's skill picker -
 # isn't confirmed against this engine build's own source, which isn't in this repo; the claim above
 # is id Tech 4's documented general behavior, not something read out of this build's binary.)
@@ -51,7 +51,7 @@
 # tracked down (the function's own `sys.wait( 1 )` needs a running script thread, which a
 # directly-called, non-`thread`-prefixed console "script" expression may not provide the same way
 # a real `runScript` GUI command's own idThread wrapping does - unconfirmed, not worth chasing
-# further since it isn't this sub-issue's own feature to prove). #46's actual AC is narrower and
+# further since it isn't #46's own feature to prove). #46's actual AC is narrower and
 # more literal than "reproduce the whole GUI chain": "its exit (nextMap e1m1) loads e1m1" - i.e.
 # the real, already-placed exit entity's own nextMap wiring works. `trigger target_endlevel_3`
 # fires that real, unmodified stock entity directly (the same `Cmd_Trigger_f` -> `ProcessEvent(

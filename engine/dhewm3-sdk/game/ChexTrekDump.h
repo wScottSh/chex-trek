@@ -115,7 +115,7 @@ void ChexTrek_TestMapCmd_f( const idCmdArgs &args );
 // same variable name hud.gui's impulse-23 path uses for the HUD's corner map, but for the PDA it is
 // set only by guis/pda_chex.gui's own click-driven script (its "Data" tab button resets the
 // hudmap_open window's timeline, `set "gui::HudMap" "1"` at its onTime 5) - a real mouse click on a
-// PDA tab, not anything idPlayer's C++ (this sub-issue's scope) drives, and out of the console-only
+// PDA tab, not anything idPlayer's C++ (#37's scope) drives, and out of the console-only
 // harness's reach the same way #34/#35/#36's real inputs were. Since this variable is purely a GUI
 // state flag (not a member of idPlayer, and not read or written by any #37 C++), setting it
 // directly through idUserInterface::SetStateBool - the same underlying engine call the GUI
@@ -142,7 +142,7 @@ void ChexTrek_NoteTryOpenDoor( const char *doorName );
 // chextrek: spec #42. idAI::OpenDoors (decomp-so/reference/door-opening.md, AI.cpp) calls this
 // right after it actually activates a door (the unlocked-and-at-rest branch, door->Use). Shared by
 // both of OpenDoors' callers - the "openDoors" script event (spec #30, already covered by
-// tools/test-script-events.sh) and this sub-issue's new AnimMove/FlyMove/SlideMove wiring, which
+// tools/test-script-events.sh) and #42's new AnimMove/FlyMove/SlideMove wiring, which
 // calls OpenDoors whenever a monster's own movement is blocked by a door and its canOpenDoors is
 // set. OpenDoors itself logs nothing, so this is the only way a scenario can tell "an AI's own
 // blocked-movement wiring opened this specific door" from "the door happened to already be open

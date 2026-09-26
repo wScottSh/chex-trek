@@ -50,7 +50,9 @@ which:
 1. Points the `chextrek` symlink at whichever checkout you're running from.
 2. Wipes `Documents\My Games\dhewm3\chextrek\` (see below), copies in any scenario fixture files
    (`CHEXTREK_FIXTURE_DIR`), and writes the console script there.
-3. Launches `dhewm3.exe` with the mod mounted and that script queued via `+exec`.
+3. Launches `dhewm3.exe` with the mod mounted, `+set fs_gameDllPath <this checkout>` so the engine
+   loads the freshly built `chextrek.dll` from the repo root (not from the engine's install dir),
+   and that script queued via `+exec`.
 4. Kills it if it doesn't exit within the timeout (an error dialog hanging it); that counts as a
    FAIL, reported with the log's last error line.
 5. Copies the run's log and screenshots into
@@ -99,7 +101,7 @@ depend on it.
 
 ## Why none of this lives in the repo
 
-- **The junction/symlink must be a real NTFS symlink, not a plain `ln -s` fallback.** On this
+- **The mount must be a real NTFS symlink, not a plain `ln -s` fallback.** On this
   toolchain, `ln -s` on a directory silently falls back to a full recursive *copy* when it can't
   get symlink privilege, instead of failing loudly. A copy would make the harness silently test
   stale content. `tools/lib-harness.sh` forces a real symlink with
@@ -113,7 +115,7 @@ depend on it.
   cares about. The harness treats it as the scratch save path and wipes it before every run.
 - **A stale `dhewm.cfg`/`config.spec` from an earlier hung run changes engine behavior on the next
   run.** One was observed to make the engine hang on what looks like a cached video-mode
-  confirmation dialog *before* it even reaches the mod's scripts, well short of the known failure -
+  confirmation dialog *before* it even reaches the mod's scripts -
   making runs non-reproducible. Wiping the per-mod save dir before every run fixes this and is
   also just good hygiene for a "scratch" path.
 - **The engine's log write is buffered and can truncate the last line mid-word when the process is

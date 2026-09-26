@@ -13,10 +13,10 @@
 # Environment overrides (see docs/dev-setup.md for the documented dev-machine defaults):
 #   DHEWM3_HOME     - the dhewm3 1.5.5 win32 engine's install dir (has dhewm3.exe in it).
 #   DOOM3_BASEPATH  - the classic Doom 3 1.3.1 install (fs_basepath); has base/pak000.pk4 etc.
-#                     This is also where the "chextrek" junction/symlink to this repo lives.
+#                     This is also where the "chextrek" symlink to this repo lives.
 #
 # Never writes into this repo: the mod's data is only ever read (via fs_gameDllPath for the
-# freshly built chextrek.dll, and via the basepath junction for the data files already in this
+# freshly built chextrek.dll, and via the basepath symlink for the data files already in this
 # repo). All configs/logs/saves/screenshots go to dhewm3's own per-mod save folder, which lives
 # under the user's Documents folder, not in this repo - see docs/dev-setup.md for why that's the
 # "scratch save path" the ACs mean (dhewm3 hardcodes it on Windows; it can't be redirected into

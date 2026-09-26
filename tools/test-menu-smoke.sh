@@ -28,11 +28,6 @@ if [ $HARNESS_EXIT -ne 0 ]; then
 	FAIL=1
 fi
 
-if echo "$HARNESS_OUT" | grep -qF "==> Timed out"; then
-	echo "FAIL: expected no timeout kill (that meant an error dialog hung the game on the known #29 failure)"
-	FAIL=1
-fi
-
 for marker in "PASS: chextrek.dll loaded (not base.dll)" "PASS: state-dump header present" "PASS: no ERROR / unknown-event / unknown-spawnclass / script-compile lines"; do
 	if ! echo "$HARNESS_OUT" | grep -qF "$marker"; then
 		echo "FAIL: expected to see '${marker}'"
