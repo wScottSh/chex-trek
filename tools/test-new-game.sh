@@ -9,9 +9,9 @@
 # target_endlevelgui on sf_923, target_endlevelgui on both maps, locked/"requires" doors on both
 # maps, flemoids with trailDef on both maps) is already ported and separately scenario-tested
 # (#31/#33/#34/#41/#43 respectively) - #46's own job is the end-to-end run: both real maps, in the
-# real order a player reaches them, back to back in one session, proving nothing about running
-# them together (as opposed to each in its own isolated scenario, which is all every earlier
-# sub-issue's own test does) regresses.
+# real order a player reaches them, back to back in one session. That's a check no earlier
+# sub-issue's own test (each its own isolated, single-map scenario) can make: that running them
+# together, in sequence, doesn't regress anything.
 #
 # --- "New Game from the main menu": confirmed NOT reachable as typed console text ---
 # guis/mainmenu.gui's own New Game button flow (windowDef AnimNewGame's "onTime 2400 { set "cmd"
@@ -23,9 +23,9 @@
 # GUI-originated events (a real mouse click), which - like every other mouse-only interaction this
 # harness suite has already hit (#34's stats-screen buttons, #37/#38's PDA-map buttons) - a
 # console-only script can't produce. "startgame <map>" is documented (id Tech 4's own session
-# code) to itself just run "disconnect" then "map <map>", the same underlying
-# `gameLocal.sessionCommand = "map " + name` transition every other scenario in this suite already
-# drives directly - so this scenario boots to the main menu (proving AC1's own "from the main
+# code) to itself just run "disconnect" then "map <map>" - the same kind of map-load transition
+# every other scenario in this suite already drives directly with a plain `map <name>` console
+# line - so this scenario boots to the main menu (proving AC1's own "from the main
 # menu" half: no map is loaded and chextrek_dump's level_stats/hud_map/customui lines all read
 # "none" at that point) and then uses the same `map sf_923` every other scenario uses, rather than
 # guessing at further GUI-only plumbing this sub-issue's AC doesn't ask for. (What "startgame"
@@ -35,7 +35,7 @@
 #
 # --- "its exit (nextMap e1m1) loads e1m1": drives the real exit entity directly, not the GUI chain ---
 # The real, shipped path from sf_923's stats screen to e1m1 is a multi-step GUI chain (trigger
-# target_endlevelgui_1's stats.gui -> its state 5 auto-ActivateTargets's its own "target",
+# target_endlevelgui_1's stats.gui -> its state 5 automatically calling ActivateTargets on its own "target",
 # target_endlevelgui_2's end_trek.gui -> a mouse click on end_trek.gui's "e1m1_button" ->
 # `runScript map_storage_facility::end_trek_e1m1` -> `sys.trigger( $target_endlevel_3 )`) -
 # already fully described, and already out of scope, by #34's own tools/test-end-level-nextmap.sh
@@ -63,6 +63,9 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SCRATCH_DIR="$(mktemp -d)"
 trap 'rm -rf "$SCRATCH_DIR"' EXIT
+
+# shellcheck source=tools/lib-harness.sh
+source "${SCRIPT_DIR}/lib-harness.sh"
 
 echo "=== #46 new-game test: build ==="
 if ! bash "${SCRIPT_DIR}/build-chextrek.sh"; then
@@ -121,9 +124,6 @@ if [ -z "$LOCAL_LOG" ] || [ ! -f "$LOCAL_LOG" ]; then
 	exit 1
 fi
 
-# shellcheck source=tools/lib-harness.sh
-source "${SCRIPT_DIR}/lib-harness.sh"
-
 # --- AC1: New Game loads sf_923 and it finishes loading; AC2: its exit loads e1m1, and it comes
 # strictly after sf_923's own load in the log (not a stale artifact of a previous run, and not a
 # coincidental map switch that happened before the scenario ever triggered the exit) ---
@@ -133,6 +133,12 @@ if [ -n "$SF923_LINE" ]; then
 	echo "PASS: sf_923 finished loading"
 else
 	echo "FAIL: expected to see '<N> msec to load sf_923' in the log"
+	FAIL=1
+fi
+if [ -n "$E1M1_LINE" ]; then
+	echo "PASS: e1m1 finished loading"
+else
+	echo "FAIL: expected to see '<N> msec to load e1m1' in the log"
 	FAIL=1
 fi
 if [ -n "$SF923_LINE" ] && [ -n "$E1M1_LINE" ] && [ "$E1M1_LINE" -gt "$SF923_LINE" ]; then
@@ -156,6 +162,7 @@ fi
 TRAILS_VALUES="$(chextrek_line_field_values "$LOCAL_LOG" trails)"
 LEVEL_STATS_VALUES="$(chextrek_line_field_values "$LOCAL_LOG" level_stats)"
 HUD_MAP_VALUES="$(chextrek_line_field_values "$LOCAL_LOG" hud_map)"
+CUSTOMUI_VALUES="$(chextrek_line_field_values "$LOCAL_LOG" customui)"
 
 DUMP_COUNT="$(echo "$TRAILS_VALUES" | grep -c .)"
 if [ "$DUMP_COUNT" -eq 7 ]; then
@@ -168,21 +175,25 @@ fi
 # --- AC1: at the main menu (before "map sf_923"), no map/level is loaded yet - dump #1 ---
 DUMP1_LEVEL_STATS="$(echo "$LEVEL_STATS_VALUES" | sed -n '1p')"
 DUMP1_HUD_MAP="$(echo "$HUD_MAP_VALUES" | sed -n '1p')"
-if [ "$DUMP1_LEVEL_STATS" = "none" ] && [ "$DUMP1_HUD_MAP" = "none" ]; then
-	echo "PASS: the run started at the main menu with no level loaded (dump #1's level_stats/hud_map both 'none', before 'map sf_923')"
+DUMP1_CUSTOMUI="$(echo "$CUSTOMUI_VALUES" | sed -n '1p')"
+if [ "$DUMP1_LEVEL_STATS" = "none" ] && [ "$DUMP1_HUD_MAP" = "none" ] && [ "$DUMP1_CUSTOMUI" = "none" ]; then
+	echo "PASS: the run started at the main menu with no level loaded (dump #1's level_stats/hud_map/customui all 'none', before 'map sf_923')"
 else
-	echo "FAIL: expected dump #1 (before 'map sf_923') to show level_stats/hud_map as 'none' (no level loaded yet), got level_stats='${DUMP1_LEVEL_STATS}' hud_map='${DUMP1_HUD_MAP}'"
+	echo "FAIL: expected dump #1 (before 'map sf_923') to show level_stats/hud_map/customui as 'none' (no level loaded yet), got level_stats='${DUMP1_LEVEL_STATS}' hud_map='${DUMP1_HUD_MAP}' customui='${DUMP1_CUSTOMUI}'"
 	FAIL=1
 fi
 
 # --- AC1: sf_923 plays clean for N frames - dumps #2-#4, all three showing the same, stable,
-# map-specific state (sf_923 places 27 monster_flemoid... no, 27 total across monsters/items/
-# secrets found/total isn't a single count; the values below are sf_923's own real level_stats
-# totals and #43's own recorded trail baseline for this map - 18 live trails, one placed flemoid
-# short of e1m1's own 19 because sf_923 overrides "hasTrail" "0" on one of them). Checking all
-# three dumps (not just one) is what "sustained", not just "instantaneous", clean running means
-# here - the always-on checks already scan the whole log for ERROR/unknown-event/unknown-
-# spawnclass/script-compile lines, so this adds the map-specific evidence they don't.
+# map-specific state: sf_923's own real level_stats totals (27/30/1 - idGameLocal::GetLevelStats,
+# Game_local.cpp, counts entities carrying the "level_monster"/"level_item"/"secret" spawnArgs, not
+# raw entity counts by classname, so 27 "monsters" isn't sf_923's own 28 monster_* entities minus
+# one - it's however many of them, plus/minus any other entity type, actually carry
+# "level_monster" "1" in this map's own data) and #43's own recorded trail baseline for this map -
+# 18 live trails, one placed flemoid short of e1m1's own 19 because sf_923 overrides "hasTrail" "0"
+# on one of them. Checking all three dumps (not just one) is what "sustained", not just
+# "instantaneous", clean running means here - the always-on checks already scan the whole log for
+# ERROR/unknown-event/unknown-spawnclass/script-compile lines, so this adds the map-specific
+# evidence they don't.
 SF923_TRAILS="$(echo "$TRAILS_VALUES" | sed -n '2p;3p;4p')"
 SF923_LEVEL_STATS="$(echo "$LEVEL_STATS_VALUES" | sed -n '2p;3p;4p')"
 if [ "$(echo "$SF923_TRAILS" | sort -u)" = "18" ]; then
