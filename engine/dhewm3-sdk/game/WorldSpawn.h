@@ -50,6 +50,23 @@ public:
 	void			Save( idRestoreGame *savefile );
 	void			Restore( idRestoreGame *savefile );
 
+	// chextrek: spec #45/#16 (decomp-so/reference/worldspawn.md). The stock GPL source above
+	// declares Save with the wrong parameter type (idRestoreGame*, a pre-existing stock typo left
+	// untouched - see its own empty body in WorldSpawn.cpp); gamex86.so exports a distinctly-named
+	// _ZN12idWorldspawn4SaveEP10idSaveGame, so the mod adds this correctly-typed overload, which is
+	// what CLASS_DECLARATION's idWorldspawn::Type actually registers and the save system calls.
+	// Declared `const`, unlike the reference's plain "void Save( idSaveGame *savefile );": with two
+	// overloads now in scope, CLASS_DECLARATION's `(void (idClass::*)(idSaveGame*) const)&Save` cast
+	// needs an exact function-type match (params + cv-qualification) to pick this one over the
+	// idRestoreGame* overload, matching idEntity::Save's own `const` (Entity.h) - the reference's
+	// Ghidra reconstruction can't observe constness from disassembly either way, and an
+	// unqualified declaration here fails to compile once both overloads exist. Recorded deviation,
+	// not a behavior change (the body is empty either way).
+	void			Save( idSaveGame *savefile ) const;
+	// Binary: idWorldspawn's vtable entry +0x14, idEntity::Think's slot (idEntity's vtable has
+	// idEntity::Think there), is this function. So it overrides the stock virtual Think.
+	virtual void	Think( void );
+
 private:
 	void			Event_Remove( void );
 };

@@ -152,4 +152,16 @@ void ChexTrek_NoteAIOpenDoor( const char *doorName );
 // separate AAS-level obstacle-avoidance system, not this direct physics-collision signal).
 void ChexTrek_NoteAIBlocked( const char *entName );
 
+// chextrek: spec #45. idWorldspawn::Think (decomp-so/reference/worldspawn.md, WorldSpawn.cpp)
+// calls this right after it applies a changed g_MusicVolume (either stopping the music, or
+// starting/fading it to the newly-computed dB), passing the cvar's own current value and whether
+// this application stopped the music (g_MusicVolume < 1). Think itself logs nothing, and the
+// music's actual dB level isn't observable from the log any other way, so this is the only way a
+// scenario can tell "Think actually re-applied the changed cvar" from "the cvar changed but
+// nothing reacted" - the AC's "music volume follows it" needs, independent of the sound engine's
+// own playback. Test-only instrumentation, same pattern as ChexTrek_NoteTryOpenDoor/
+// ChexTrek_NoteAIOpenDoor above: it counts calls and remembers the last applied value, it doesn't
+// change what Think does.
+void ChexTrek_NoteMusicVolume( float volume, bool stopped );
+
 #endif /* !__CHEXTREK_DUMP_H__ */

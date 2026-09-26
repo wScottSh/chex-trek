@@ -43,6 +43,11 @@ static idStr chextrekAIOpenDoorLast;
 // chextrek: spec #42. See ChexTrek_NoteAIBlocked in ChexTrekDump.h.
 static idStr chextrekAIBlockedLast = "none";
 
+// chextrek: spec #45. See ChexTrek_NoteMusicVolume in ChexTrekDump.h.
+static int chextrekMusicVolumeAppliedCount = 0;
+static float chextrekMusicVolumeLast = 0.0f;
+static bool chextrekMusicVolumeStoppedLast = false;
+
 // chextrek: spec #30, test-only. The AFK harness drives the game only through console commands
 // (spec #28), including the "script" command to call scriptEvents like setProj/spawnDict that
 // need a string literal argument. The console's own tokenizer (idCmdArgs::TokenizeString,
@@ -159,6 +164,17 @@ void ChexTrek_NoteAIBlocked( const char *entName ) {
 
 /*
 ==================
+ChexTrek_NoteMusicVolume
+==================
+*/
+void ChexTrek_NoteMusicVolume( float volume, bool stopped ) {
+	chextrekMusicVolumeAppliedCount++;
+	chextrekMusicVolumeLast = volume;
+	chextrekMusicVolumeStoppedLast = stopped;
+}
+
+/*
+==================
 ChexTrek_Dump_f
 
 Prints the mod's custom state to the game log for the AFK test harness. #29 lands only the
@@ -263,6 +279,15 @@ cleaned up (`trails` back down
 to whatever it was before that actor's own trail existed - not necessarily 0: real content's
 "trailDef" never fades on its own, decomp-so/reference/trails.md's Notes, so any already-placed
 actor with a trail keeps counting toward this the whole time) - without depending on render state.
+
+#45 adds `music_volume_applied_count`/`music_volume_last`/`music_volume_stopped`
+(decomp-so/reference/worldspawn.md, via ChexTrek_NoteMusicVolume): idWorldspawn::Think logs
+nothing itself and the sound engine's actual playback dB isn't observable from the log, so these
+are the only way a scenario can tell "Think re-applied the changed g_MusicVolume" from "the cvar
+changed but nothing reacted" - `music_volume_last` is the cvar's own value at the last apply (so a
+scenario can assert it followed a `set g_MusicVolume <N>`), `music_volume_stopped` is whether that
+apply stopped the music (g_MusicVolume < 1), and `_applied_count` lets a scenario assert Think
+actually ran again (not just that the cvar's stored value changed) after each change.
 ==================
 */
 void ChexTrek_Dump_f( const idCmdArgs &args ) {
@@ -385,6 +410,12 @@ void ChexTrek_Dump_f( const idCmdArgs &args ) {
 		gameLocal.Printf( "trails: %d\n", gameLocal.trails.Num() );
 		gameLocal.Printf( "anchors: %d\n", chextrekAnchorTotal );
 	}
+
+	// chextrek: spec #45 (decomp-so/reference/worldspawn.md). See ChexTrek_NoteMusicVolume and the
+	// ChexTrek_Dump_f header comment above.
+	gameLocal.Printf( "music_volume_applied_count: %d\n", chextrekMusicVolumeAppliedCount );
+	gameLocal.Printf( "music_volume_last: %s\n", chextrekMusicVolumeAppliedCount > 0 ? va( "%f", chextrekMusicVolumeLast ) : "none" );
+	gameLocal.Printf( "music_volume_stopped: %s\n", chextrekMusicVolumeAppliedCount > 0 ? ( chextrekMusicVolumeStoppedLast ? "1" : "0" ) : "none" );
 
 	// chextrek: spec #33 (decomp-so/reference/custom-ui.md, end-level-stats.md). The local
 	// player's registered idCustomUI (only idTarget_EndLevelGUI in this mod) and, while active, the

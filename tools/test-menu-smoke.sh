@@ -60,10 +60,13 @@ else
 		echo "PASS: the known #29 'openDoors' unknown-event failure is gone"
 	fi
 
-	if grep -qF "guis/mainmenu.gui" "$LOCAL_LOG"; then
-		echo "PASS: the main menu's own GUI (guis/mainmenu.gui) was reached"
+	# guis/assets/splash/launch is the main menu's own splash background image, reloaded via
+	# idImageManager's own asset caching whenever the main menu GUI is active - a stable, cvar-
+	# independent signal that the main menu's own GUI assets were actually reached.
+	if grep -qF "reloading guis/assets/splash/launch." "$LOCAL_LOG"; then
+		echo "PASS: the main menu's own GUI assets (guis/assets/splash/launch) were reached"
 	else
-		echo "FAIL: expected to see guis/mainmenu.gui referenced in the log (the main menu map itself)"
+		echo "FAIL: expected to see guis/assets/splash/launch reloaded in the log (the main menu's own splash background)"
 		FAIL=1
 	fi
 fi
