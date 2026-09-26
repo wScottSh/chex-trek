@@ -113,16 +113,31 @@
 # on the same schedule (markers 46100/46200/.../47400) and requires *every* one of them to read
 # closed.
 #
-# A prior review round found AC2 could pass even if the console-spawned monster never moved at all
-# (canopendoors 0 blocking the door and a monster sitting still both read as "every poll closed").
-# Both ACs now also print distanceToPoint() against the same moveToPosition target - once right
-# after spawn (baseline, ~76 units: the monster spawns at "-180 184 64", the target is
-# "-256 184 64") and once after the last poll (see the header above for the actual measured drop,
-# ~9 units, whether the door opened or stayed shut) - proving the monster actually walked toward
-# and got blocked at the door in both cases, not merely that it held still. AC1 uses markers 90000
+# canopendoors 0 blocking the door and a monster sitting still both read as "every poll closed" on
+# the isOpen() checks alone, so both ACs also print distanceToPoint() against the same
+# moveToPosition target - once right after spawn (baseline, ~76 units: the monster spawns at
+# "-180 184 64", the target is "-256 184 64") and once after the last poll (see the header above
+# for the actual measured drop, ~9 units, whether the door opened or stayed shut) - proving the
+# monster actually walked toward the door rather than holding still. AC1 uses markers 90000
 # (baseline)/91000 (final); AC2 uses 93000/94000 - all four ranges sit well clear of the
 # 43000/44100-45400/46100-47400 isOpen() marker ranges above (distanceToPoint returns
 # double-digit-to-low-hundreds units here, so none of these can collide).
+#
+# What distanceToPoint() alone can't prove is that func_door_1 *specifically* is what stopped the
+# monster short of the target, as opposed to something else in the way: `idAI::MoveToPosition`'s
+# own AAS-reachability refusal (see point 3 above) rules out "it just stopped because the AAS said
+# so", but no script event exposes `physicsObj.GetSlideMoveEntity()` (the actual blocking-entity
+# accessor this sub-issue's C++ wiring reads) or an equivalent signal that reliably reads back the
+# blocking entity from the console independent of ai_opendoor_count/_last (which AC2, by
+# definition, can't rely on - canopendoors 0 means idAI::OpenDoors, and therefore
+# ai_opendoor_count/_last, never runs at all). idAI::moveStatus() looked promising but doesn't
+# help: it's set by SlideMove's own GetMovePos -> CheckObstacleAvoidance call, a separate AAS-level
+# obstacle-avoidance system from the direct physics collision AC1/AC2 actually exercise, and an
+# actual run confirmed it never leaves MOVE_STATUS_MOVING/_DONE here. AC1 is still fully proven -
+# ai_opendoor_count/_last name func_door_1 directly - but AC2's proof rests on distanceToPoint()
+# plus the map geometry (func_door_1 is the only solid thing between the spawn point and the
+# target; see point 3 above), not on a second, independent contact signal. Recorded here rather
+# than left silent.
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -228,11 +243,15 @@ else
 	AI_OPENDOOR_COUNT_AFTER="$(echo "$AI_OPENDOOR_COUNT_VALUES" | sed -n '2p')"
 	AI_OPENDOOR_LAST_AFTER="$(chextrek_line_field_values "$LOCAL_LOG_AC1" ai_opendoor_last | sed -n '2p')"
 	if [ "$AI_OPENDOOR_COUNT_BASELINE" = "0" ] \
-		&& [ -n "$AI_OPENDOOR_COUNT_AFTER" ] && [ "$AI_OPENDOOR_COUNT_AFTER" -eq $(( AI_OPENDOOR_COUNT_BASELINE + 1 )) ] \
+		&& [ -n "$AI_OPENDOOR_COUNT_AFTER" ] && [ "$AI_OPENDOOR_COUNT_AFTER" -ge $(( AI_OPENDOOR_COUNT_BASELINE + 1 )) ] \
 		&& [ "$AI_OPENDOOR_LAST_AFTER" = "func_door_1" ]; then
 		echo "PASS: AC1 - idAI::OpenDoors' automatic wiring opened func_door_1 (ai_opendoor_count ${AI_OPENDOOR_COUNT_BASELINE} -> ${AI_OPENDOOR_COUNT_AFTER}, last=func_door_1)"
 	else
-		echo "FAIL: expected ai_opendoor_count to go 0 -> 1 and ai_opendoor_last=func_door_1, got count='${AI_OPENDOOR_COUNT_BASELINE}'->'${AI_OPENDOOR_COUNT_AFTER}' last='${AI_OPENDOOR_LAST_AFTER}'"
+		# -ge, not -eq baseline+1: func_door_1 auto-closes after ~3s (no "wait"/"toggle"), so if the
+		# monster is still pressed against it when it re-closes, OpenDoors can fire a second time
+		# across this scenario's ~5.6s poll window - a real re-trigger, not a bug, and AC1 only
+		# needs "opened at least once".
+		echo "FAIL: expected ai_opendoor_count to go from 0 to at least 1 and ai_opendoor_last=func_door_1, got count='${AI_OPENDOOR_COUNT_BASELINE}'->'${AI_OPENDOOR_COUNT_AFTER}' last='${AI_OPENDOOR_LAST_AFTER}'"
 		FAIL=1
 	fi
 
@@ -248,14 +267,14 @@ else
 		FAIL=1
 	fi
 
-	# A prior review round found this scenario could pass even if the monster never moved at all
-	# (an already-open-door reading and a never-moved monster look identical to the isOpen()
-	# checks above). distanceToPoint() against the moveToPosition target proves actual movement: it
-	# must start far (>50 units - confirmed ~76 on an actual run) and then drop by a meaningful
-	# margin (>5 units) once blocked at the door - a relative check rather than a fixed final
-	# distance, since an actual run measured the SlideMove-blocked resting distance at ~67 units
-	# (~9 unit net progress before the monster's own bounding volume is stopped by the door's solid
-	# brush), not the ~19 units the header's manual-run note above guessed at.
+	# An already-open-door reading and a never-moved monster would look identical on the isOpen()
+	# checks above, so distanceToPoint() against the moveToPosition target proves actual movement
+	# too: it must start far (>50 units - confirmed ~76 on an actual run) and then drop by a
+	# meaningful margin (>5 units) once blocked at the door - a relative check rather than a fixed
+	# final distance, since an actual run measured the SlideMove-blocked resting distance at ~67
+	# units (~9 unit net progress before the monster's own bounding volume is stopped by the door's
+	# solid brush) - see the header's "canopendoors 0" note above for what this check does and
+	# doesn't prove.
 	DIST_BASELINE_AC1="$(grep -E '^90[0-9]+(\.[0-9]+)?$' "$LOCAL_LOG_AC1" | head -1)"
 	DIST_FINAL_AC1="$(grep -E '^91[0-9]+(\.[0-9]+)?$' "$LOCAL_LOG_AC1" | head -1)"
 	if [ -n "$DIST_BASELINE_AC1" ] && [ -n "$DIST_FINAL_AC1" ] \
@@ -375,13 +394,14 @@ else
 
 	# Same rationale and thresholds as AC1's distance check above: without this, "canopendoors 0
 	# blocked the door" and "the monster never moved" both read as "every poll closed" above. Prove
-	# the monster still walked toward and got blocked at func_door_1 even with door-opening
-	# disabled (a relative drop, not a fixed final distance - see the AC1 comment for why).
+	# the monster still walked toward func_door_1 even with door-opening disabled (a relative drop,
+	# not a fixed final distance - see the AC1 comment, and the header's "canopendoors 0" note, for
+	# what this check does and doesn't prove).
 	DIST_BASELINE_AC2="$(grep -E '^93[0-9]+(\.[0-9]+)?$' "$LOCAL_LOG_AC2" | head -1)"
 	DIST_FINAL_AC2="$(grep -E '^94[0-9]+(\.[0-9]+)?$' "$LOCAL_LOG_AC2" | head -1)"
 	if [ -n "$DIST_BASELINE_AC2" ] && [ -n "$DIST_FINAL_AC2" ] \
 		&& awk -v b="$DIST_BASELINE_AC2" -v f="$DIST_FINAL_AC2" 'BEGIN{exit !((b-93000)>50 && ((b-93000)-(f-94000))>5)}'; then
-		echo "PASS: AC2 - the monster still walked toward func_door_1 and was blocked by it (distanceToPoint ${DIST_BASELINE_AC2} -> ${DIST_FINAL_AC2})"
+		echo "PASS: AC2 - the monster still walked toward func_door_1 (distanceToPoint ${DIST_BASELINE_AC2} -> ${DIST_FINAL_AC2})"
 	else
 		echo "FAIL: expected distanceToPoint to start >50 and drop by >5, got baseline='${DIST_BASELINE_AC2}' final='${DIST_FINAL_AC2}'"
 		FAIL=1
