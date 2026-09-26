@@ -62,15 +62,12 @@
 #      carries the AI's own bounding volume into the closed door's solid brush well before it
 #      "reaches" that nominal target point, which is exactly what triggers `GetSlideMoveEntity()`
 #      returning the door and this sub-issue's wiring firing - confirmed directly via
-#      `ai_opendoor_count`/`ai_opendoor_last` on an actual run, in both the open (AC1) and blocked
-#      (AC2) cases, with both ending at essentially the same final `distanceToPoint()` reading
-#      (~67 units from the -256 184 64 target, down from ~76 at spawn) either way - asserted below,
-#      not just observed manually (a prior review round found the manual-only version of this
-#      claim was wrong: an earlier draft of this comment guessed the final position at ~-237 182,
-#      ~19 units from the target; the actual measured distanceToPoint() is ~67 units, i.e. only
-#      ~9 units of net progress before the monster's own bounding volume is stopped by the door's
-#      solid brush - the assertions below use that real, relative ~9-unit drop, not the guessed
-#      absolute one).
+#      `ai_blocked_last` on an actual run, in both the open (AC1, where `ai_opendoor_count`/
+#      `_last` confirm it too) and blocked (AC2, where `canopendoors 0` keeps `ai_opendoor_count`/
+#      `_last` from ever moving, so `ai_blocked_last` is AC2's only such proof) cases, with both
+#      ending at essentially the same final `distanceToPoint()` reading (~67 units from the
+#      -256 184 64 target, down from ~76 at spawn) either way - asserted below, not just observed
+#      manually.
 #
 # `chextrek_test_str14` (ChexTrekDump.cpp, this sub-issue) holds the spawned monster's own name,
 # quoted, for the same reason `chextrek_test_str10`/`_11`/etc. hold door names - see
@@ -105,23 +102,38 @@
 # every plain, non-toggle func_door in this mod already has. A single isOpen() check some fixed
 # time after the walk can land on either side of that ~3-second open window and wrongly read as
 # "never opened" (confirmed on an actual run: `SetMoverState` traced the real sequence
-# closed->opening->open->closing->closed all inside about 5.5 seconds). So AC1 below polls
-# isOpen() repeatedly (14 checks, `wait 400` apart, markers 44100/44200/.../45400 each plus
-# isOpen()) across a window wide enough to cover both the walk itself and the door's own
-# open/close cycle, and passes if *any* of them ever reads open - proof the door genuinely opened,
-# independent of exactly when that 3-second window lands relative to the poll cadence. AC2 polls
-# on the same schedule (markers 46100/46200/.../47400) and requires *every* one of them to read
-# closed.
+# closed->opening->open->closing->closed all inside a few seconds). So AC1 below polls isOpen()
+# repeatedly (14 checks, `wait 400` apart - the console's own `wait` argument is in engine frames,
+# not ms; `tools/test-end-level-nextmap.sh`'s header measured `wait 10` at ~167ms of sim time, so
+# `wait 400` here is closer to ~6.7s per poll, several times longer than the door's own ~3-second
+# open window - comfortably enough margin that at least one poll should land inside it regardless
+# of exactly when the walk itself finishes), markers 44100/44200/.../45400 each plus isOpen()) and
+# passes if *any* of them ever reads open - proof the door genuinely opened, independent of exactly
+# when that open window lands relative to the poll cadence. AC2 polls on the same schedule (markers
+# 46100/46200/.../47400) and requires *every* one of them to read closed.
 #
 # canopendoors 0 blocking the door and a monster sitting still both read as "every poll closed" on
 # the isOpen() checks alone, so both ACs also print distanceToPoint() against the same
 # moveToPosition target - once right after spawn (baseline, ~76 units: the monster spawns at
-# "-180 184 64", the target is "-256 184 64") and once after the last poll (see the header above
-# for the actual measured drop, ~9 units, whether the door opened or stayed shut) - proving the
-# monster actually walked toward the door rather than holding still. AC1 uses markers 90000
-# (baseline)/91000 (final); AC2 uses 93000/94000 - all four ranges sit well clear of the
-# 43000/44100-45400/46100-47400 isOpen() marker ranges above (distanceToPoint returns
-# double-digit-to-low-hundreds units here, so none of these can collide).
+# "-180 184 64", the target is "-256 184 64") and once after the last poll - proving the monster
+# actually walked toward the door rather than holding still. distanceToPoint() is 3D, and the
+# monster's z can change as it settles onto the floor after spawning, so the measured drop (an
+# actual run saw baseline ~76 down to final ~67) isn't simply "horizontal units of progress" - only
+# that some net movement toward the target happened. AC1 uses markers 90000 (baseline)/91000
+# (final); AC2 uses 93000/94000 - all four ranges sit well clear of the 43000/44100-45400/
+# 46100-47400 isOpen() marker ranges above (distanceToPoint returns double-digit-to-low-hundreds
+# units here, so none of these can collide).
+#
+# Neither isOpen() nor distanceToPoint() can tell whether func_door_1 *specifically* is what
+# stopped the monster (as opposed to something else in its path), which matters most for AC2:
+# canopendoors 0 means idAI::OpenDoors - and so ai_opendoor_count/_last - never runs at all, so
+# AC2's own acceptance criterion ("the monster is blocked and the door stays shut") needs a signal
+# independent of that gating. `idAI::moveStatus()` looked like a candidate but doesn't work: an
+# actual run showed it's driven by SlideMove's own AAS-level CheckObstacleAvoidance call, a
+# different subsystem from the direct physics collision this scenario exercises, and it never left
+# MOVE_STATUS_MOVING/_DONE here. `ai_blocked_last` (ChexTrekDump.cpp, this sub-issue) is what
+# actually closes this: it reads `physicsObj.GetSlideMoveEntity()` unconditionally, before the
+# `if ( canOpenDoors )` check, so it fires the same way regardless of canopendoors.
 #
 # What distanceToPoint() alone can't prove is that func_door_1 *specifically* is what stopped the
 # monster short of the target, as opposed to something else in the way: `idAI::MoveToPosition`'s
@@ -284,6 +296,18 @@ else
 		echo "FAIL: expected distanceToPoint to start >50 and drop by >5, got baseline='${DIST_BASELINE_AC1}' final='${DIST_FINAL_AC1}'"
 		FAIL=1
 	fi
+
+	# ai_blocked_last (ChexTrek_NoteAIBlocked, ChexTrekDump.cpp) reads GetSlideMoveEntity()
+	# unconditionally, before the canOpenDoors check - independent proof (alongside
+	# ai_opendoor_count/_last above) that func_door_1 itself is what the monster's own physics
+	# bumped into.
+	AI_BLOCKED_LAST_AC1="$(chextrek_line_field_values "$LOCAL_LOG_AC1" ai_blocked_last | sed -n '2p')"
+	if [ "$AI_BLOCKED_LAST_AC1" = "func_door_1" ]; then
+		echo "PASS: AC1 - ai_blocked_last=func_door_1, proving the monster's own blocked-movement physics bumped into that specific door"
+	else
+		echo "FAIL: expected ai_blocked_last=func_door_1, got '${AI_BLOCKED_LAST_AC1}'"
+		FAIL=1
+	fi
 fi
 
 # --- AC2: canopendoors 0 - the monster is blocked and the door stays shut ---
@@ -395,8 +419,7 @@ else
 	# Same rationale and thresholds as AC1's distance check above: without this, "canopendoors 0
 	# blocked the door" and "the monster never moved" both read as "every poll closed" above. Prove
 	# the monster still walked toward func_door_1 even with door-opening disabled (a relative drop,
-	# not a fixed final distance - see the AC1 comment, and the header's "canopendoors 0" note, for
-	# what this check does and doesn't prove).
+	# not a fixed final distance - see the AC1 comment for why).
 	DIST_BASELINE_AC2="$(grep -E '^93[0-9]+(\.[0-9]+)?$' "$LOCAL_LOG_AC2" | head -1)"
 	DIST_FINAL_AC2="$(grep -E '^94[0-9]+(\.[0-9]+)?$' "$LOCAL_LOG_AC2" | head -1)"
 	if [ -n "$DIST_BASELINE_AC2" ] && [ -n "$DIST_FINAL_AC2" ] \
@@ -404,6 +427,18 @@ else
 		echo "PASS: AC2 - the monster still walked toward func_door_1 (distanceToPoint ${DIST_BASELINE_AC2} -> ${DIST_FINAL_AC2})"
 	else
 		echo "FAIL: expected distanceToPoint to start >50 and drop by >5, got baseline='${DIST_BASELINE_AC2}' final='${DIST_FINAL_AC2}'"
+		FAIL=1
+	fi
+
+	# canopendoors 0 means idAI::OpenDoors (and so ai_opendoor_count/_last) never runs at all, so
+	# the distance check above only proves the monster moved, not that func_door_1 specifically is
+	# what stopped it. ai_blocked_last (ChexTrek_NoteAIBlocked) closes that gap: it reads
+	# GetSlideMoveEntity() unconditionally, before the canOpenDoors check, so it still fires here.
+	AI_BLOCKED_LAST_AC2="$(chextrek_line_field_values "$LOCAL_LOG_AC2" ai_blocked_last | sed -n '2p')"
+	if [ "$AI_BLOCKED_LAST_AC2" = "func_door_1" ]; then
+		echo "PASS: AC2 - ai_blocked_last=func_door_1 even with canopendoors 0, proving func_door_1 itself is what stopped the monster"
+	else
+		echo "FAIL: expected ai_blocked_last=func_door_1, got '${AI_BLOCKED_LAST_AC2}'"
 		FAIL=1
 	fi
 fi

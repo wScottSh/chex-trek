@@ -39,6 +39,9 @@ static idStr chextrekDoorTryOpenLast;
 static int chextrekAIOpenDoorCount = 0;
 static idStr chextrekAIOpenDoorLast;
 
+// chextrek: spec #42. See ChexTrek_NoteAIBlocked in ChexTrekDump.h.
+static idStr chextrekAIBlockedLast = "none";
+
 // chextrek: spec #30, test-only. The AFK harness drives the game only through console commands
 // (spec #28), including the "script" command to call scriptEvents like setProj/spawnDict that
 // need a string literal argument. The console's own tokenizer (idCmdArgs::TokenizeString,
@@ -139,6 +142,22 @@ void ChexTrek_NoteAIOpenDoor( const char *doorName ) {
 
 /*
 ==================
+ChexTrek_NoteAIBlocked
+==================
+*/
+void ChexTrek_NoteAIBlocked( const char *entName ) {
+	// Only latch a real blocker: blockEnt reverts to NULL the instant the AI isn't actively
+	// colliding with anything (e.g. once it stops pressing into the door, or the door opens and it
+	// walks through), so overwriting on every call - including the NULL/"none" ones - would lose
+	// the one tick of real contact this hook exists to prove by the time a scenario's own
+	// chextrek_dump runs, several ticks later.
+	if ( idStr::Cmp( entName, "none" ) != 0 ) {
+		chextrekAIBlockedLast = entName;
+	}
+}
+
+/*
+==================
 ChexTrek_Dump_f
 
 Prints the mod's custom state to the game log for the AFK test harness. #29 lands only the
@@ -230,7 +249,12 @@ AnimMove/FlyMove/SlideMove wiring (idAI::canOpenDoors, read from the "canopendoo
 default "1"), which calls OpenDoors whenever a monster's own blocked-movement physics reports the
 entity it bumped into. These two lines let a scenario tell "a monster's own movement wiring opened
 this door" from "the door happened to already be open" independent of the door's own isOpen()
-state, the same technique #40/#41's door_tryopen_count/_last use for idPlayer::tryOpen.
+state, the same technique #40/#41's door_tryopen_count/_last use for idPlayer::tryOpen. A later
+review round added `ai_blocked_last` (via ChexTrek_NoteAIBlocked), read unconditionally from
+GetSlideMoveEntity() before the canOpenDoors check runs: with "canopendoors 0", OpenDoors never
+runs at all, so ai_opendoor_count/_last alone can't tell "the monster was blocked by func_door_1
+specifically" from "the monster stopped for some unrelated reason" - the gap that scenario needs
+closed for its own "canopendoors 0" acceptance criterion.
 ==================
 */
 void ChexTrek_Dump_f( const idCmdArgs &args ) {
@@ -322,6 +346,7 @@ void ChexTrek_Dump_f( const idCmdArgs &args ) {
 	// chextrek: spec #42 (decomp-so/reference/door-opening.md). See ChexTrek_NoteAIOpenDoor.
 	gameLocal.Printf( "ai_opendoor_count: %d\n", chextrekAIOpenDoorCount );
 	gameLocal.Printf( "ai_opendoor_last: %s\n", chextrekAIOpenDoorCount > 0 ? chextrekAIOpenDoorLast.c_str() : "none" );
+	gameLocal.Printf( "ai_blocked_last: %s\n", chextrekAIBlockedLast.c_str() );
 
 	// chextrek: spec #41 (decomp-so/reference/door-opening.md). idPlayer::tryOpen's locked-door
 	// branches call the already-stock idPlayer::ShowTip, which only sets HUD gui state - read
