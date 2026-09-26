@@ -1,26 +1,79 @@
-# chextrek: shared AFK-harness plumbing (spec #28/#29/#30). Sourced by tools/run-harness.sh and
-# tools/test-*.sh scenario scripts - not meant to be run directly.
+# chextrek: shared AFK-harness plumbing (spec #28). Sourced by tools/run-harness.sh,
+# tools/run-scenario.sh and the tools/test-*.sh scenario scripts - not meant to be run directly.
 #
-# Provides chextrek_run_console_script(), which does everything common to every harness run:
-# mounts this checkout as the "chextrek" fs_game folder, wipes the scratch save path, writes and
-# execs a given console script, launches dhewm3 with a timeout, archives the run's log/screenshot/
-# cfg outside the repo, and asserts the spec #28 always-on checks (chextrek.dll loaded, state-dump
-# header present, no ERROR/unknown-event/unknown-spawnclass/script-compile lines). Callers add
-# their own scenario-specific assertions on top of $CHEXTREK_LOCAL_LOG; the always-on checks alone
-# set $CHEXTREK_RUN_STATUS (0 pass, 1 fail).
+# Harness core:
+#   chextrek_run_console_script - one game run: mounts this checkout as the "chextrek" fs_game
+#     folder, wipes the scratch save path, writes and execs a console script, launches dhewm3 with
+#     a timeout, archives the run's log/screenshots/cfg outside the repo, and asserts the spec #28
+#     always-on checks (chextrek.dll loaded, state-dump header present, no ERROR/unknown-event/
+#     unknown-spawnclass/script-compile lines, no timeout kill).
 #
-# Also provides chextrek_hud_map_visible_values()/chextrek_hud_map_coverage_values()/
-# chextrek_hud_map_level_values() (#36/#38/#39), shared by tools/test-hud-map.sh,
-# tools/test-show-map.sh and tools/test-hud-map-saveload.sh so none of them repeat the same
-# `hud_map: level=<N> visible=<0|1> coverage=<N>` parsing pipeline.
-#
-# Also provides chextrek_line_field_values() (#41), for any `chextrek_dump` line of the form
-# `<field>: <rest of line>` (one field per line, e.g. `door_tryopen_last`, `hud_tip_title`) -
-# shared by tools/test-door-locked.sh so its own repeated `grep -oE '^<field>: .*$' | sed
-# 's/^<field>: //'` pipeline lives in one place.
+# Scenario-script helpers (tools/test-*.sh):
+#   chextrek_build_or_exit      - builds chextrek.dll once (skipped under CHEXTREK_SKIP_BUILD=1).
+#   chextrek_run_scenario       - runs one console script via tools/run-scenario.sh and finds its
+#                                 archived log; propagates the no-display exit 3.
+#   chextrek_assert_map_loaded  - the always-on "map finishes loading" check.
+#   chextrek_line_field_values  - values of a `<field>: <rest of line>` chextrek_dump line.
+#   chextrek_hud_map_*_values   - fields of the dump's `hud_map:` line.
 #
 # See docs/dev-setup.md for the environment variables this reads (DHEWM3_HOME, DOOM3_BASEPATH,
 # DHEWM3_DOCUMENTS_DIR) and for why the mount/save-path/timeout handling works the way it does.
+
+# chextrek_build_or_exit
+#
+# Builds chextrek.dll with tools/build-chextrek.sh, exiting the calling script with 1 if the build
+# fails. A no-op when CHEXTREK_SKIP_BUILD=1 (set by tools/run-all-tests.sh, which builds once
+# up front instead of once per scenario).
+chextrek_build_or_exit() {
+	[ "${CHEXTREK_SKIP_BUILD:-0}" = "1" ] && return 0
+	local LIB_DIR
+	LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+	if ! bash "${LIB_DIR}/build-chextrek.sh"; then
+		echo "FAIL: build-chextrek.sh failed"
+		exit 1
+	fi
+}
+
+# chextrek_run_scenario SCENARIO_NAME CONSOLE_SCRIPT_FILE TIMEOUT_SECS
+#
+# Runs tools/run-scenario.sh in a subshell and echoes its output. Sets:
+#   CHEXTREK_SCENARIO_OUT   - that output (for callers that grep the harness's own PASS/FAIL lines);
+#   CHEXTREK_SCENARIO_EXIT  - its exit status (0 = always-on checks passed);
+#   CHEXTREK_SCENARIO_LOG   - the archived engine log's path, or "" if the run produced none;
+#   CHEXTREK_SCENARIO_SAVE_DIR - the scratch save dir (see chextrek_run_console_script).
+# Prints a FAIL line when the always-on checks failed. If the run stopped because there is no
+# display (exit 3), exits the calling script with 3 too, so that environment blocker is never
+# reported as an ordinary test FAIL. Returns CHEXTREK_SCENARIO_EXIT.
+chextrek_run_scenario() {
+	local LIB_DIR
+	LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+	CHEXTREK_SCENARIO_OUT="$(bash "${LIB_DIR}/run-scenario.sh" "$1" "$2" "$3" 2>&1)"
+	CHEXTREK_SCENARIO_EXIT=$?
+	echo "$CHEXTREK_SCENARIO_OUT"
+	[ $CHEXTREK_SCENARIO_EXIT -eq 3 ] && exit 3
+	if [ $CHEXTREK_SCENARIO_EXIT -ne 0 ]; then
+		echo "FAIL: expected the always-on harness checks to pass for '$1', but the run exited ${CHEXTREK_SCENARIO_EXIT}"
+	fi
+	CHEXTREK_SCENARIO_LOG="$(echo "$CHEXTREK_SCENARIO_OUT" | sed -n 's/^CHEXTREK_LOCAL_LOG=//p')"
+	CHEXTREK_SCENARIO_SAVE_DIR="$(echo "$CHEXTREK_SCENARIO_OUT" | sed -n 's/^CHEXTREK_MOD_SAVE_DIR=//p')"
+	if [ -n "$CHEXTREK_SCENARIO_LOG" ] && [ ! -f "$CHEXTREK_SCENARIO_LOG" ]; then
+		CHEXTREK_SCENARIO_LOG=""
+	fi
+	return $CHEXTREK_SCENARIO_EXIT
+}
+
+# chextrek_assert_map_loaded LOG_FILE MAP_NAME
+#
+# Spec #28 always-on check: the map finished loading (the engine's "<N> msec to load <map>" line).
+# Prints PASS/FAIL; returns 0/1.
+chextrek_assert_map_loaded() {
+	if grep -qE "^ *[0-9]+ msec to load $2\$" "$1"; then
+		echo "PASS: $2 finished loading"
+		return 0
+	fi
+	echo "FAIL: expected to see '<N> msec to load $2' in the log"
+	return 1
+}
 
 # chextrek_hud_map_visible_values LOG_FILE
 #
@@ -48,7 +101,7 @@ chextrek_hud_map_level_values() {
 # Prints each `<FIELD_NAME>: <rest of line>` chextrek_dump line's value (everything after
 # "<FIELD_NAME>: "), in log order, one per line. FIELD_NAME must be a plain field name (no regex
 # metacharacters - every field this is used for is a fixed identifier like "door_tryopen_last" or
-# "hud_tip_title", never user input). (#41)
+# "hud_tip_title", never user input).
 chextrek_line_field_values() {
 	local LOG_FILE="$1"
 	local FIELD_NAME="$2"
@@ -81,7 +134,7 @@ chextrek_exit_no_display() {
 # "developer 1" and a trailing "quit" - callers own the whole script, not just a snippet, since
 # scenarios need to interleave "wait"s with their own commands).
 #
-# On return: CHEXTREK_RUN_STATUS is always set (0 pass, 1 fail). CHEXTREK_ARTIFACT_DIR and
+# On return: CHEXTREK_RUN_STATUS is always set (0 pass, 1 fail; a timeout kill is a fail). CHEXTREK_ARTIFACT_DIR and
 # CHEXTREK_LOCAL_LOG are set once the run actually launches dhewm3; CHEXTREK_MOD_SAVE_DIR is set a
 # little earlier (as soon as the scratch save dir itself is resolved and wiped, before dhewm3 is
 # launched). On an early-return failure (missing dhewm3.exe/chextrek.dll, can't create the mount
@@ -194,7 +247,9 @@ chextrek_run_console_script() {
 		+exec "$CFG_NAME"
 	local RUN_EXIT=$?
 
+	local TIMED_OUT=0
 	if [ $RUN_EXIT -eq 124 ] || [ $RUN_EXIT -eq 137 ]; then
+		TIMED_OUT=1
 		echo "==> Timed out after ${TIMEOUT_SECS}s - an error dialog likely hung the game. Killed it."
 		# Belt-and-braces: `timeout` already sent the kill, but make sure nothing lingers. This
 		# kills *every* dhewm3.exe on the machine (image-name match, not PID) - see the "one run
@@ -203,17 +258,11 @@ chextrek_run_console_script() {
 	fi
 
 	# --- archive this run's artifacts (log + any screenshot), still outside the repo ---
-	# `screenshot <name>` writes a plain, extensionless file named exactly <name> straight into
-	# MOD_SAVE_DIR (confirmed on #30's scenario runs: "screenshot chextrek_script_events" writes
-	# "chextrek_script_events" - this is what #29 originally found too; see docs/dev-setup.md for
-	# where a stale claim to the contrary, that the name is ignored in favor of an auto-numbered
-	# "screenshots/shot00001.tga", briefly crept in and was corrected). Rather than hardcode a name
-	# pattern here - which would have to track whatever name each caller's console script happens
-	# to pick - archive everything: since
-	# MOD_SAVE_DIR is wiped to empty before every run (above), anything left in it (or under a
-	# screenshots/ subfolder, just in case) afterward, other than our own cfg, is this run's own
-	# output. Never asserted on (spec #28: "saved as artifacts, never asserted"), so this stays
-	# best-effort.
+	# `screenshot <name>` writes an extensionless file named exactly <name> into MOD_SAVE_DIR.
+	# Since MOD_SAVE_DIR is wiped before every run, everything left in it (or in a screenshots/
+	# subfolder) other than our own cfg is this run's output, so archive all of it rather than track
+	# each caller's screenshot names. Never asserted on (spec #28: "saved as artifacts, never
+	# asserted").
 	CHEXTREK_ARTIFACT_DIR="${SAVE_ROOT}/chextrek-harness-artifacts/${RUN_ID}"
 	mkdir -p "$CHEXTREK_ARTIFACT_DIR"
 	[ -f "$LOG_FILE" ] && cp -f "$LOG_FILE" "${CHEXTREK_ARTIFACT_DIR}/dhewm3log.txt"
@@ -257,15 +306,9 @@ chextrek_run_console_script() {
 		CHEXTREK_RUN_STATUS=1
 	fi
 
-	# Always-on checks (spec #28): no ERROR, no unknown event/spawnclass/script-compile lines.
-	# "Unknown spawnclass" was the #29 guess at how the engine reports this; it never actually
-	# matches anything (Game_local.cpp warns "Could not spawn '<classname>'.  Class '<spawnclass>' not
-	# found..." instead - grep confirms "Unknown spawnclass" isn't a string this engine build ever
-	# prints), so this check was silently unable to fire before now. Matching the real message
-	# turned up one pre-existing gap on `e1m1`/`sf_923`, `idTarget_EndLevelGUI` not being
-	# implemented (spec #28's own step 3, "Custom UI and end-level stats"), allowlisted by #30/#31/
-	# #32 by class name until it landed. #33 ports idTarget_EndLevelGUI, so the allowlist is gone:
-	# `target_endlevelgui_1`/`_2` must now spawn cleanly on both maps (#33's AC3).
+	# Always-on checks (spec #28): no ERROR, no unknown event/spawnclass/script-compile lines. This
+	# engine reports an unknown spawnclass as "Could not spawn '<classname>'.  Class '<spawnclass>'
+	# not found..." (Game_local.cpp), not with the words "unknown spawnclass".
 	local ERROR_LINES
 	ERROR_LINES="$(grep -nE "^ERROR:|Unknown event|Could not spawn|Error: file .*\.script" "$CHEXTREK_LOCAL_LOG" || true)"
 	if [ -n "$ERROR_LINES" ]; then
@@ -274,6 +317,17 @@ chextrek_run_console_script() {
 		CHEXTREK_RUN_STATUS=1
 	else
 		echo "PASS: no ERROR / unknown-event / unknown-spawnclass / script-compile lines"
+	fi
+
+	# Spec #28: a run the harness had to kill is a failure, whatever the log says, and the report
+	# names the log's last error line (or, if there is none, its last line).
+	if [ $TIMED_OUT -eq 1 ]; then
+		echo "FAIL: the game didn't exit within ${TIMEOUT_SECS}s and was killed"
+		local LAST_LINE
+		LAST_LINE="$(grep -E "^ERROR:|Unknown event|Could not spawn|Error: file .*\.script|[Ee]rror" "$CHEXTREK_LOCAL_LOG" | tail -1)"
+		[ -z "$LAST_LINE" ] && LAST_LINE="$(grep -v '^[[:space:]]*$' "$CHEXTREK_LOCAL_LOG" | tail -1)"
+		echo "FAIL: last error line in the log: ${LAST_LINE}"
+		CHEXTREK_RUN_STATUS=1
 	fi
 
 	echo "==> Full log: ${CHEXTREK_LOCAL_LOG}"
