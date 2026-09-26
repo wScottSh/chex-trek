@@ -13,11 +13,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SCRATCH_DIR="$(mktemp -d)"
 trap 'rm -rf "$SCRATCH_DIR"' EXIT
 
+# shellcheck source=tools/lib-harness.sh
+source "${SCRIPT_DIR}/lib-harness.sh"
+
 echo "=== #31 objectives test: build ==="
-if ! bash "${SCRIPT_DIR}/build-chextrek.sh"; then
-	echo "FAIL: build-chextrek.sh failed"
-	exit 1
-fi
+chextrek_build_or_exit
 
 # sf_923's two trigger_objective entities (maps/sf_923.map): trigger_objective_1 ("Acquire a
 # weapon", addmsg+rmmsg+remove) and trigger_objective_2 ("Investigate", addmsg+remove, no rmmsg).
@@ -70,18 +70,12 @@ EOF
 
 echo
 echo "=== #31 objectives test: scenario run ==="
-RUN_OUT="$(bash "${SCRIPT_DIR}/run-scenario.sh" chextrek_objectives "$CONSOLE_SCRIPT" 120 2>&1)"
-RUN_EXIT=$?
-echo "$RUN_OUT"
 
 FAIL=0
-if [ $RUN_EXIT -ne 0 ]; then
-	echo "FAIL: expected the always-on harness checks to pass (chextrek.dll loaded, state-dump header, no ERROR/unknown-event/unknown-spawnclass/script-compile lines), but the run exited ${RUN_EXIT}"
-	FAIL=1
-fi
+chextrek_run_scenario chextrek_objectives "$CONSOLE_SCRIPT" 120 || FAIL=1
 
-LOCAL_LOG="$(echo "$RUN_OUT" | sed -n 's/^CHEXTREK_LOCAL_LOG=//p')"
-if [ -z "$LOCAL_LOG" ] || [ ! -f "$LOCAL_LOG" ]; then
+LOCAL_LOG="$CHEXTREK_SCENARIO_LOG"
+if [ -z "$LOCAL_LOG" ]; then
 	echo "FAIL: couldn't find the archived log to check scenario-specific assertions"
 	exit 1
 fi
@@ -90,18 +84,13 @@ fi
 # The always-on unknown-spawnclass/ERROR checks above already fail the run if either entity
 # couldn't spawn (mkObjective not found), or a script/data error printed. Belt-and-suspenders: the
 # map's own load-complete line, confirming sf_923 (not some other map) is what actually loaded.
-if grep -qE '^ *[0-9]+ msec to load sf_923$' "$LOCAL_LOG"; then
-	echo "PASS: sf_923 finished loading (both trigger_objective entities spawned - see the always-on checks above)"
-else
-	echo "FAIL: expected to see '<N> msec to load sf_923' in the log"
-	FAIL=1
-fi
+chextrek_assert_map_loaded "$LOCAL_LOG" sf_923 || FAIL=1
 
 # There are 6 chextrek_dump calls (see the console script above): baseline, after triggering _1,
 # after triggering _2, after triggering _1 again (the removal), after the first save/load
 # round-trip, and after a second save/load round-trip taken from that already-loaded state.
-SLOT1_VALUES="$(grep -oE '^objective_slot_1: .*$' "$LOCAL_LOG" | sed 's/^objective_slot_1: //')"
-SLOT2_VALUES="$(grep -oE '^objective_slot_2: .*$' "$LOCAL_LOG" | sed 's/^objective_slot_2: //')"
+SLOT1_VALUES="$(chextrek_line_field_values "$LOCAL_LOG" objective_slot_1)"
+SLOT2_VALUES="$(chextrek_line_field_values "$LOCAL_LOG" objective_slot_2)"
 S1_BASELINE="$(echo "$SLOT1_VALUES" | sed -n '1p')"
 S1_AFTER_TRIGGER1="$(echo "$SLOT1_VALUES" | sed -n '2p')"
 S1_AFTER_TRIGGER2="$(echo "$SLOT1_VALUES" | sed -n '3p')"

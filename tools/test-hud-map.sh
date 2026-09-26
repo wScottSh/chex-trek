@@ -31,7 +31,7 @@
 # console command (both confirmed rejected as "Unknown command" against this engine build) -
 # "_impulseN" strings are recognized by idUsercmdGenLocal only from a real, currently-held bound
 # key, which a console script can't simulate. `chextrek_test_impulse <N>` (test-only, spec #36,
-# ChexTrekDump.cpp/.h) closes that gap the same way chextrek_customui_cmd (#34) does for a GUI
+# ChexTrekDump.cpp/.h) closes that gap the same way chextrek_test_customui_cmd (#34) does for a GUI
 # button click: it calls idPlayer::PerformImpulse(N) directly - everything downstream (the switch
 # in PerformImpulse itself, HandleNamedEvent, hud.gui's own onNamedEvent blocks) is the real,
 # already-ported game code, unchanged. guis/hud.gui's hudmap_open window flips "gui::HudMap" to 1
@@ -42,10 +42,10 @@
 # tools/test-pda-map.sh hit the exact same gap for guis/pda_chex.gui's own onTime 400: "how much
 # gameLocal.time advances per 'wait' tick isn't fixed, so a fixed frame-count margin can't reliably
 # bound a gameLocal.time-based threshold"). A single fixed-length wait followed by one dump
-# (originally "wait 40") was observed to land on either side of the flip across runs - sometimes
+# was observed to land on either side of the flip across runs - sometimes
 # still 1, sometimes already 0. Rather than guess a bigger fixed margin (liable to the same
 # intermittent failure, just at lower odds), this scenario samples repeatedly: eight chextrek_dumps,
-# 20 frames apart (160 frames of total margin, 4x the original single wait), and the assertion
+# 20 frames apart (160 frames of total margin), and the assertion
 # below passes if *any* of the eight shows visible=0 - the flip is one-time and monotonic (hud.gui's
 # own onTime semantics: a timeline fires once and only resetTime rearms it, and nothing here calls
 # resetTime "hudmap_close" again), so once one sample sees 0, every later sample would too. The
@@ -80,10 +80,7 @@ trap 'rm -rf "$SCRATCH_DIR"' EXIT
 source "${SCRIPT_DIR}/lib-harness.sh"
 
 echo "=== #36 HUD map test: build ==="
-if ! bash "${SCRIPT_DIR}/build-chextrek.sh"; then
-	echo "FAIL: build-chextrek.sh failed"
-	exit 1
-fi
+chextrek_build_or_exit
 
 CONSOLE_SCRIPT="${SCRATCH_DIR}/hud_map.cfg"
 cat > "$CONSOLE_SCRIPT" <<'EOF'
@@ -135,29 +132,18 @@ EOF
 
 echo
 echo "=== #36 HUD map test: scenario run ==="
-RUN_OUT="$(bash "${SCRIPT_DIR}/run-scenario.sh" chextrek_hud_map "$CONSOLE_SCRIPT" 120 2>&1)"
-RUN_EXIT=$?
-echo "$RUN_OUT"
 
 FAIL=0
-if [ $RUN_EXIT -ne 0 ]; then
-	echo "FAIL: expected the always-on harness checks to pass (chextrek.dll loaded, state-dump header, no ERROR/unknown-event/unknown-spawnclass/script-compile lines), but the run exited ${RUN_EXIT}"
-	FAIL=1
-fi
+chextrek_run_scenario chextrek_hud_map "$CONSOLE_SCRIPT" 120 || FAIL=1
 
-LOCAL_LOG="$(echo "$RUN_OUT" | sed -n 's/^CHEXTREK_LOCAL_LOG=//p')"
-if [ -z "$LOCAL_LOG" ] || [ ! -f "$LOCAL_LOG" ]; then
+LOCAL_LOG="$CHEXTREK_SCENARIO_LOG"
+if [ -z "$LOCAL_LOG" ]; then
 	echo "FAIL: couldn't find the archived log to check scenario-specific assertions"
 	exit 1
 fi
 
 # --- e1m1 finishes loading (spec #28 always-on check) ---
-if grep -qE '^ *[0-9]+ msec to load e1m1$' "$LOCAL_LOG"; then
-	echo "PASS: e1m1 finished loading"
-else
-	echo "FAIL: expected to see '<N> msec to load e1m1' in the log"
-	FAIL=1
-fi
+chextrek_assert_map_loaded "$LOCAL_LOG" e1m1 || FAIL=1
 
 # There are 13 chextrek_dump calls total: baseline, after the first impulse 23 (open), eight
 # samples taken 20 frames apart after the second impulse 23 (close - see the comment above the

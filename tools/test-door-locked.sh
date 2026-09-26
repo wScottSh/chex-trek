@@ -15,7 +15,7 @@
 # comment for why (no plain "impulse" console command, and "_impulse16" isn't recognized from a
 # typed console line).
 #
-# `chextrek_line_field_values()` (tools/lib-harness.sh, this sub-issue) is a shared helper for
+# `chextrek_line_field_values()` (tools/lib-harness.sh) is a shared helper for
 # reading any `<field>: <rest of line>` chextrek_dump line's value, so the assertions below don't
 # each repeat the same grep/sed pipeline - see lib-harness.sh's own header comment.
 #
@@ -85,10 +85,7 @@ trap 'rm -rf "$SCRATCH_DIR"' EXIT
 source "${SCRIPT_DIR}/lib-harness.sh"
 
 echo "=== #41 locked-door test: build ==="
-if ! bash "${SCRIPT_DIR}/build-chextrek.sh"; then
-	echo "FAIL: build-chextrek.sh failed"
-	exit 1
-fi
+chextrek_build_or_exit
 
 FAIL=0
 
@@ -116,26 +113,14 @@ EOF
 
 echo
 echo "=== #41 locked-door test: sf_923 scenario run ==="
-RUN_OUT_SF923="$(bash "${SCRIPT_DIR}/run-scenario.sh" chextrek_door_locked_sf923 "$CONSOLE_SCRIPT_SF923" 90 2>&1)"
-RUN_EXIT_SF923=$?
-echo "$RUN_OUT_SF923"
+chextrek_run_scenario chextrek_door_locked_sf923 "$CONSOLE_SCRIPT_SF923" 90 || FAIL=1
 
-if [ $RUN_EXIT_SF923 -ne 0 ]; then
-	echo "FAIL: expected the always-on harness checks to pass on sf_923, but the run exited ${RUN_EXIT_SF923}"
-	FAIL=1
-fi
-
-LOCAL_LOG_SF923="$(echo "$RUN_OUT_SF923" | sed -n 's/^CHEXTREK_LOCAL_LOG=//p')"
-if [ -z "$LOCAL_LOG_SF923" ] || [ ! -f "$LOCAL_LOG_SF923" ]; then
+LOCAL_LOG_SF923="$CHEXTREK_SCENARIO_LOG"
+if [ -z "$LOCAL_LOG_SF923" ]; then
 	echo "FAIL: couldn't find the archived sf_923 log to check scenario-specific assertions"
 	FAIL=1
 else
-	if grep -qE '^ *[0-9]+ msec to load sf_923$' "$LOCAL_LOG_SF923"; then
-		echo "PASS: sf_923 finished loading"
-	else
-		echo "FAIL: expected to see '<N> msec to load sf_923' in the log"
-		FAIL=1
-	fi
+	chextrek_assert_map_loaded "$LOCAL_LOG_SF923" sf_923 || FAIL=1
 
 	COUNT_41000_SF923="$(grep -c '^41000$' "$LOCAL_LOG_SF923")"
 	if [ "$COUNT_41000_SF923" -ge 1 ]; then
@@ -226,26 +211,14 @@ EOF
 
 echo
 echo "=== #41 locked-door test: e1m1 scenario run ==="
-RUN_OUT_E1M1="$(bash "${SCRIPT_DIR}/run-scenario.sh" chextrek_door_locked_e1m1 "$CONSOLE_SCRIPT_E1M1" 90 2>&1)"
-RUN_EXIT_E1M1=$?
-echo "$RUN_OUT_E1M1"
+chextrek_run_scenario chextrek_door_locked_e1m1 "$CONSOLE_SCRIPT_E1M1" 90 || FAIL=1
 
-if [ $RUN_EXIT_E1M1 -ne 0 ]; then
-	echo "FAIL: expected the always-on harness checks to pass on e1m1, but the run exited ${RUN_EXIT_E1M1}"
-	FAIL=1
-fi
-
-LOCAL_LOG_E1M1="$(echo "$RUN_OUT_E1M1" | sed -n 's/^CHEXTREK_LOCAL_LOG=//p')"
-if [ -z "$LOCAL_LOG_E1M1" ] || [ ! -f "$LOCAL_LOG_E1M1" ]; then
+LOCAL_LOG_E1M1="$CHEXTREK_SCENARIO_LOG"
+if [ -z "$LOCAL_LOG_E1M1" ]; then
 	echo "FAIL: couldn't find the archived e1m1 log to check scenario-specific assertions"
 	FAIL=1
 else
-	if grep -qE '^ *[0-9]+ msec to load e1m1$' "$LOCAL_LOG_E1M1"; then
-		echo "PASS: e1m1 finished loading"
-	else
-		echo "FAIL: expected to see '<N> msec to load e1m1' in the log"
-		FAIL=1
-	fi
+	chextrek_assert_map_loaded "$LOCAL_LOG_E1M1" e1m1 || FAIL=1
 
 	COUNT_42000_E1M1="$(grep -c '^42000$' "$LOCAL_LOG_E1M1")"
 	if [ "$COUNT_42000_E1M1" -ge 1 ]; then

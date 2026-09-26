@@ -24,50 +24,31 @@
 # scenario would with any other pre-populated map state.
 #
 # Real content only ever uses def/slime_trail.def's "trail" entityDef, whose "fadeTime" "-1" means
-# (decomp-so/reference/trails.md's Notes, corvette_notes.txt "i thought the trails lasted forever")
-# a trail never deletes itself once its owner is gone - by design, it lasts the whole level (this is
-# also why the map's own pre-placed flemoids' trails are expected to stay part of the baseline
-# for the whole run, not fade out on their own). That makes AC1's "returns to zero after the fade"
-# unobservable within a bounded AFK run using unmodified content alone (nothing in this mod's real
-# def/ content ever gives a trail a finite fadeTime). def/slime_trail.def's new
-# "chextrek_test_trail_fastfade" entityDef - a test-only fixture, used only here, that inherits every
-# other value from "trail" unchanged and only shortens fadeDelay/fadeTime - closes that gap: this
-# scenario spawns its own, extra flemoid with that as its "trailDef" override (idActor::Spawn reads
-# that spawnArg, Actor.cpp, to pick which entityDef to copy into the new mkTrail - the same override
-# mechanism tools/test-ai-door-open.sh uses for "canopendoors").
+# (decomp-so/reference/trails.md's Notes) a trail never deletes itself - it lasts the whole level
+# by design, which makes AC1's "returns to zero after the fade" unobservable with unmodified content.
+# So this scenario spawns its own flemoid with a test-only fixture as its "trailDef" override
+# (idActor::Spawn reads that spawnArg to pick the entityDef it copies into the new mkTrail): an
+# entityDef that inherits everything from "trail" and only shortens fadeDelay/fadeTime. The fixture
+# is written to a scratch dir and handed to the harness as CHEXTREK_FIXTURE_DIR, which copies it
+# into the scratch save path - it never lives in the shipped mod data.
 #
-# `neverDormant "1"` (stock idEntity spawnArg, Entity.cpp - see tools/test-ai-door-open.sh's header
-# for the fuller "why") keeps the freshly console-spawned flemoid's idAI::Think actually running so
-# it can move at all. It spawns at sf_923's own "info_player_start_1" origin/angle ("16 -224 0"/
-# "135", the real map data the player itself spawns standing on - not a synthetic fixture) rather
-# than reusing tools/test-ai-door-open.sh's door-side spot: an early run spawned there instead and
-# the dump's `anchors` count never rose above the map's own pre-existing baseline there, across an
-# entire walk. At the time this was guessed to be mkTrail::addNewAnchor's ground trace (maxSurfDist
-# 8 units) not finding solid floor close enough at that exact spot - a plausible read, not a
-# confirmed one, since that door-side spot was picked for a different sub-issue's scenario, not
-# this one's floor requirements. A point every real player stands on (info_player_start_1) looked
-# like a safer bet - but this scenario's own trail doesn't reliably lay down an anchor at *this*
-# spot either (see the INFO-only anchors check below), which rules the "bad location"/"no ground"
-# guess back out again: the real cause is unknown (see that check's own comment), not this spot's
-# floor. `setMoveType( 2 )`/
-# `moveToPosition( ... )` (stock idAI script events) then drive a real walk with the same movement
-# physics idAI itself uses, satisfying AC1's "let it move" - proven directly below via
-# distanceToPoint(), the same technique tools/test-ai-door-open.sh uses, not just inferred from the
-# trail bookkeeping.
+# `neverDormant "1"` keeps the console-spawned flemoid's idAI::Think running so it can move; it
+# spawns at sf_923's own info_player_start_1 ("16 -224 0"/"135"). `setMoveType( 2 )`/
+# `moveToPosition( ... )` (stock idAI script events) drive a real walk, proven via
+# distanceToPoint(). `remove` (Cmd_Remove_f) deletes it synchronously, so ~idActor calls
+# trail->FadeTrail() at once; with the fixture's "fadeTime" "2" the trail deletes itself (and
+# RemoveTrail drops it from gameLocal.trails) 2 s of game time later. The "script" lines reach the
+# monster through $chextrek_test_str14, whose compiled-in value is its name (see ChexTrekDump.cpp).
 #
-# `remove` (Cmd_Remove_f, gamesys/SysCmds.cpp) reads its one argument directly, with no script
-# compile step, so - unlike a "script" console line's quoting workarounds - the flemoid's plain
-# console-spawned name can be typed straight into a "remove <name>" line with no cvar indirection.
-# The "script" lines below still need $chextrek_test_str14 (the entity-name workaround
-# ChexTrekDump.cpp's comment above chextrek_test_str14 explains) - this scenario doesn't `set` it,
-# it just spawns its monster with the exact name that cvar's compiled-in default already holds
-# ("chextrek_test_ai_monster", ChexTrekDump.cpp), the same reuse tools/test-ai-door-open.sh's own
-# scenario relies on for the same cvar.
-# Cmd_Remove_f's `delete ent` runs ~idActor synchronously, which (this sub-issue's Actor.cpp edit) calls
-# trail->FadeTrail() immediately: with the fixture's "fadeTime" "2" "fadeDelay" "0", the trail's
-# Think() deletes itself (and so idGameLocal::RemoveTrail's this) once real game time passes 2
-# seconds past that moment - tested below by waiting several seconds past the remove before the
-# final chextrek_dump.
+# "Trails appear where they should" (anchors on the ground under the actor) is asserted on the
+# map's own flemoids: their trails lay an anchor below the actor when first presented, so the
+# baseline `anchors` count must be nonzero. This scenario's own spawned trail is NOT asserted to lay
+# anchors: mkTrail::lastPos is never initialized (reference Notes; an original-mod bug spec #28
+# leaves alone since it doesn't crash). An in-game check (a temporary log line in
+# mkTrail::addNewAnchor) showed about half of sf_923's trails start with a garbage lastPos (NaN, or
+# values ~1e38 whose squared length overflows): Think's `LengthFast() > updateDist` test is then
+# always false, so those trails never update or anchor for the whole level. Whether the spawned
+# one does depends on heap contents, so its anchor count is reported as INFO only.
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -79,10 +60,18 @@ trap 'rm -rf "$SCRATCH_DIR"' EXIT
 source "${SCRIPT_DIR}/lib-harness.sh"
 
 echo "=== #43 trails test: build ==="
-if ! bash "${SCRIPT_DIR}/build-chextrek.sh"; then
-	echo "FAIL: build-chextrek.sh failed"
-	exit 1
-fi
+chextrek_build_or_exit
+
+mkdir -p "${SCRATCH_DIR}/fixture/def"
+cat > "${SCRATCH_DIR}/fixture/def/chextrek_test_trail.def" <<'EOF'
+// Test-only fixture for tools/test-trails.sh: "trail" with a 2-second fade.
+entityDef chextrek_test_trail_fastfade {
+	"inherit"					"trail"
+	"fadeDelay"					"0"
+	"fadeTime"					"2"
+}
+EOF
+export CHEXTREK_FIXTURE_DIR="${SCRATCH_DIR}/fixture"
 
 FAIL=0
 
@@ -127,26 +116,13 @@ EOF
 
 echo
 echo "=== #43 trails test: AC1 scenario run ==="
-RUN_OUT="$(bash "${SCRIPT_DIR}/run-scenario.sh" chextrek_trails_ac1 "$CONSOLE_SCRIPT" 150 2>&1)"
-RUN_EXIT=$?
-echo "$RUN_OUT"
-
-if [ $RUN_EXIT -ne 0 ]; then
-	echo "FAIL: expected the always-on harness checks to pass, but the run exited ${RUN_EXIT}"
-	FAIL=1
-fi
-
-LOCAL_LOG="$(echo "$RUN_OUT" | sed -n 's/^CHEXTREK_LOCAL_LOG=//p')"
-if [ -z "$LOCAL_LOG" ] || [ ! -f "$LOCAL_LOG" ]; then
+chextrek_run_scenario chextrek_trails_ac1 "$CONSOLE_SCRIPT" 150 || FAIL=1
+LOCAL_LOG="$CHEXTREK_SCENARIO_LOG"
+if [ -z "$LOCAL_LOG" ]; then
 	echo "FAIL: couldn't find the archived log to check scenario-specific assertions"
 	FAIL=1
 else
-	if grep -qE '^ *[0-9]+ msec to load sf_923$' "$LOCAL_LOG"; then
-		echo "PASS: sf_923 finished loading"
-	else
-		echo "FAIL: expected to see '<N> msec to load sf_923' in the log"
-		FAIL=1
-	fi
+	chextrek_assert_map_loaded "$LOCAL_LOG" sf_923 || FAIL=1
 
 	# Nine chextrek_dump calls in the script above, in order: (1) baseline, right after map load
 	# (already nonzero - see the header comment above), (2) right after spawn, (3) after the walk,
@@ -196,23 +172,18 @@ else
 		FAIL=1
 	fi
 
-	# Informational only, not gating: #43's actual acceptance criterion is the trail *count*
-	# (checked above/below), not the anchor count. Why this scenario's own spawned trail lays down
-	# no anchor of its own here is not conclusively diagnosed - decomp-so/reference/trails.md's
-	# Notes flag mkTrail::lastPos as never initialized by the reference (neither the constructor nor
-	# Spawn() sets it), which is one candidate (spec #28's Out of Scope lists this exact bug as one
-	# to leave alone unless it crashes - it doesn't), but the same Notes say that only blocks the
-	# first update if the initial distance-vs-garbage comparison itself fails (e.g. on a NaN); if it
-	# doesn't fail, lastPos gets set to the real origin before the first Present() runs, same as
-	# normal. The distance check above confirms the flemoid does move a real distance in this
-	# window, so "it never moved" isn't the explanation either. A live run showed the anchor count
-	# consistently unchanged for this scenario's own trail across several different spawn points
-	# while the map's own pre-placed flemoids' trails do have anchors already (baseline is
-	# nonzero) - logged here as "cause unknown", not asserted, rather than guessing further.
-	if [ -n "$ANCHORS_BASELINE" ] && [ -n "$ANCHORS_AFTER_WALK" ] && [ "$ANCHORS_AFTER_WALK" -gt "$ANCHORS_BASELINE" ]; then
-		echo "INFO: the trail laid down at least one anchor while the flemoid moved (anchors: ${ANCHORS_BASELINE} -> ${ANCHORS_AFTER_WALK})"
+	# Trails appear where they should: the map's own flemoids' trails anchored on the ground below
+	# them (see the header for why the spawned trail's anchors are INFO only).
+	if [ -n "$ANCHORS_BASELINE" ] && [ "$ANCHORS_BASELINE" -ge 1 ]; then
+		echo "PASS: the map's own flemoids' trails laid anchors on the ground below them (anchors: ${ANCHORS_BASELINE} at load)"
 	else
-		echo "INFO: this run's trail added no anchor of its own (anchors stayed at ${ANCHORS_AFTER_WALK}) - cause unknown, not a gating check, see the comment above"
+		echo "FAIL: expected the map's own flemoid trails to have laid at least one anchor at load, got anchors='${ANCHORS_BASELINE}'"
+		FAIL=1
+	fi
+	if [ -n "$ANCHORS_AFTER_WALK" ] && [ -n "$ANCHORS_BASELINE" ] && [ "$ANCHORS_AFTER_WALK" -gt "$ANCHORS_BASELINE" ]; then
+		echo "INFO: the spawned flemoid's trail laid anchors while it walked (anchors: ${ANCHORS_BASELINE} -> ${ANCHORS_AFTER_WALK})"
+	else
+		echo "INFO: the spawned flemoid's trail laid no anchor (anchors stayed at ${ANCHORS_AFTER_WALK}) - uninitialized mkTrail::lastPos, see the header"
 	fi
 
 	# Right after remove: the trail is still in gameLocal.trails (FadeTrail only detaches it and

@@ -1,4 +1,4 @@
-// chextrek: developer-only state-dump console command (spec #28/#29). See ChexTrekDump.h.
+// chextrek: the library's test surface for the AFK harness (spec #28). See ChexTrekDump.h.
 
 #include "sys/platform.h"
 #include "idlib/LangDict.h"
@@ -177,10 +177,10 @@ void ChexTrek_NoteMusicVolume( float volume, bool stopped ) {
 ==================
 ChexTrek_Dump_f
 
-Prints the mod's custom state to the game log for the AFK test harness. #29 lands only the
-stable header line; later feature sub-issues append their own state under it (objective slots,
-level stats, hud-map/fog-of-war coverage, trail/anchor counts, the active custom UI), per the
-state-dump list in spec #28.
+Prints the mod's custom state to the game log for the AFK test harness: the stable header line,
+then one `<field>: <value>` line per item of spec #28's state-dump list (objective slots, level
+stats, hud-map/fog-of-war coverage, trail/anchor counts, the active custom UI and its GUI state).
+The feature sub-issue that added each line is noted below.
 
 #30 adds two lines: `entities: <N>` (gameLocal.spawnedEntities.Num(), so a scenario can prove a
 script's `remove()` call actually shrank the entity count - the log has no other line for this)
@@ -460,29 +460,13 @@ it to the local player's registered idCustomUI through the exact same virtual ca
 HandleSingleGuiCommand makes - HandleCustomGUICommand( entityGui, &token ) - with the customUI
 entity itself standing in for entityGui (the reference's Notes say idTarget_EndLevelGUI's override
 never reads that parameter). Everything downstream of that call is the real, already-ported game
-code; this command changes no game behavior of its own, the same as chextrek_dump. Not a stand-in
+code. Not a stand-in
 for "any GUI command" generally - it only reaches idCustomUI subclasses (the only kind of GUI this
 mod routes through a single, always-reachable idPlayer member, customUIEntity), which is exactly
 the "nextmap"/"skip"/"unregister" screen spec #34 is about.
 
-Recorded deviation from spec #28's Implementation Decisions, which describe the state-dump command
-as "the only test code in the library": this is a second one, needed because #34's AC can't be
-proven through spec #28's console-only command list otherwise (see above) - the same class of gap
-the state-dump command itself exists to close (observing/driving state those commands can't reach),
-just on the driving side instead of the observing side. CMD_FL_CHEAT (gamesys/SysCmds.cpp) plus its
-own CheatsOk( false ) check matches idGameLocal's other state-changing debug commands
-(Cmd_Trigger_f, Cmd_Spawn_f) - "false" (don't require a live player) is fine here since reaching
-past the customUIEntity check below already implies one. This is honestly a weaker gate than "only
-runs with developer 1" (spec #28 story 34 calls the state-dump command "developer-only"):
-CheatsOk()/CMD_FL_CHEAT only block non-cheat multiplayer clients, not single-player without
-"developer 1" (Game_local.cpp) - an explicit developer.GetBool() check was tried here too and
-reverted after it broke the harness scenario for a reason not tracked down (the harness always runs
-with "developer 1" set, both via the launch command line and this command's own console script -
-tools/test-end-level-nextmap.sh - so the cvar not reading true where other game code's own
-developer.GetBool() calls, e.g. Light.cpp, presumably do work needs more investigation before
-relying on it). Narrower in practice, though not in principle (multiplayer with net_allowCheats 1
-still passes this gate): this command can only ever change anything meaningful when a
-player-triggered idCustomUI (only idTarget_EndLevelGUI in this mod) is already registered.
+Test-only input stand-in; see the test-surface note (and its recorded deviation) in
+ChexTrekDump.h.
 ==================
 */
 void ChexTrek_CustomUICmd_f( const idCmdArgs &args ) {
@@ -491,7 +475,7 @@ void ChexTrek_CustomUICmd_f( const idCmdArgs &args ) {
 	}
 
 	if ( args.Argc() != 2 ) {
-		gameLocal.Printf( "usage: chextrek_customui_cmd <command>\n" );
+		gameLocal.Printf( "usage: chextrek_test_customui_cmd <command>\n" );
 		return;
 	}
 
@@ -500,21 +484,21 @@ void ChexTrek_CustomUICmd_f( const idCmdArgs &args ) {
 	// only once its own `gui` is non-NULL) and customUIEntity must be set.
 	idPlayer *player = gameLocal.GetLocalPlayer();
 	if ( !player || !player->customUI || !player->customUIEntity ) {
-		gameLocal.Printf( "chextrek_customui_cmd: no idCustomUI registered on the local player\n" );
+		gameLocal.Printf( "chextrek_test_customui_cmd: no idCustomUI registered on the local player\n" );
 		return;
 	}
 
 	const char *cmd = args.Argv( 1 );
 	idLexer src( LEXFL_ALLOWMULTICHARLITERALS | LEXFL_NOFATALERRORS );
 	idToken token;
-	src.LoadMemory( cmd, idStr::Length( cmd ), "chextrek_customui_cmd" );
+	src.LoadMemory( cmd, idStr::Length( cmd ), "chextrek_test_customui_cmd" );
 	if ( !src.ReadToken( &token ) ) {
-		gameLocal.Printf( "chextrek_customui_cmd: no command token in '%s'\n", cmd );
+		gameLocal.Printf( "chextrek_test_customui_cmd: no command token in '%s'\n", cmd );
 		return;
 	}
 
 	bool handled = player->customUIEntity->HandleCustomGUICommand( player->customUIEntity, &token );
-	gameLocal.Printf( "chextrek_customui_cmd: '%s' %s\n", token.c_str(), handled ? "handled" : "not handled" );
+	gameLocal.Printf( "chextrek_test_customui_cmd: '%s' %s\n", token.c_str(), handled ? "handled" : "not handled" );
 }
 
 /*
@@ -526,17 +510,8 @@ command has to stand in for a real, currently-held bind key here. Reads one inte
 calls idPlayer::PerformImpulse with it directly - everything downstream is the real, already-ported
 game code (Player.cpp's PerformImpulse switch), unchanged.
 
-Recorded deviation from spec #28's Implementation Decisions, which describe the state-dump command
-as "the only test code in the library": this is a third one (after chextrek_customui_cmd, spec #34,
-and chextrek_test_gui_completion, spec #35), needed because nothing in spec #28's console-only
-command list can simulate a real, currently-held bind key - the same class of gap those two close
-for a GUI button click and interactive tab-completion. CMD_FL_CHEAT plus its own CheatsOk( false )
-check matches chextrek_customui_cmd - honestly weaker than "developer-only" (spec #28 story 34,
-which the state-dump command matches): CheatsOk()/CMD_FL_CHEAT only block non-cheat multiplayer
-clients, not single-player without "developer 1". Unlike chextrek_customui_cmd (which only reaches
-idCustomUI subclasses), this one accepts any impulse number, not just 23 - kept general on purpose,
-since a future scenario for any other impulse-driven feature can reuse it rather than adding another
-single-purpose command.
+Test-only input stand-in; see the test-surface note (and its recorded deviation) in
+ChexTrekDump.h.
 ==================
 */
 void ChexTrek_TestImpulse_f( const idCmdArgs &args ) {
@@ -571,14 +546,8 @@ stock entry point a real GUI onAction reaches - so everything downstream (idPlay
 HandleSingleGuiCommand's token dispatch, the #37 edit itself) is the real, already-ported game code,
 unchanged.
 
-Recorded deviation from spec #28's Implementation Decisions (which describe the state-dump command
-as "the only test code in the library"): this is another one, after chextrek_customui_cmd (#34),
-chextrek_test_gui_completion (#35) and chextrek_test_impulse (#36), needed because nothing in spec
-#28's console-only command list can simulate a real click on the PDA map's buttons. CMD_FL_CHEAT
-plus its own CheatsOk( false ) check matches chextrek_customui_cmd/chextrek_test_impulse - honestly
-weaker than "developer-only" (spec #28 story 34, which the state-dump command matches):
-CheatsOk()/CMD_FL_CHEAT only block non-cheat multiplayer clients, not single-player without
-"developer 1".
+Test-only input stand-in; see the test-surface note (and its recorded deviation) in
+ChexTrekDump.h.
 ==================
 */
 void ChexTrek_TestMapCmd_f( const idCmdArgs &args ) {
@@ -621,10 +590,8 @@ idUserInterface::SetStateBool - the same underlying engine call the GUI script's
 `set "gui::HudMap" "1"` resolves to (not literally the same call site: the real click goes through
 the window-script interpreter, this calls SetStateBool directly).
 
-Recorded deviation from spec #28's Implementation Decisions (which describe the state-dump command
-as "the only test code in the library"): this is another one, alongside chextrek_test_map_cmd above
-- see that command's comment for the fuller "deviation" note this one shares. CMD_FL_CHEAT plus its
-own CheatsOk( false ) check matches chextrek_customui_cmd/chextrek_test_impulse/chextrek_test_map_cmd.
+Test-only input stand-in; see the test-surface note (and its recorded deviation) in
+ChexTrekDump.h.
 ==================
 */
 void ChexTrek_TestPdaMapOpen_f( const idCmdArgs &args ) {

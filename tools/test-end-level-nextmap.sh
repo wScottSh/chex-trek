@@ -12,7 +12,7 @@
 # (idPlayer::Think reads it from usercmd_t::mx/my), which none of those commands can produce. This
 # is the same class of gap the state-dump command already exists to close (state/behavior the
 # console's own commands can't observe or drive) - see ChexTrek_CustomUICmd_f's own header comment
-# in ChexTrekDump.cpp for the full reasoning. `chextrek_customui_cmd <command>` (spec #34,
+# in ChexTrekDump.cpp for the full reasoning. `chextrek_test_customui_cmd <command>` (spec #34,
 # registered by gamesys/SysCmds.cpp) supplies just the command string a click would have produced,
 # then calls the exact same virtual method (idCustomUI::HandleCustomGUICommand) a real click
 # reaches - everything downstream is the already-ported #33 code, unchanged.
@@ -27,7 +27,7 @@
 # nothing else does), so this scenario needs that first tic to have fired, but not much more,
 # before it starts sending "skip" (an already-*completed* line, i.e. one whose natural counting
 # ran all the way to state++ before the scenario gets to it, would shift every later "skip" onto
-# the wrong line - each `chextrek_customui_cmd skip` would still be "handled", but on the wrong
+# the wrong line - each `chextrek_test_customui_cmd skip` would still be "handled", but on the wrong
 # line, and the assertions below would need to catch that, not silently reinterpret it).
 # g_statTicTime stays at its default (50ms). An earlier attempt overrode it (set to 1 right before
 # `trigger`, then back to a huge value right after, all in the same command-buffer pass before any
@@ -44,7 +44,7 @@
 # ~167ms). If a future map/setup ever makes that fastest line's target percentage 1% or less
 # (needing only one tic), this wait would need shortening to match, and the ASSERTION_BELOW check
 # would start failing loudly instead of silently mis-attributing which line each skip landed on.
-# Four `chextrek_customui_cmd skip` calls are then chained back to back with no `wait` between them
+# Four `chextrek_test_customui_cmd skip` calls are then chained back to back with no `wait` between them
 # (each reads and mutates state instantly, in the same engine frame, so no naturally-scheduled tic
 # - which only fires on a later frame boundary - can interleave and change the picture mid-sequence):
 # one each for the monsters/items/secrets lines (state 0-2) and one for the level-time line
@@ -86,11 +86,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SCRATCH_DIR="$(mktemp -d)"
 trap 'rm -rf "$SCRATCH_DIR"' EXIT
 
+# shellcheck source=tools/lib-harness.sh
+source "${SCRIPT_DIR}/lib-harness.sh"
+
 echo "=== #34 end-level-nextmap test: build ==="
-if ! bash "${SCRIPT_DIR}/build-chextrek.sh"; then
-	echo "FAIL: build-chextrek.sh failed"
-	exit 1
-fi
+chextrek_build_or_exit
 
 FAIL=0
 
@@ -120,13 +120,13 @@ trigger target_endlevelgui_1
 wait 10
 chextrek_dump
 
-chextrek_customui_cmd skip
+chextrek_test_customui_cmd skip
 chextrek_dump
-chextrek_customui_cmd skip
+chextrek_test_customui_cmd skip
 chextrek_dump
-chextrek_customui_cmd skip
+chextrek_test_customui_cmd skip
 chextrek_dump
-chextrek_customui_cmd skip
+chextrek_test_customui_cmd skip
 chextrek_dump
 
 screenshot chextrek_end_level_skip_e1m1
@@ -136,27 +136,15 @@ EOF
 
 echo
 echo "=== #34 end-level-nextmap test: e1m1 'skip' scenario run ==="
-RUN_OUT="$(bash "${SCRIPT_DIR}/run-scenario.sh" chextrek_end_level_skip_e1m1 "$CONSOLE_SCRIPT" 90 2>&1)"
-RUN_EXIT=$?
-echo "$RUN_OUT"
+chextrek_run_scenario chextrek_end_level_skip_e1m1 "$CONSOLE_SCRIPT" 90 || FAIL=1
 
-if [ $RUN_EXIT -ne 0 ]; then
-	echo "FAIL: expected the always-on harness checks to pass (chextrek.dll loaded, state-dump header, no ERROR/unknown-event/unknown-spawnclass/script-compile lines), but the run exited ${RUN_EXIT}"
-	FAIL=1
-fi
-
-LOCAL_LOG="$(echo "$RUN_OUT" | sed -n 's/^CHEXTREK_LOCAL_LOG=//p')"
-if [ -z "$LOCAL_LOG" ] || [ ! -f "$LOCAL_LOG" ]; then
+LOCAL_LOG="$CHEXTREK_SCENARIO_LOG"
+if [ -z "$LOCAL_LOG" ]; then
 	echo "FAIL: couldn't find the archived log to check scenario-specific assertions"
 	exit 1
 fi
 
-if grep -qE '^ *[0-9]+ msec to load e1m1$' "$LOCAL_LOG"; then
-	echo "PASS: e1m1 finished loading"
-else
-	echo "FAIL: expected to see '<N> msec to load e1m1' in the log"
-	FAIL=1
-fi
+chextrek_assert_map_loaded "$LOCAL_LOG" e1m1 || FAIL=1
 
 # There are 7 chextrek_dump calls in order: (1) baseline after map load, (2) after the kill/
 # pickup/secret setup (the "final" level_stats values skip should reproduce), (3) right after
@@ -202,7 +190,7 @@ ITEMS_FOUND_VALUES="$(grep -oE '^customui_gui_items_found: [0-9]+$' "$LOCAL_LOG"
 ITEMS_PERCENT_VALUES="$(grep -oE '^customui_gui_items_percent: [0-9]+$' "$LOCAL_LOG" | grep -oE '[0-9]+$')"
 SECRETS_FOUND_VALUES="$(grep -oE '^customui_gui_secrets_found: [0-9]+$' "$LOCAL_LOG" | grep -oE '[0-9]+$')"
 SECRETS_PERCENT_VALUES="$(grep -oE '^customui_gui_secrets_percent: [0-9]+$' "$LOCAL_LOG" | grep -oE '[0-9]+$')"
-LEVEL_TIME_VALUES="$(grep -oE '^customui_gui_level_time: .*$' "$LOCAL_LOG" | sed 's/^customui_gui_level_time: //')"
+LEVEL_TIME_VALUES="$(chextrek_line_field_values "$LOCAL_LOG" customui_gui_level_time)"
 
 # Guard against the failure mode the wait-timing comment above describes: if natural counting had
 # already finished the monsters line (state advanced past 0) by dump #3 - before any "skip" - every
@@ -301,7 +289,7 @@ spawn target_endlevelgui name chextrek_nextmap_test gui guis/chex/stats.gui mapn
 wait 5
 
 trigger chextrek_nextmap_test
-chextrek_customui_cmd nextmap
+chextrek_test_customui_cmd nextmap
 wait 20
 chextrek_dump
 
@@ -312,32 +300,20 @@ EOF
 
 echo
 echo "=== #34 end-level-nextmap test: sf_923 'nextmap' scenario run ==="
-RUN_OUT2="$(bash "${SCRIPT_DIR}/run-scenario.sh" chextrek_end_level_nextmap_sf923 "$CONSOLE_SCRIPT2" 90 2>&1)"
-RUN_EXIT2=$?
-echo "$RUN_OUT2"
+chextrek_run_scenario chextrek_end_level_nextmap_sf923 "$CONSOLE_SCRIPT2" 90 || FAIL=1
 
-if [ $RUN_EXIT2 -ne 0 ]; then
-	echo "FAIL: expected the always-on harness checks to pass (chextrek.dll loaded, state-dump header, no ERROR/unknown-event/unknown-spawnclass/script-compile lines), but the run exited ${RUN_EXIT2}"
-	FAIL=1
-fi
-
-LOCAL_LOG2="$(echo "$RUN_OUT2" | sed -n 's/^CHEXTREK_LOCAL_LOG=//p')"
-if [ -z "$LOCAL_LOG2" ] || [ ! -f "$LOCAL_LOG2" ]; then
+LOCAL_LOG2="$CHEXTREK_SCENARIO_LOG"
+if [ -z "$LOCAL_LOG2" ]; then
 	echo "FAIL: couldn't find the archived log to check scenario-specific assertions"
 	exit 1
 fi
 
-if grep -qE '^ *[0-9]+ msec to load sf_923$' "$LOCAL_LOG2"; then
-	echo "PASS: sf_923 finished loading"
-else
-	echo "FAIL: expected to see '<N> msec to load sf_923' in the log"
-	FAIL=1
-fi
+chextrek_assert_map_loaded "$LOCAL_LOG2" sf_923 || FAIL=1
 
-if grep -qF "chextrek_customui_cmd: 'nextmap' handled" "$LOCAL_LOG2"; then
-	echo "PASS: chextrek_customui_cmd actually reached HandleCustomGUICommand with 'nextmap' (not just timed out into some other path)"
+if grep -qF "chextrek_test_customui_cmd: 'nextmap' handled" "$LOCAL_LOG2"; then
+	echo "PASS: chextrek_test_customui_cmd actually reached HandleCustomGUICommand with 'nextmap' (not just timed out into some other path)"
 else
-	echo "FAIL: expected \"chextrek_customui_cmd: 'nextmap' handled\" in the log - e1m1 loading below could otherwise be coincidental (e.g. a hung/late run reaching state 5 on its own after the 3s pause)"
+	echo "FAIL: expected \"chextrek_test_customui_cmd: 'nextmap' handled\" in the log - e1m1 loading below could otherwise be coincidental (e.g. a hung/late run reaching state 5 on its own after the 3s pause)"
 	FAIL=1
 fi
 

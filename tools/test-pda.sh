@@ -48,7 +48,7 @@
 # it only ever runs from interactive tab-completion, which the console-only harness (spec #28) can't
 # drive. Calling ArgCompletion_GuiName directly (with a hardcoded command name) would only prove
 # that function exists, not that g_PDA is wired to it. `chextrek_test_gui_completion` (test-only,
-# ChexTrekDump.cpp/.h, spec #35) closes that gap the same way chextrek_customui_cmd (#34) does for a
+# ChexTrekDump.cpp/.h, spec #35) closes that gap the same way chextrek_test_customui_cmd (#34) does for a
 # GUI button click: it looks g_PDA up via cvarSystem->Find, reads its own
 # idCVar::GetValueCompletion() - the exact function pointer real tab-completion would call - and
 # prints whether the cvar was found, whether that pointer equals idCmdSystem::ArgCompletion_GuiName
@@ -61,11 +61,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SCRATCH_DIR="$(mktemp -d)"
 trap 'rm -rf "$SCRATCH_DIR"' EXIT
 
+# shellcheck source=tools/lib-harness.sh
+source "${SCRIPT_DIR}/lib-harness.sh"
+
 echo "=== #35 PDA test: build ==="
-if ! bash "${SCRIPT_DIR}/build-chextrek.sh"; then
-	echo "FAIL: build-chextrek.sh failed"
-	exit 1
-fi
+chextrek_build_or_exit
 
 CONSOLE_SCRIPT="${SCRATCH_DIR}/pda.cfg"
 cat > "$CONSOLE_SCRIPT" <<'EOF'
@@ -99,18 +99,12 @@ EOF
 
 echo
 echo "=== #35 PDA test: scenario run ==="
-RUN_OUT="$(bash "${SCRIPT_DIR}/run-scenario.sh" chextrek_pda "$CONSOLE_SCRIPT" 120 2>&1)"
-RUN_EXIT=$?
-echo "$RUN_OUT"
 
 FAIL=0
-if [ $RUN_EXIT -ne 0 ]; then
-	echo "FAIL: expected the always-on harness checks to pass (chextrek.dll loaded, state-dump header, no ERROR/unknown-event/unknown-spawnclass/script-compile lines), but the run exited ${RUN_EXIT}"
-	FAIL=1
-fi
+chextrek_run_scenario chextrek_pda "$CONSOLE_SCRIPT" 120 || FAIL=1
 
-LOCAL_LOG="$(echo "$RUN_OUT" | sed -n 's/^CHEXTREK_LOCAL_LOG=//p')"
-if [ -z "$LOCAL_LOG" ] || [ ! -f "$LOCAL_LOG" ]; then
+LOCAL_LOG="$CHEXTREK_SCENARIO_LOG"
+if [ -z "$LOCAL_LOG" ]; then
 	echo "FAIL: couldn't find the archived log to check scenario-specific assertions"
 	exit 1
 fi
@@ -126,7 +120,7 @@ fi
 
 # There are 4 chextrek_dump calls total: phase 1 baseline, phase 1 after opening the PDA, phase 2
 # baseline, phase 2 after opening the PDA.
-PDA_GUI_VALUES="$(grep -oE '^pda_gui: .*$' "$LOCAL_LOG" | sed 's/^pda_gui: //')"
+PDA_GUI_VALUES="$(chextrek_line_field_values "$LOCAL_LOG" pda_gui)"
 PDA_OPEN_VALUES="$(grep -oE '^pda_open: [01]$' "$LOCAL_LOG" | grep -oE '[01]$')"
 P1_GUI_BASELINE="$(echo "$PDA_GUI_VALUES" | sed -n '1p')"
 P1_GUI_AFTER="$(echo "$PDA_GUI_VALUES" | sed -n '2p')"

@@ -61,11 +61,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SCRATCH_DIR="$(mktemp -d)"
 trap 'rm -rf "$SCRATCH_DIR"' EXIT
 
+# shellcheck source=tools/lib-harness.sh
+source "${SCRIPT_DIR}/lib-harness.sh"
+
 echo "=== #40 door-open test: build ==="
-if ! bash "${SCRIPT_DIR}/build-chextrek.sh"; then
-	echo "FAIL: build-chextrek.sh failed"
-	exit 1
-fi
+chextrek_build_or_exit
 
 # 4 chextrek_dump calls: baseline, after the AC1 near-range attempt (func_door_1, well within the
 # default g_doorTraceDist of 100), after the AC2 far-range attempt (func_door_24, well outside the
@@ -112,32 +112,21 @@ EOF
 
 echo
 echo "=== #40 door-open test: scenario run ==="
-RUN_OUT="$(bash "${SCRIPT_DIR}/run-scenario.sh" chextrek_door_open "$CONSOLE_SCRIPT" 90 2>&1)"
-RUN_EXIT=$?
-echo "$RUN_OUT"
 
 FAIL=0
-if [ $RUN_EXIT -ne 0 ]; then
-	echo "FAIL: expected the always-on harness checks to pass (chextrek.dll loaded, state-dump header, no ERROR/unknown-event/unknown-spawnclass/script-compile lines), but the run exited ${RUN_EXIT}"
-	FAIL=1
-fi
+chextrek_run_scenario chextrek_door_open "$CONSOLE_SCRIPT" 90 || FAIL=1
 
-LOCAL_LOG="$(echo "$RUN_OUT" | sed -n 's/^CHEXTREK_LOCAL_LOG=//p')"
-if [ -z "$LOCAL_LOG" ] || [ ! -f "$LOCAL_LOG" ]; then
+LOCAL_LOG="$CHEXTREK_SCENARIO_LOG"
+if [ -z "$LOCAL_LOG" ]; then
 	echo "FAIL: couldn't find the archived log to check scenario-specific assertions"
 	exit 1
 fi
 
 # --- sf_923 finishes loading (spec #28 always-on check) ---
-if grep -qE '^ *[0-9]+ msec to load sf_923$' "$LOCAL_LOG"; then
-	echo "PASS: sf_923 finished loading"
-else
-	echo "FAIL: expected to see '<N> msec to load sf_923' in the log"
-	FAIL=1
-fi
+chextrek_assert_map_loaded "$LOCAL_LOG" sf_923 || FAIL=1
 
 TRYOPEN_COUNT_VALUES="$(grep -oE '^door_tryopen_count: [0-9]+$' "$LOCAL_LOG" | grep -oE '[0-9]+$')"
-TRYOPEN_LAST_VALUES="$(grep -oE '^door_tryopen_last: .*$' "$LOCAL_LOG" | sed 's/^door_tryopen_last: //')"
+TRYOPEN_LAST_VALUES="$(chextrek_line_field_values "$LOCAL_LOG" door_tryopen_last)"
 COUNT_BASELINE="$(echo "$TRYOPEN_COUNT_VALUES" | sed -n '1p')"
 COUNT_AFTER_NEAR="$(echo "$TRYOPEN_COUNT_VALUES" | sed -n '2p')"
 COUNT_AFTER_FAR="$(echo "$TRYOPEN_COUNT_VALUES" | sed -n '3p')"

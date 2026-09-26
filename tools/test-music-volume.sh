@@ -37,10 +37,7 @@ trap 'rm -rf "$SCRATCH_DIR"' EXIT
 source "${SCRIPT_DIR}/lib-harness.sh"
 
 echo "=== #45 music-volume test: build ==="
-if ! bash "${SCRIPT_DIR}/build-chextrek.sh"; then
-	echo "FAIL: build-chextrek.sh failed"
-	exit 1
-fi
+chextrek_build_or_exit
 
 CONSOLE_SCRIPT="${SCRATCH_DIR}/music_volume.cfg"
 cat > "$CONSOLE_SCRIPT" <<'EOF'
@@ -68,29 +65,18 @@ EOF
 
 echo
 echo "=== #45 music-volume test: scenario run ==="
-RUN_OUT="$(bash "${SCRIPT_DIR}/run-scenario.sh" chextrek_music_volume "$CONSOLE_SCRIPT" 120 2>&1)"
-RUN_EXIT=$?
-echo "$RUN_OUT"
 
 FAIL=0
-if [ $RUN_EXIT -ne 0 ]; then
-	echo "FAIL: expected the always-on harness checks to pass (chextrek.dll loaded, state-dump header, no ERROR/unknown-event/unknown-spawnclass/script-compile lines), but the run exited ${RUN_EXIT}"
-	FAIL=1
-fi
+chextrek_run_scenario chextrek_music_volume "$CONSOLE_SCRIPT" 120 || FAIL=1
 
-LOCAL_LOG="$(echo "$RUN_OUT" | sed -n 's/^CHEXTREK_LOCAL_LOG=//p')"
-if [ -z "$LOCAL_LOG" ] || [ ! -f "$LOCAL_LOG" ]; then
+LOCAL_LOG="$CHEXTREK_SCENARIO_LOG"
+if [ -z "$LOCAL_LOG" ]; then
 	echo "FAIL: couldn't find the archived log to check scenario-specific assertions"
 	exit 1
 fi
 
 # --- e1m1 finishes loading (spec #28 always-on check) ---
-if grep -qE '^ *[0-9]+ msec to load e1m1$' "$LOCAL_LOG"; then
-	echo "PASS: e1m1 finished loading"
-else
-	echo "FAIL: expected to see '<N> msec to load e1m1' in the log"
-	FAIL=1
-fi
+chextrek_assert_map_loaded "$LOCAL_LOG" e1m1 || FAIL=1
 
 # Four chextrek_dump calls in the script above, in order: (1) baseline (map start, no `set` yet -
 # the cvar's own compiled-in default, 50), (2) after `set g_MusicVolume 80`, (3) after

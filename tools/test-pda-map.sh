@@ -19,7 +19,7 @@
 #
 # These GUI commands only ever arrive, in the real game, from a mouse click on the PDA map's
 # arrow/zoom/center buttons (guis/pda.gui, guis/pda_chex.gui) - the same class of gap
-# chextrek_customui_cmd (#34) closed for the end-level stats screen's buttons. The new test-only
+# chextrek_test_customui_cmd (#34) closed for the end-level stats screen's buttons. The new test-only
 # `chextrek_test_map_cmd <command>` (ChexTrekDump.cpp/.h) closes it here: it calls the local
 # player's own idEntity::HandleGuiCommands( player, cmd ) - the exact stock entry point a real GUI
 # onAction reaches - so everything downstream is the real, already-ported game code, unchanged.
@@ -84,11 +84,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SCRATCH_DIR="$(mktemp -d)"
 trap 'rm -rf "$SCRATCH_DIR"' EXIT
 
+# shellcheck source=tools/lib-harness.sh
+source "${SCRIPT_DIR}/lib-harness.sh"
+
 echo "=== #37 PDA map test: build ==="
-if ! bash "${SCRIPT_DIR}/build-chextrek.sh"; then
-	echo "FAIL: build-chextrek.sh failed"
-	exit 1
-fi
+chextrek_build_or_exit
 
 CONSOLE_SCRIPT="${SCRATCH_DIR}/pda_map.cfg"
 cat > "$CONSOLE_SCRIPT" <<'EOF'
@@ -213,29 +213,18 @@ EOF
 
 echo
 echo "=== #37 PDA map test: scenario run ==="
-RUN_OUT="$(bash "${SCRIPT_DIR}/run-scenario.sh" chextrek_pda_map "$CONSOLE_SCRIPT" 120 2>&1)"
-RUN_EXIT=$?
-echo "$RUN_OUT"
 
 FAIL=0
-if [ $RUN_EXIT -ne 0 ]; then
-	echo "FAIL: expected the always-on harness checks to pass (chextrek.dll loaded, state-dump header, no ERROR/unknown-event/unknown-spawnclass/script-compile lines), but the run exited ${RUN_EXIT}"
-	FAIL=1
-fi
+chextrek_run_scenario chextrek_pda_map "$CONSOLE_SCRIPT" 120 || FAIL=1
 
-LOCAL_LOG="$(echo "$RUN_OUT" | sed -n 's/^CHEXTREK_LOCAL_LOG=//p')"
-if [ -z "$LOCAL_LOG" ] || [ ! -f "$LOCAL_LOG" ]; then
+LOCAL_LOG="$CHEXTREK_SCENARIO_LOG"
+if [ -z "$LOCAL_LOG" ]; then
 	echo "FAIL: couldn't find the archived log to check scenario-specific assertions"
 	exit 1
 fi
 
 # --- e1m1 finishes loading (spec #28 always-on check) ---
-if grep -qE '^ *[0-9]+ msec to load e1m1$' "$LOCAL_LOG"; then
-	echo "PASS: e1m1 finished loading"
-else
-	echo "FAIL: expected to see '<N> msec to load e1m1' in the log"
-	FAIL=1
-fi
+chextrek_assert_map_loaded "$LOCAL_LOG" e1m1 || FAIL=1
 
 # There are 11 chextrek_dump calls: baseline (map open, before any map_* command), after zoom_in,
 # after stop+zoom_out, after stop+scroll_right, after stop+scroll_up, after stop+scroll_down,

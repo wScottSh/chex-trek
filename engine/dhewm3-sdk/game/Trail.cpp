@@ -384,9 +384,8 @@ bool mkTrail::addNewAnchor( void ) {
 	// question: with no owner (after FadeTrail) and zero anchors yet, the binary indexes
 	// anchors[ anchors.Num() - 1 ] with no bounds check, which is undefined behavior (0.Num() - 1 ==
 	// -1). It's only reachable if FadeTrail runs before the trail ever placed an anchor at all -
-	// tools/test-trails.sh's own scenario likely hits exactly this window (its own trail's anchor
-	// count stays at 0 for reasons not conclusively diagnosed there, so by the time it removes the
-	// actor, anchors.Num() is probably still 0) - but a defensive bail is cheap and matches "just
+	// e.g. a trail whose uninitialized lastPos kept it from ever updating (see tools/test-trails.sh's
+	// header and the reference's Notes) and whose actor is then removed - and a defensive bail matches "just
 	// return false" (the same thing a failed ground trace already does two lines above) rather than
 	// changing any other observable behavior.
 	if ( !owner && anchors.Num() == 0 ) {

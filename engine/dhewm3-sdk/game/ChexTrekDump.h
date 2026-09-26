@@ -1,27 +1,39 @@
-// chextrek: developer-only state-dump console command (spec #28/#29).
+// chextrek: the library's test surface for the AFK test harness (spec #28).
 //
-// Prints the mod's custom state to the game log in a stable, line-based format meant for the
-// AFK test harness to parse. This file is the bulk of the test-only code in the library and never
-// changes game behavior; #30 adds a little more alongside it for the same reason (a footprint
-// counter here, plus a handful of test-only string-literal cvars - see the comment above
-// chextrek_test_str1 in ChexTrekDump.cpp), all likewise inert. See decomp-so/reference/coverage.md
-// and the spec #28 issue body for the full list of state the finished command will report
-// (objective slots, level stats, map/fog-of-war coverage,
-// trail/anchor counts, the active custom UI and its GUI state). Each feature sub-issue adds its
-// own section under the stable header as that feature lands; #29 only lands the header itself, so
-// the harness can prove chextrek.dll (not base.dll) loaded before the game gets past script
-// compilation.
+// Spec #28 asks for one developer-only state-dump command, "the only test code in the library",
+// that changes no game behavior. What the finished port carries, all defined in this file pair
+// (game code only gets one-line calls to the ChexTrek_Note* recorders):
+//   - chextrek_dump: prints the mod's custom state in a stable, line-based format.
+//   - ChexTrek_Note* recorders: counters/last-value slots called from game code at events the log
+//     shows nothing about; read only by chextrek_dump. They record, they don't change behavior.
+//   - chextrek_test_str1..15 cvars: string/vector literals for console `script` lines (the console
+//     tokenizer strips quotes - see ChexTrekDump.cpp).
+//   - Five input stand-in commands, for input a console script can't produce (a GUI button click,
+//     a held bind key, interactive tab completion): chextrek_test_customui_cmd,
+//     chextrek_test_impulse, chextrek_test_map_cmd, chextrek_test_pda_map_open and
+//     chextrek_test_gui_completion. Each hands its argument to the real, ported game code at the
+//     point the real input would reach it.
+//
+// Recorded deviation from spec #28: the input stand-ins are test code beyond the one dump command.
+// Without them the stats screen's skip/nextmap (#34), g_PDA completion (#35), impulse 23 (#36) and
+// the PDA map_* commands (#37) can't be driven by a console-only scenario at all. They only act
+// when typed; nothing in normal play calls them. The state-changing ones need cheats
+// (CMD_FL_CHEAT + CheatsOk), like the stock trigger/spawn debug commands.
+//
+// "Developer-only" (spec #28 story 34) means debug commands for developers, like the stock ones:
+// they are not gated on the `developer` cvar, because the engine's `map` command - which every
+// scenario uses, per spec #28 - resets `developer` to 0 (dhewm3 1.5.5 framework/Session.cpp,
+// Session_Map_f; only `devmap` sets it), so such a gate would switch the dump off mid-scenario.
 #ifndef __CHEXTREK_DUMP_H__
 #define __CHEXTREK_DUMP_H__
 
 // Registered as the "chextrek_dump" console command by idGameLocal::InitConsoleCommands.
 void ChexTrek_Dump_f( const idCmdArgs &args );
 
-// Prints just the stable header line, with no console-command wrapper. idGameLocal::Init calls
-// this once, right after idLib/cvars are up, so the header always reaches the log even when game
-// init later aborts (e.g. the known script-compile failure #29's harness proves is still red) -
-// before Common::Init ever gets to run queued console commands. The "chextrek_dump" command
-// above calls this too, so later scenarios can re-dump on demand once maps are loading.
+// Prints just the stable header line, with no console-command wrapper.
+// idGameLocal::Init calls this once, right after idLib/cvars are up, so the header reaches the log
+// even when game init later aborts (e.g. a script-compile failure) before any queued console
+// command runs. The "chextrek_dump" command above calls this too.
 void ChexTrek_PrintHeader( void );
 
 // chextrek: spec #30. idActor::Event_FootPrint calls this right after each decal it actually
@@ -47,7 +59,7 @@ void ChexTrek_NoteFootprintProjected( void );
 // addItemText does.
 void ChexTrek_NoteItemTextShown( const char *name );
 
-// chextrek: spec #34, test-only. Registered as the "chextrek_customui_cmd" console command by
+// chextrek: spec #34, test-only. Registered as the "chextrek_test_customui_cmd" console command by
 // idGameLocal::InitConsoleCommands. Sends its one argument to the local player's registered
 // idCustomUI (idTarget_EndLevelGUI::HandleCustomGUICommand) exactly as idPlayer::
 // HandleSingleGuiCommand would - see ChexTrek_CustomUICmd_f in ChexTrekDump.cpp for why a console
@@ -59,7 +71,7 @@ void ChexTrek_CustomUICmd_f( const idCmdArgs &args );
 // own registered value-completion function to actually run and list guis/*.gui files, but
 // tab-completion itself isn't reachable from a console script (spec #28's harness only drives the
 // game through queued commands, not interactive keystrokes) - the same class of gap
-// chextrek_customui_cmd (spec #34) closes for a GUI button click, though this one is read-only
+// chextrek_test_customui_cmd (spec #34) closes for a GUI button click, though this one is read-only
 // (no CMD_FL_CHEAT, like chextrek_dump - it changes no cvar or game state, just calls a function
 // pointer and prints what it returns). This command looks g_PDA up via cvarSystem->Find, reads its
 // idCVar::GetValueCompletion(), confirms it's actually idCmdSystem::ArgCompletion_GuiName (not
@@ -75,12 +87,11 @@ void ChexTrek_TestGuiCompletion_f( const idCmdArgs &args );
 // reference/hud-map.md's Notes) are bind-target tokens idUsercmdGenLocal recognizes only from a
 // real, currently-held key - typing them directly ("impulse 23" or "_impulse23") is rejected as an
 // unknown command (confirmed against this engine build), and there's no plain "impulse" console
-// command either. The same class of gap chextrek_customui_cmd (spec #34) closes for a GUI button
+// command either. The same class of gap chextrek_test_customui_cmd (spec #34) closes for a GUI button
 // click and chextrek_test_gui_completion (spec #35) closes for interactive tab-completion: this
 // command reads one integer argument and calls the local player's PerformImpulse with it directly -
 // everything downstream (the switch in PerformImpulse, HandleNamedEvent, the GUI's own onNamedEvent
-// blocks) is the real, already-ported game code, unchanged. CMD_FL_CHEAT plus its own
-// CheatsOk( false ) check, matching chextrek_customui_cmd.
+// blocks) is the real, already-ported game code, unchanged.
 void ChexTrek_TestImpulse_f( const idCmdArgs &args );
 
 // chextrek: spec #37, test-only. Registered as the "chextrek_test_map_cmd" console command by
@@ -89,13 +100,12 @@ void ChexTrek_TestImpulse_f( const idCmdArgs &args );
 // down/left/right, map_scroll_center, map_stop - decomp-so/reference/hud-map.md) to actually reach
 // idPlayer::HandleSingleGuiCommand, but those only ever arrive, in the real game, from a mouse
 // click on the PDA map's buttons (guis/pda.gui, guis/pda_chex.gui onAction) - input the
-// console-only harness can't produce, the same class of gap chextrek_customui_cmd (spec #34)
+// console-only harness can't produce, the same class of gap chextrek_test_customui_cmd (spec #34)
 // closes for the end-level stats screen's buttons. This command reads one command-name argument
 // and calls the local player's own idEntity::HandleGuiCommands( player, cmd ) - the exact same
 // stock entry point a real GUI onAction reaches - so everything downstream (HandleSingleGuiCommand's
 // token dispatch, the #37 edit itself, updateMapUI's per-frame use of mapControl) is the real,
-// already-ported game code, unchanged. CMD_FL_CHEAT plus its own CheatsOk( false ) check, matching
-// chextrek_customui_cmd/chextrek_test_impulse.
+// already-ported game code, unchanged.
 void ChexTrek_TestMapCmd_f( const idCmdArgs &args );
 
 // chextrek: spec #37, test-only. Registered as the "chextrek_test_pda_map_open" console command by

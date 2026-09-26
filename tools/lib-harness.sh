@@ -222,6 +222,13 @@ chextrek_run_console_script() {
 	mkdir -p "$MOD_SAVE_DIR"
 	CHEXTREK_MOD_SAVE_DIR="$MOD_SAVE_DIR"
 
+	# Test-only data files (e.g. a fixture entityDef) a scenario needs: copied into the scratch save
+	# path, which dhewm3 searches ahead of the mod folder, so they never live in the shipped mod
+	# data. CHEXTREK_FIXTURE_DIR is a directory laid out like the mod folder (e.g. def/x.def).
+	if [ -n "${CHEXTREK_FIXTURE_DIR:-}" ]; then
+		cp -R "${CHEXTREK_FIXTURE_DIR}/." "$MOD_SAVE_DIR/"
+	fi
+
 	local RUN_ID
 	RUN_ID="$(date +%Y%m%d-%H%M%S%N)"
 	local CFG_NAME="${RUN_LABEL}_${RUN_ID}.cfg"

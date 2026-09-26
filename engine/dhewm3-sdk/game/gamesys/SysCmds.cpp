@@ -2306,29 +2306,14 @@ so it can perform tab completion
 =================
 */
 void idGameLocal::InitConsoleCommands( void ) {
-	// chextrek: developer-only state-dump command for the AFK test harness (spec #28/#29).
+	// chextrek: the developer-only test surface for the AFK harness (spec #28): the state dump plus
+	// the input stand-ins - see ChexTrekDump.h. The state-changing stand-ins are CMD_FL_CHEAT like the
+	// stock trigger/spawn debug commands.
 	cmdSystem->AddCommand( "chextrek_dump",			ChexTrek_Dump_f,				CMD_FL_GAME,				"chextrek: dumps mod state for the test harness" );
-	// chextrek: spec #34, test-only. CMD_FL_CHEAT matches idGameLocal's other state-changing
-	// debug commands (trigger, spawn, below) - see ChexTrek_CustomUICmd_f's own comment in
-	// ChexTrekDump.cpp for exactly what this does and doesn't gate.
-	cmdSystem->AddCommand( "chextrek_customui_cmd",	ChexTrek_CustomUICmd_f,		CMD_FL_GAME|CMD_FL_CHEAT,	"chextrek: sends a command to the local player's registered idCustomUI (test harness only)" );
-	// chextrek: spec #35, test-only. Proves g_PDA's value-completion is actually wired to
-	// idCmdSystem::ArgCompletion_GuiName - see ChexTrek_TestGuiCompletion_f's own comment in
-	// ChexTrekDump.cpp for why a console command has to stand in for what tab-completion would
-	// otherwise show interactively. No CMD_FL_CHEAT (matches chextrek_dump above, not
-	// chextrek_customui_cmd above it): read-only, changes no cvar or game state.
+	cmdSystem->AddCommand( "chextrek_test_customui_cmd", ChexTrek_CustomUICmd_f,	CMD_FL_GAME|CMD_FL_CHEAT,	"chextrek: sends a command to the local player's registered idCustomUI (test harness only)" );
 	cmdSystem->AddCommand( "chextrek_test_gui_completion", ChexTrek_TestGuiCompletion_f, CMD_FL_GAME, "chextrek: dumps g_PDA's value-completion results (test harness only)" );
-	// chextrek: spec #36, test-only. CMD_FL_CHEAT matches chextrek_customui_cmd above - see
-	// ChexTrek_TestImpulse_f's own comment in ChexTrekDump.cpp/.h for why a console command has to
-	// stand in for a real, currently-held bind key.
 	cmdSystem->AddCommand( "chextrek_test_impulse",	ChexTrek_TestImpulse_f,		CMD_FL_GAME|CMD_FL_CHEAT,	"chextrek: sends an impulse to the local player (test harness only)" );
-	// chextrek: spec #37, test-only. CMD_FL_CHEAT matches chextrek_customui_cmd/
-	// chextrek_test_impulse above - see ChexTrek_TestMapCmd_f's own comment in ChexTrekDump.cpp/.h
-	// for why a console command has to stand in for a real click on the PDA map's buttons.
 	cmdSystem->AddCommand( "chextrek_test_map_cmd",	ChexTrek_TestMapCmd_f,		CMD_FL_GAME|CMD_FL_CHEAT,	"chextrek: sends a PDA map_* GUI command to the local player (test harness only)" );
-	// chextrek: spec #37, test-only. See ChexTrek_TestPdaMapOpen_f's own comment in
-	// ChexTrekDump.cpp/.h for why a console command has to stand in for a real click on the PDA's
-	// "Data" tab that opens its map page.
 	cmdSystem->AddCommand( "chextrek_test_pda_map_open", ChexTrek_TestPdaMapOpen_f, CMD_FL_GAME|CMD_FL_CHEAT, "chextrek: sets the PDA gui's own HudMap state flag directly (test harness only)" );
 	cmdSystem->AddCommand( "listTypeInfo",			ListTypeInfo_f,				CMD_FL_GAME,				"list type info" );
 	cmdSystem->AddCommand( "writeGameState",		WriteGameState_f,			CMD_FL_GAME,				"write game state" );

@@ -6,8 +6,7 @@
 #
 # Drives e1m1 (spec #28's real first map) for AC1/AC2, plus a second, shorter sf_923 run for the
 # "both maps" half of AC3 (e1m1's own run already proves its half via the always-on
-# unknown-spawnclass check, now that idTarget_EndLevelGUI is ported and #30/#31/#32's allowlist for
-# it is gone - tools/lib-harness.sh), through console commands only (map, spawn, script, trigger,
+# unknown-spawnclass check in tools/lib-harness.sh), through console commands only (map, spawn, script, trigger,
 # wait, chextrek_dump, screenshot), per spec #28's testing decisions.
 #
 # g_statTicTime (decomp-so/reference/end-level-stats.md's cvar, default 50ms between stats-screen
@@ -50,11 +49,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SCRATCH_DIR="$(mktemp -d)"
 trap 'rm -rf "$SCRATCH_DIR"' EXIT
 
+# shellcheck source=tools/lib-harness.sh
+source "${SCRIPT_DIR}/lib-harness.sh"
+
 echo "=== #33 end-level-stats test: build ==="
-if ! bash "${SCRIPT_DIR}/build-chextrek.sh"; then
-	echo "FAIL: build-chextrek.sh failed"
-	exit 1
-fi
+chextrek_build_or_exit
 
 FAIL=0
 
@@ -99,17 +98,11 @@ EOF
 
 echo
 echo "=== #33 end-level-stats test: e1m1 scenario run ==="
-RUN_OUT="$(bash "${SCRIPT_DIR}/run-scenario.sh" chextrek_end_level_stats_e1m1 "$CONSOLE_SCRIPT" 90 2>&1)"
-RUN_EXIT=$?
-echo "$RUN_OUT"
+# AC3: the always-on no-ERROR/unknown-spawnclass check covers e1m1's target_endlevelgui_1 spawning cleanly.
+chextrek_run_scenario chextrek_end_level_stats_e1m1 "$CONSOLE_SCRIPT" 90 || FAIL=1
 
-if [ $RUN_EXIT -ne 0 ]; then
-	echo "FAIL: expected the always-on harness checks to pass (chextrek.dll loaded, state-dump header, no ERROR/unknown-event/unknown-spawnclass/script-compile lines - including e1m1's target_endlevelgui_1 spawning with no error, AC3), but the run exited ${RUN_EXIT}"
-	FAIL=1
-fi
-
-LOCAL_LOG="$(echo "$RUN_OUT" | sed -n 's/^CHEXTREK_LOCAL_LOG=//p')"
-if [ -z "$LOCAL_LOG" ] || [ ! -f "$LOCAL_LOG" ]; then
+LOCAL_LOG="$CHEXTREK_SCENARIO_LOG"
+if [ -z "$LOCAL_LOG" ]; then
 	echo "FAIL: couldn't find the archived log to check scenario-specific assertions"
 	exit 1
 fi
@@ -189,15 +182,10 @@ else
 	FAIL=1
 fi
 
-if grep -qE '^ *[0-9]+ msec to load e1m1$' "$LOCAL_LOG"; then
-	echo "PASS: e1m1 finished loading"
-else
-	echo "FAIL: expected to see '<N> msec to load e1m1' in the log"
-	FAIL=1
-fi
+chextrek_assert_map_loaded "$LOCAL_LOG" e1m1 || FAIL=1
 
 # --- sf_923: the other half of AC3 (its own target_endlevelgui_1/_2 spawn with no errors - the
-# always-on check above, now that the #30/#31/#32 allowlist for idTarget_EndLevelGUI is gone) ---
+# always-on check above) ---
 CONSOLE_SCRIPT_SF923="${SCRATCH_DIR}/end-level-stats-sf923.cfg"
 cat > "$CONSOLE_SCRIPT_SF923" <<'EOF'
 developer 1
@@ -217,17 +205,11 @@ EOF
 
 echo
 echo "=== #33 end-level-stats test: sf_923 scenario run ==="
-RUN_OUT_SF923="$(bash "${SCRIPT_DIR}/run-scenario.sh" chextrek_end_level_stats_sf923 "$CONSOLE_SCRIPT_SF923" 90 2>&1)"
-RUN_EXIT_SF923=$?
-echo "$RUN_OUT_SF923"
+# AC3: likewise for sf_923's target_endlevelgui_1/_2.
+chextrek_run_scenario chextrek_end_level_stats_sf923 "$CONSOLE_SCRIPT_SF923" 90 || FAIL=1
 
-if [ $RUN_EXIT_SF923 -ne 0 ]; then
-	echo "FAIL: expected the always-on harness checks to pass on sf_923 too (including target_endlevelgui_1/_2 spawning with no error, AC3), but the run exited ${RUN_EXIT_SF923}"
-	FAIL=1
-fi
-
-LOCAL_LOG_SF923="$(echo "$RUN_OUT_SF923" | sed -n 's/^CHEXTREK_LOCAL_LOG=//p')"
-if [ -z "$LOCAL_LOG_SF923" ] || [ ! -f "$LOCAL_LOG_SF923" ]; then
+LOCAL_LOG_SF923="$CHEXTREK_SCENARIO_LOG"
+if [ -z "$LOCAL_LOG_SF923" ]; then
 	echo "FAIL: couldn't find the archived sf_923 log to check scenario-specific assertions"
 	exit 1
 fi
@@ -242,12 +224,7 @@ else
 	FAIL=1
 fi
 
-if grep -qE '^ *[0-9]+ msec to load sf_923$' "$LOCAL_LOG_SF923"; then
-	echo "PASS: sf_923 finished loading"
-else
-	echo "FAIL: expected to see '<N> msec to load sf_923' in the log"
-	FAIL=1
-fi
+chextrek_assert_map_loaded "$LOCAL_LOG_SF923" sf_923 || FAIL=1
 
 echo
 if [ $FAIL -eq 0 ]; then

@@ -27,11 +27,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SCRATCH_DIR="$(mktemp -d)"
 trap 'rm -rf "$SCRATCH_DIR"' EXIT
 
+# shellcheck source=tools/lib-harness.sh
+source "${SCRIPT_DIR}/lib-harness.sh"
+
 echo "=== #32 item-text test: build ==="
-if ! bash "${SCRIPT_DIR}/build-chextrek.sh"; then
-	echo "FAIL: build-chextrek.sh failed"
-	exit 1
-fi
+chextrek_build_or_exit
 
 # "trigger <name>" (Cmd_Trigger_f, gamesys/SysCmds.cpp) sends EV_Activate to the named entity with
 # the local player as activator. trigger_once_6 targets trigger_objective_1 and _2 directly
@@ -64,29 +64,18 @@ EOF
 
 echo
 echo "=== #32 item-text test: scenario run ==="
-RUN_OUT="$(bash "${SCRIPT_DIR}/run-scenario.sh" chextrek_item_text "$CONSOLE_SCRIPT" 90 2>&1)"
-RUN_EXIT=$?
-echo "$RUN_OUT"
 
 FAIL=0
-if [ $RUN_EXIT -ne 0 ]; then
-	echo "FAIL: expected the always-on harness checks to pass (chextrek.dll loaded, state-dump header, no ERROR/unknown-event/unknown-spawnclass/script-compile lines), but the run exited ${RUN_EXIT}"
-	FAIL=1
-fi
+chextrek_run_scenario chextrek_item_text "$CONSOLE_SCRIPT" 90 || FAIL=1
 
-LOCAL_LOG="$(echo "$RUN_OUT" | sed -n 's/^CHEXTREK_LOCAL_LOG=//p')"
-if [ -z "$LOCAL_LOG" ] || [ ! -f "$LOCAL_LOG" ]; then
+LOCAL_LOG="$CHEXTREK_SCENARIO_LOG"
+if [ -z "$LOCAL_LOG" ]; then
 	echo "FAIL: couldn't find the archived log to check scenario-specific assertions"
 	exit 1
 fi
 
 # --- sf_923 finishes loading (spec #28 always-on check) ---
-if grep -qE '^ *[0-9]+ msec to load sf_923$' "$LOCAL_LOG"; then
-	echo "PASS: sf_923 finished loading"
-else
-	echo "FAIL: expected to see '<N> msec to load sf_923' in the log"
-	FAIL=1
-fi
+chextrek_assert_map_loaded "$LOCAL_LOG" sf_923 || FAIL=1
 
 # --- picking up an item shows its item text (spec #32 AC) ---
 # There are 3 chextrek_dump calls (see the console script above): baseline (before anything is
@@ -98,7 +87,7 @@ fi
 # (trigger_objective_1's "rmmsg") - proving the pickup, not the earlier trigger, is what produced
 # that specific text.
 COUNT_VALUES="$(grep -oE '^item_text_count: [0-9]+$' "$LOCAL_LOG" | grep -oE '[0-9]+$')"
-LAST_VALUES="$(grep -oE '^item_text_last: .*$' "$LOCAL_LOG" | sed 's/^item_text_last: //')"
+LAST_VALUES="$(chextrek_line_field_values "$LOCAL_LOG" item_text_last)"
 COUNT_BASELINE="$(echo "$COUNT_VALUES" | sed -n '1p')"
 COUNT_AFTER_SETUP="$(echo "$COUNT_VALUES" | sed -n '2p')"
 COUNT_AFTER_PICKUP="$(echo "$COUNT_VALUES" | sed -n '3p')"

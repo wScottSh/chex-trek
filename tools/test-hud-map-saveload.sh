@@ -38,10 +38,9 @@
 #   further per-frame change happens between capturing the pre-save value and loading - proving the
 #   save/load round-trip, not just standing still, is what carries the value across.
 #
-# Review finding fixed here (an earlier version of this comment wrongly claimed a savegame load
-# keeps "the same idPlayer object" - it doesn't: idGameLocal::InitFromSaveGame calls MapShutdown()
-# then savegame.CreateObjects() (Game_local.cpp/gamesys/SaveGame.cpp), which allocates a brand-new
-# idPlayer via idTypeInfo::CreateInstance for the load, same as any other saved object). What
+# A savegame load does not keep the same idPlayer object: idGameLocal::InitFromSaveGame calls
+# MapShutdown() then savegame.CreateObjects() (Game_local.cpp/gamesys/SaveGame.cpp), which allocates
+# a brand-new idPlayer via idTypeInfo::CreateInstance for the load, same as any other saved object. What
 # actually needed proving: `hudmap_alpha` is a process-wide global untouched by that
 # object-recreation (only Init()/a reveal/showMap/Restore ever write to it - none of which run
 # between the savegame and the loadgame otherwise), so a naive "dump before save, dump after load,
@@ -84,14 +83,14 @@
 # savegame/loadgame reused verbatim from #31's tools/test-objectives.sh (developer-only console
 # commands, per spec #28's testing decisions).
 #
-# Timing fix, found by a live run failing intermittently (mapScale reading back at exactly its
+# Timing: a live run failed intermittently (mapScale reading back at exactly its
 # pre-zoom value, i.e. 0 zoom steps landed in the window): a "wait 5" after
 # chextrek_test_map_cmd map_zoom_in isn't reliably enough margin for updateMapUI's 1%-per-frame
 # zoom step (idPlayer::Think, Player.cpp) to tick even once - the same class of gameLocal.time-vs-
 # frame-count gap tools/test-pda-map.sh and tools/test-hud-map.sh's own header comments describe
 # for the hudmap_open/hudmap_close GUI timelines, just landing here on ordinary per-frame game
-# logic instead of a GUI timeline. Each map_zoom_in below is followed by "wait 60" instead (12x
-# the original margin) - unlike a GUI-timeline flip, this isn't a one-time event a single
+# logic instead of a GUI timeline. Each map_zoom_in below is followed by "wait 60" instead -
+# unlike a GUI-timeline flip, this isn't a one-time event a single
 # well-placed re-assert can catch after the fact, so the fix is a longer wait up front, not a
 # denser sequence of samples.
 set -uo pipefail
@@ -104,10 +103,7 @@ trap 'rm -rf "$SCRATCH_DIR"' EXIT
 source "${SCRIPT_DIR}/lib-harness.sh"
 
 echo "=== #39 HUD map save/load test: build ==="
-if ! bash "${SCRIPT_DIR}/build-chextrek.sh"; then
-	echo "FAIL: build-chextrek.sh failed"
-	exit 1
-fi
+chextrek_build_or_exit
 
 CONSOLE_SCRIPT="${SCRATCH_DIR}/hud_map_saveload.cfg"
 cat > "$CONSOLE_SCRIPT" <<'EOF'
@@ -157,29 +153,18 @@ EOF
 
 echo
 echo "=== #39 HUD map save/load test: scenario run ==="
-RUN_OUT="$(bash "${SCRIPT_DIR}/run-scenario.sh" chextrek_hud_map_saveload "$CONSOLE_SCRIPT" 120 2>&1)"
-RUN_EXIT=$?
-echo "$RUN_OUT"
 
 FAIL=0
-if [ $RUN_EXIT -ne 0 ]; then
-	echo "FAIL: expected the always-on harness checks to pass (chextrek.dll loaded, state-dump header, no ERROR/unknown-event/unknown-spawnclass/script-compile lines), but the run exited ${RUN_EXIT}"
-	FAIL=1
-fi
+chextrek_run_scenario chextrek_hud_map_saveload "$CONSOLE_SCRIPT" 120 || FAIL=1
 
-LOCAL_LOG="$(echo "$RUN_OUT" | sed -n 's/^CHEXTREK_LOCAL_LOG=//p')"
-if [ -z "$LOCAL_LOG" ] || [ ! -f "$LOCAL_LOG" ]; then
+LOCAL_LOG="$CHEXTREK_SCENARIO_LOG"
+if [ -z "$LOCAL_LOG" ]; then
 	echo "FAIL: couldn't find the archived log to check scenario-specific assertions"
 	exit 1
 fi
 
 # --- e1m1 finishes loading (spec #28 always-on check) ---
-if grep -qE '^ *[0-9]+ msec to load e1m1$' "$LOCAL_LOG"; then
-	echo "PASS: e1m1 finished loading"
-else
-	echo "FAIL: expected to see '<N> msec to load e1m1' in the log"
-	FAIL=1
-fi
+chextrek_assert_map_loaded "$LOCAL_LOG" e1m1 || FAIL=1
 
 # There are 4 chextrek_dump calls: after zooming+map_stop (before the walk), after the setviewpos
 # walk (the pre-save state), after showMap (post-save, pre-load - proves hudmap_alpha actually

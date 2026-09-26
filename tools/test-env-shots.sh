@@ -52,10 +52,7 @@ trap 'rm -rf "$SCRATCH_DIR"' EXIT
 source "${SCRIPT_DIR}/lib-harness.sh"
 
 echo "=== #44 env-shots test: build ==="
-if ! bash "${SCRIPT_DIR}/build-chextrek.sh"; then
-	echo "FAIL: build-chextrek.sh failed"
-	exit 1
-fi
+chextrek_build_or_exit
 
 CONSOLE_SCRIPT="${SCRATCH_DIR}/env_shots.cfg"
 cat > "$CONSOLE_SCRIPT" <<'EOF'
@@ -77,29 +74,18 @@ EOF
 
 echo
 echo "=== #44 env-shots test: scenario run ==="
-RUN_OUT="$(bash "${SCRIPT_DIR}/run-scenario.sh" chextrek_env_shots "$CONSOLE_SCRIPT" 120 2>&1)"
-RUN_EXIT=$?
-echo "$RUN_OUT"
 
 FAIL=0
-if [ $RUN_EXIT -ne 0 ]; then
-	echo "FAIL: expected the always-on harness checks to pass (chextrek.dll loaded, state-dump header, no ERROR/unknown-event/unknown-spawnclass/script-compile lines), but the run exited ${RUN_EXIT}"
-	FAIL=1
-fi
+chextrek_run_scenario chextrek_env_shots "$CONSOLE_SCRIPT" 120 || FAIL=1
 
-LOCAL_LOG="$(echo "$RUN_OUT" | sed -n 's/^CHEXTREK_LOCAL_LOG=//p')"
-if [ -z "$LOCAL_LOG" ] || [ ! -f "$LOCAL_LOG" ]; then
+LOCAL_LOG="$CHEXTREK_SCENARIO_LOG"
+if [ -z "$LOCAL_LOG" ]; then
 	echo "FAIL: couldn't find the archived log to check scenario-specific assertions"
 	exit 1
 fi
 
 # --- e1m1 finishes loading (spec #28 always-on check) ---
-if grep -qE '^ *[0-9]+ msec to load e1m1$' "$LOCAL_LOG"; then
-	echo "PASS: e1m1 finished loading"
-else
-	echo "FAIL: expected to see '<N> msec to load e1m1' in the log"
-	FAIL=1
-fi
+chextrek_assert_map_loaded "$LOCAL_LOG" e1m1 || FAIL=1
 
 # --- the log shows takeEnvShots' own envShots-taken count line ---
 if grep -qE '^1 envShots taken$' "$LOCAL_LOG"; then
@@ -123,10 +109,10 @@ else
 fi
 
 # --- the images are written ---
-# CHEXTREK_MOD_SAVE_DIR (tools/lib-harness.sh) is the scratch save dir itself - reading it from
-# there (rather than recomputing DHEWM3_DOCUMENTS_DIR's default here too) keeps this path in one
-# place. It isn't wiped until the *next* harness invocation, so it's still valid to read now.
-MOD_SAVE_DIR="$(echo "$RUN_OUT" | sed -n 's/^CHEXTREK_MOD_SAVE_DIR=//p')"
+# CHEXTREK_SCENARIO_SAVE_DIR (tools/lib-harness.sh) is the scratch save dir itself - reading it
+# from there (rather than recomputing DHEWM3_DOCUMENTS_DIR's default here too) keeps this path in
+# one place. It isn't wiped until the *next* harness invocation, so it's still valid to read now.
+MOD_SAVE_DIR="$CHEXTREK_SCENARIO_SAVE_DIR"
 if [ -z "$MOD_SAVE_DIR" ]; then
 	echo "FAIL: couldn't find the scratch save dir to check the written env-shot images"
 	exit 1

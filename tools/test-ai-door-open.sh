@@ -160,10 +160,7 @@ trap 'rm -rf "$SCRATCH_DIR"' EXIT
 source "${SCRIPT_DIR}/lib-harness.sh"
 
 echo "=== #42 ai-door-open test: build ==="
-if ! bash "${SCRIPT_DIR}/build-chextrek.sh"; then
-	echo "FAIL: build-chextrek.sh failed"
-	exit 1
-fi
+chextrek_build_or_exit
 
 FAIL=0
 
@@ -221,26 +218,14 @@ EOF
 
 echo
 echo "=== #42 ai-door-open test: AC1 scenario run ==="
-RUN_OUT_AC1="$(bash "${SCRIPT_DIR}/run-scenario.sh" chextrek_ai_door_open_ac1 "$CONSOLE_SCRIPT_AC1" 150 2>&1)"
-RUN_EXIT_AC1=$?
-echo "$RUN_OUT_AC1"
+chextrek_run_scenario chextrek_ai_door_open_ac1 "$CONSOLE_SCRIPT_AC1" 150 || FAIL=1
 
-if [ $RUN_EXIT_AC1 -ne 0 ]; then
-	echo "FAIL: expected the always-on harness checks to pass on AC1, but the run exited ${RUN_EXIT_AC1}"
-	FAIL=1
-fi
-
-LOCAL_LOG_AC1="$(echo "$RUN_OUT_AC1" | sed -n 's/^CHEXTREK_LOCAL_LOG=//p')"
-if [ -z "$LOCAL_LOG_AC1" ] || [ ! -f "$LOCAL_LOG_AC1" ]; then
+LOCAL_LOG_AC1="$CHEXTREK_SCENARIO_LOG"
+if [ -z "$LOCAL_LOG_AC1" ]; then
 	echo "FAIL: couldn't find the archived AC1 log to check scenario-specific assertions"
 	FAIL=1
 else
-	if grep -qE '^ *[0-9]+ msec to load sf_923$' "$LOCAL_LOG_AC1"; then
-		echo "PASS: sf_923 finished loading (AC1)"
-	else
-		echo "FAIL: expected to see '<N> msec to load sf_923' in the AC1 log"
-		FAIL=1
-	fi
+	chextrek_assert_map_loaded "$LOCAL_LOG_AC1" sf_923 || FAIL=1
 
 	COUNT_43000="$(grep -c '^43000$' "$LOCAL_LOG_AC1")"
 	if [ "$COUNT_43000" -ge 1 ]; then
@@ -364,26 +349,14 @@ EOF
 
 echo
 echo "=== #42 ai-door-open test: AC2 scenario run ==="
-RUN_OUT_AC2="$(bash "${SCRIPT_DIR}/run-scenario.sh" chextrek_ai_door_open_ac2 "$CONSOLE_SCRIPT_AC2" 150 2>&1)"
-RUN_EXIT_AC2=$?
-echo "$RUN_OUT_AC2"
+chextrek_run_scenario chextrek_ai_door_open_ac2 "$CONSOLE_SCRIPT_AC2" 150 || FAIL=1
 
-if [ $RUN_EXIT_AC2 -ne 0 ]; then
-	echo "FAIL: expected the always-on harness checks to pass on AC2, but the run exited ${RUN_EXIT_AC2}"
-	FAIL=1
-fi
-
-LOCAL_LOG_AC2="$(echo "$RUN_OUT_AC2" | sed -n 's/^CHEXTREK_LOCAL_LOG=//p')"
-if [ -z "$LOCAL_LOG_AC2" ] || [ ! -f "$LOCAL_LOG_AC2" ]; then
+LOCAL_LOG_AC2="$CHEXTREK_SCENARIO_LOG"
+if [ -z "$LOCAL_LOG_AC2" ]; then
 	echo "FAIL: couldn't find the archived AC2 log to check scenario-specific assertions"
 	FAIL=1
 else
-	if grep -qE '^ *[0-9]+ msec to load sf_923$' "$LOCAL_LOG_AC2"; then
-		echo "PASS: sf_923 finished loading (AC2)"
-	else
-		echo "FAIL: expected to see '<N> msec to load sf_923' in the AC2 log"
-		FAIL=1
-	fi
+	chextrek_assert_map_loaded "$LOCAL_LOG_AC2" sf_923 || FAIL=1
 
 	COUNT_45000="$(grep -c '^45000$' "$LOCAL_LOG_AC2")"
 	if [ "$COUNT_45000" -ge 1 ]; then

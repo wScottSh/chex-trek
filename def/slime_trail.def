@@ -18,19 +18,3 @@ entityDef trail {
 	"surfDist"					"1"
 	"maxSurfDist"				"8"
 }
-
-// chextrek: spec #43 test-only fixture, used only by tools/test-trails.sh. Real content only ever
-// uses "trail" above, whose "fadeTime" "-1" means (decomp-so/reference/trails.md) a trail never
-// deletes itself - it lasts the whole level by design (corvette_notes.txt, 6/15/06: "i thought the
-// trails lasted forever"). That makes #43's AC ("the dump trail count rises, then returns to zero
-// after the fade") unobservable within a bounded AFK harness run using unmodified content alone, so
-// this variant inherits every other value from "trail" unchanged and only shortens fadeDelay/
-// fadeTime to a few seconds - long enough to prove the fade actually plays out and deletes the
-// trail, short enough for a harness scenario to wait it out. tools/test-trails.sh spawns a flemoid
-// with this as its "trailDef" override (idActor::Spawn reads that spawnArg to pick which entityDef
-// to copy into the new mkTrail - see Actor.cpp) instead of the real "trail".
-entityDef chextrek_test_trail_fastfade {
-	"inherit"					"trail"
-	"fadeDelay"					"0"
-	"fadeTime"					"2"
-}

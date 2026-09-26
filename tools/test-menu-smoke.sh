@@ -3,25 +3,23 @@
 # green (turns ticket 1's known failure green)". Builds chextrek.dll and runs the harness, then
 # checks the run is green and that the specific #29 failure (chex_events.script line 2, Unknown
 # event 'openDoors') is gone - not just that *some* different error stopped showing up.
-#
-# This replaces tools/test-tracer-bullet.sh (spec #29), which asserted the opposite: that the
-# harness reproduced that same failure as expected-red before the script events were ported. See
-# docs/harness-coverage.md.
+# See docs/harness-coverage.md.
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# shellcheck source=tools/lib-harness.sh
+source "${SCRIPT_DIR}/lib-harness.sh"
+
 echo "=== #30 menu-smoke test: build ==="
-if ! bash "${SCRIPT_DIR}/build-chextrek.sh"; then
-	echo "FAIL: build-chextrek.sh failed"
-	exit 1
-fi
+chextrek_build_or_exit
 
 echo
 echo "=== #30 menu-smoke test: harness run ==="
 HARNESS_OUT="$(bash "${SCRIPT_DIR}/run-harness.sh" 60 2>&1)"
 HARNESS_EXIT=$?
 echo "$HARNESS_OUT"
+[ $HARNESS_EXIT -eq 3 ] && exit 3
 
 FAIL=0
 
