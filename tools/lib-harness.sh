@@ -55,6 +55,26 @@ chextrek_line_field_values() {
 	grep -oE "^${FIELD_NAME}: .*\$" "$LOG_FILE" | sed "s/^${FIELD_NAME}: //"
 }
 
+# chextrek_log_has_no_display LOG_FILE
+#
+# True if dhewm3's log shows it died because there was no display to open a window on.
+chextrek_log_has_no_display() {
+	grep -qF "No displays available" "$1"
+}
+
+# chextrek_exit_no_display
+#
+# dhewm3 needs an active interactive desktop. When this Windows user session is disconnected
+# (another user switched in on the console, or an RDP session dropped), SDL can't open a window
+# and every run fails. That is an environment problem, not a test result, and it won't clear
+# until a human reconnects - so exit the whole calling script with code 3 instead of returning
+# a normal FAIL that reads like a code bug.
+chextrek_exit_no_display() {
+	echo "ENVIRONMENT: no display - this Windows session is not the active console session, so dhewm3 can't open a window."
+	echo "ENVIRONMENT: this is not a test failure. Stop and tell the human to reconnect to this session; do not wait or retry."
+	exit 3
+}
+
 # chextrek_run_console_script REPO_ROOT CONSOLE_SCRIPT_BODY TIMEOUT_SECS RUN_LABEL
 #
 # CONSOLE_SCRIPT_BODY is the full text written to the .cfg file dhewm3 execs (including
@@ -65,7 +85,8 @@ chextrek_line_field_values() {
 # CHEXTREK_LOCAL_LOG are set once the run actually launches dhewm3; on an early-return failure
 # (missing dhewm3.exe/chextrek.dll, can't create the mount symlink) they're left unset, so callers
 # that echo them should use "${CHEXTREK_LOCAL_LOG:-}" under `set -u`. Does not exit the shell -
-# callers decide what to do with a non-zero CHEXTREK_RUN_STATUS.
+# callers decide what to do with a non-zero CHEXTREK_RUN_STATUS - except when there is no display
+# (see chextrek_exit_no_display), which exits the calling script with code 3.
 chextrek_run_console_script() {
 	local REPO_ROOT="$1"
 	local CONSOLE_SCRIPT_BODY="$2"
@@ -74,6 +95,11 @@ chextrek_run_console_script() {
 
 	DHEWM3_HOME="${DHEWM3_HOME:-/c/Users/Scott/dhewm3/1.5.5-win32/dhewm3}"
 	DOOM3_BASEPATH="${DOOM3_BASEPATH:-/c/Program Files (x86)/Steam/steamapps/common/Doom 3}"
+
+	# qwinsta marks this process's own session with ">"; anything but Active means no display.
+	if command -v qwinsta >/dev/null 2>&1 && ! qwinsta 2>/dev/null | grep -E '^>' | grep -qw Active; then
+		chextrek_exit_no_display
+	fi
 
 	local DHEWM3_EXE="${DHEWM3_HOME}/dhewm3.exe"
 	if [ ! -f "$DHEWM3_EXE" ]; then
@@ -199,6 +225,11 @@ chextrek_run_console_script() {
 		echo "FAIL: no engine log was produced at all"
 		CHEXTREK_RUN_STATUS=1
 		return 1
+	fi
+
+	# The session can drop mid-run (between the preflight check above and launch).
+	if chextrek_log_has_no_display "$CHEXTREK_LOCAL_LOG"; then
+		chextrek_exit_no_display
 	fi
 
 	CHEXTREK_RUN_STATUS=0

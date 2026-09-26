@@ -74,6 +74,13 @@ process by image name on timeout (not just the one it started), and concurrent r
 two worktrees at once - would also race on the shared `chextrek` symlink and the shared
 `Documents\My Games\dhewm3\chextrek\` save dir.
 
+**The harness needs an active desktop session.** dhewm3 opens a real window, so if this Windows
+user session is disconnected (another user switched in on the console, or RDP dropped), SDL dies
+with `No displays available`. The harness checks `qwinsta` before launching and the log after each
+run; on no display it prints `ENVIRONMENT: no display ...` and exits the whole script with code 3.
+Exit 3 is never a test result: stop and get a human to reconnect - don't wait or retry.
+`tools/test-harness-no-display.sh` covers this without needing a display.
+
 ## Running a feature scenario
 
 `tools/run-harness.sh` always runs the same fixed smoke-check script (menu + `chextrek_dump` +
