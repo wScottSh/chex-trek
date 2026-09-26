@@ -44,6 +44,7 @@ If you have questions concerning this license or the applicable additional terms
 
 #include "SysCmds.h"
 #include "../ChexTrekDump.h" // chextrek
+#include "../func_envshot.h" // chextrek: spec #44
 
 /*
 ==================
@@ -2430,9 +2431,14 @@ void idGameLocal::InitConsoleCommands( void ) {
 	cmdSystem->AddCommand( "testid",				Cmd_TestId_f,				CMD_FL_GAME|CMD_FL_CHEAT,	"output the string for the specified id." );
 
 	// chextrek: spec #16/#38 (decomp-so/reference/hud-map.md). Binary: cmdSystem->AddCommand right
-	// after the last stock command ("testid" above) and before the mod's "takeEnvShots"
-	// (env-shots group, not yet ported).
+	// after the last stock command ("testid" above) and before the mod's "takeEnvShots" (below).
 	cmdSystem->AddCommand( "showMap",				idPlayer::Cmd_ShowMap_f,	CMD_FL_GAME|CMD_FL_CHEAT,	"show the whole map" );
+
+	// chextrek: spec #16/#44 (decomp-so/reference/env-shots.md). Binary (0x1e7e38-0x1e7e6a):
+	// cmdSystem->AddCommand with "takeEnvShots", matt_func_envshot::takeEnvShots_f, flags 0x11
+	// (CMD_FL_GAME|CMD_FL_CHEAT), "takes an environment shot at func_envshots" and a NULL
+	// completion hook - the last command this function registers, right after "showMap" above.
+	cmdSystem->AddCommand( "takeEnvShots",			matt_func_envshot::takeEnvShots_f,	CMD_FL_GAME|CMD_FL_CHEAT,	"takes an environment shot at func_envshots" );
 }
 
 /*

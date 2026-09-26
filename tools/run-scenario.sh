@@ -11,8 +11,9 @@
 #
 # Exits with the always-on checks' status (spec #28: chextrek.dll loaded, state-dump header
 # present, no ERROR/unknown-event/unknown-spawnclass/script-compile lines). Prints
-# "CHEXTREK_LOCAL_LOG=<path>" on its own line so callers can grep the archived log for their own
-# scenario-specific assertions.
+# "CHEXTREK_LOCAL_LOG=<path>" and "CHEXTREK_MOD_SAVE_DIR=<path>" on their own lines so callers can
+# grep the archived log, and inspect anything left in the scratch save dir that the archiving loop
+# doesn't copy out (e.g. a subfolder like #44's env/), for their own scenario-specific assertions.
 set -uo pipefail
 
 if [ $# -lt 2 ]; then
@@ -41,5 +42,6 @@ chextrek_run_console_script "$REPO_ROOT" "$CONSOLE_SCRIPT" "$TIMEOUT_SECS" "$SCE
 STATUS=$CHEXTREK_RUN_STATUS
 
 echo "CHEXTREK_LOCAL_LOG=${CHEXTREK_LOCAL_LOG:-}"
+echo "CHEXTREK_MOD_SAVE_DIR=${CHEXTREK_MOD_SAVE_DIR:-}"
 
 exit $STATUS

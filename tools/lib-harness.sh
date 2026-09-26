@@ -82,11 +82,18 @@ chextrek_exit_no_display() {
 # scenarios need to interleave "wait"s with their own commands).
 #
 # On return: CHEXTREK_RUN_STATUS is always set (0 pass, 1 fail). CHEXTREK_ARTIFACT_DIR and
-# CHEXTREK_LOCAL_LOG are set once the run actually launches dhewm3; on an early-return failure
-# (missing dhewm3.exe/chextrek.dll, can't create the mount symlink) they're left unset, so callers
-# that echo them should use "${CHEXTREK_LOCAL_LOG:-}" under `set -u`. Does not exit the shell -
-# callers decide what to do with a non-zero CHEXTREK_RUN_STATUS - except when there is no display
-# (see chextrek_exit_no_display), which exits the calling script with code 3.
+# CHEXTREK_LOCAL_LOG are set once the run actually launches dhewm3; CHEXTREK_MOD_SAVE_DIR is set a
+# little earlier (as soon as the scratch save dir itself is resolved and wiped, before dhewm3 is
+# launched). On an early-return failure (missing dhewm3.exe/chextrek.dll, can't create the mount
+# symlink) all three are left unset, so callers that echo them should use
+# "${CHEXTREK_LOCAL_LOG:-}" under `set -u`. CHEXTREK_MOD_SAVE_DIR is the scratch save dir itself
+# (Documents/My Games/dhewm3/chextrek/) -
+# callers that need to inspect something the archiving loop below doesn't copy out (e.g. #44's
+# nested env/ subfolder) should read it from there rather than recomputing the path, so the two
+# can't drift. It isn't wiped until the *next* run, so it's still valid to read right after this
+# call returns. Does not exit the shell - callers decide what to do with a non-zero
+# CHEXTREK_RUN_STATUS - except when there is no display (see chextrek_exit_no_display), which
+# exits the calling script with code 3.
 chextrek_run_console_script() {
 	local REPO_ROOT="$1"
 	local CONSOLE_SCRIPT_BODY="$2"
@@ -160,6 +167,7 @@ chextrek_run_console_script() {
 	# save path".
 	rm -rf "$MOD_SAVE_DIR"
 	mkdir -p "$MOD_SAVE_DIR"
+	CHEXTREK_MOD_SAVE_DIR="$MOD_SAVE_DIR"
 
 	local RUN_ID
 	RUN_ID="$(date +%Y%m%d-%H%M%S%N)"
