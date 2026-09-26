@@ -1,0 +1,6 @@
+# Build artifacts for chextrek.dll (spec #28/#29) - rebuilt by tools/build-chextrek.sh, not tracked.
+/engine/build/
+/chextrek.dll
+/chextrek.pdb
+/chextrek.exp
+/chextrek.lib
