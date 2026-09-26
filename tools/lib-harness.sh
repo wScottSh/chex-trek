@@ -332,8 +332,11 @@ chextrek_run_console_script() {
 		echo "FAIL: the game didn't exit within ${TIMEOUT_SECS}s and was killed"
 		local LAST_LINE
 		LAST_LINE="$(grep -E "^ERROR:|Unknown event|Could not spawn|Error: file .*\.script|[Ee]rror" "$CHEXTREK_LOCAL_LOG" | tail -1)"
-		[ -z "$LAST_LINE" ] && LAST_LINE="$(grep -v '^[[:space:]]*$' "$CHEXTREK_LOCAL_LOG" | tail -1)"
-		echo "FAIL: last error line in the log: ${LAST_LINE}"
+		if [ -n "$LAST_LINE" ]; then
+			echo "FAIL: last error line in the log: ${LAST_LINE}"
+		else
+			echo "FAIL: no error line in the log; its last line: $(grep -v '^[[:space:]]*$' "$CHEXTREK_LOCAL_LOG" | tail -1)"
+		fi
 		CHEXTREK_RUN_STATUS=1
 	fi
 
