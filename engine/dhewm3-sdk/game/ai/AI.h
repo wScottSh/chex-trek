@@ -291,6 +291,15 @@ protected:
 	idMoveState				move;
 	idMoveState				savedMove;
 
+	// chextrek: spec #42, decomp-so/reference/door-opening.md (binary: idAI +0x1058, a new bool
+	// right after savedMove, shifting stock kickForce from +0x1048 to +0x105c). Read from the
+	// "canopendoors" spawnArg by idAI::Spawn (default "1"); AnimMove/FlyMove/SlideMove call
+	// OpenDoors( GetSlideMoveEntity() ) only when this is set, so monsters open doors they bump
+	// into while moving. UNCERTAIN in the reference whether this is saved - not checked there;
+	// ported here as a normal spawnArg-derived bool (same as af_push_moveables/ignore_obstacles
+	// below) so a save/restore round-trip doesn't leave it uninitialized.
+	bool					canOpenDoors;
+
 	float					kickForce;
 	bool					ignore_obstacles;
 	float					blockedRadius;

@@ -35,6 +35,10 @@ static idStr chextrekItemTextLast;
 static int chextrekDoorTryOpenCount = 0;
 static idStr chextrekDoorTryOpenLast;
 
+// chextrek: spec #42. See ChexTrek_NoteAIOpenDoor in ChexTrekDump.h.
+static int chextrekAIOpenDoorCount = 0;
+static idStr chextrekAIOpenDoorLast;
+
 // chextrek: spec #30, test-only. The AFK harness drives the game only through console commands
 // (spec #28), including the "script" command to call scriptEvents like setProj/spawnDict that
 // need a string literal argument. The console's own tokenizer (idCmdArgs::TokenizeString,
@@ -66,6 +70,21 @@ idCVar chextrek_test_str10( "chextrek_test_str10", "\"func_door_1\"", CVAR_GAME,
 idCVar chextrek_test_str11( "chextrek_test_str11", "\"func_door_24\"", CVAR_GAME, "chextrek: test-only string-literal holder for AFK harness scenarios (spec #40) - see ChexTrekDump.cpp" );
 idCVar chextrek_test_str12( "chextrek_test_str12", "\"hbdoor1\"", CVAR_GAME, "chextrek: test-only string-literal holder for AFK harness scenarios (spec #41) - see ChexTrekDump.cpp" );
 idCVar chextrek_test_str13( "chextrek_test_str13", "\"func_door_13\"", CVAR_GAME, "chextrek: test-only string-literal holder for AFK harness scenarios (spec #41) - see ChexTrekDump.cpp" );
+idCVar chextrek_test_str14( "chextrek_test_str14", "\"chextrek_test_ai_monster\"", CVAR_GAME, "chextrek: test-only string-literal holder for AFK harness scenarios (spec #42) - see ChexTrekDump.cpp" );
+// chextrek_test_str15's value holds a whole single-quoted doom-script vector literal, not just a
+// bare string: the CONSOLE's own tokenizer (idCmdArgs::TokenizeString, idlib/CmdArgs.cpp) lexes a
+// typed "'-256 184 64'" itself before doom-script's compiler ever sees it - its lexer isn't
+// configured with LEXFL_ALLOWMULTICHARLITERALS, so it doesn't treat a single quote as a
+// vector-literal delimiter the way game/script/Script_Compiler.cpp's lexer does, and re-lexes/
+// reassembles it into something that fails to compile as a vector ("type mismatch on parm 1").
+// Substituting a cvar whose *value* is already the complete "'x y z'" text sidesteps that: cvar
+// expansion splices the stored string in as one already-formed token (same mechanism
+// chextrek_test_str1..14 use for string literals/entity names), so the console tokenizer's lexer
+// never re-parses the quote characters at all. Its compiled-in default below is just a sane
+// starting value; tools/test-ai-door-open.sh overrides it at runtime with the plain `set` console
+// command (the same technique tools/test-door-open.sh uses for g_doorTraceDist) rather than
+// hardcoding one vector per scenario.
+idCVar chextrek_test_str15( "chextrek_test_str15", "'-256 184 64'", CVAR_GAME, "chextrek: test-only vector-literal holder for AFK harness scenarios (spec #42) - see ChexTrekDump.cpp" );
 
 /*
 ==================
@@ -106,6 +125,16 @@ ChexTrek_NoteTryOpenDoor
 void ChexTrek_NoteTryOpenDoor( const char *doorName ) {
 	chextrekDoorTryOpenCount++;
 	chextrekDoorTryOpenLast = doorName;
+}
+
+/*
+==================
+ChexTrek_NoteAIOpenDoor
+==================
+*/
+void ChexTrek_NoteAIOpenDoor( const char *doorName ) {
+	chextrekAIOpenDoorCount++;
+	chextrekAIOpenDoorLast = doorName;
 }
 
 /*
@@ -193,6 +222,15 @@ read other HUD gui state without any new hook: `hud_tip_up` is idPlayer::IsTipVi
 open this door." tip, or the door's own "lockedtext"), so a scenario can assert the right tip
 text/title showed up without depending on GUI rendering. No hook, no change to tryOpen/ShowTip's
 own code.
+
+#42 adds `ai_opendoor_count`/`ai_opendoor_last` (decomp-so/reference/door-opening.md's
+idAI::OpenDoors, AI.cpp, via ChexTrek_NoteAIOpenDoor). idAI::OpenDoors logs nothing itself, and it
+has two callers: the already-covered "openDoors" script event (spec #30) and this sub-issue's new
+AnimMove/FlyMove/SlideMove wiring (idAI::canOpenDoors, read from the "canopendoors" spawnArg,
+default "1"), which calls OpenDoors whenever a monster's own blocked-movement physics reports the
+entity it bumped into. These two lines let a scenario tell "a monster's own movement wiring opened
+this door" from "the door happened to already be open" independent of the door's own isOpen()
+state, the same technique #40/#41's door_tryopen_count/_last use for idPlayer::tryOpen.
 ==================
 */
 void ChexTrek_Dump_f( const idCmdArgs &args ) {
@@ -280,6 +318,10 @@ void ChexTrek_Dump_f( const idCmdArgs &args ) {
 	// chextrek: spec #40 (decomp-so/reference/door-opening.md). See ChexTrek_NoteTryOpenDoor.
 	gameLocal.Printf( "door_tryopen_count: %d\n", chextrekDoorTryOpenCount );
 	gameLocal.Printf( "door_tryopen_last: %s\n", chextrekDoorTryOpenCount > 0 ? chextrekDoorTryOpenLast.c_str() : "none" );
+
+	// chextrek: spec #42 (decomp-so/reference/door-opening.md). See ChexTrek_NoteAIOpenDoor.
+	gameLocal.Printf( "ai_opendoor_count: %d\n", chextrekAIOpenDoorCount );
+	gameLocal.Printf( "ai_opendoor_last: %s\n", chextrekAIOpenDoorCount > 0 ? chextrekAIOpenDoorLast.c_str() : "none" );
 
 	// chextrek: spec #41 (decomp-so/reference/door-opening.md). idPlayer::tryOpen's locked-door
 	// branches call the already-stock idPlayer::ShowTip, which only sets HUD gui state - read

@@ -129,4 +129,17 @@ void ChexTrek_TestPdaMapOpen_f( const idCmdArgs &args );
 // doesn't change what tryOpen does.
 void ChexTrek_NoteTryOpenDoor( const char *doorName );
 
+// chextrek: spec #42. idAI::OpenDoors (decomp-so/reference/door-opening.md, AI.cpp) calls this
+// right after it actually activates a door (the unlocked-and-at-rest branch, door->Use). Shared by
+// both of OpenDoors' callers - the "openDoors" script event (spec #30, already covered by
+// tools/test-script-events.sh) and this sub-issue's new AnimMove/FlyMove/SlideMove wiring, which
+// calls OpenDoors whenever a monster's own movement is blocked by a door and its canOpenDoors is
+// set. OpenDoors itself logs nothing, so this is the only way a scenario can tell "an AI's own
+// blocked-movement wiring opened this specific door" from "the door happened to already be open
+// for some other reason" - the distinction #42's AC needs, independent of the door's own isOpen()
+// state (checked directly via script, same as #40/#41). Test-only instrumentation, same pattern as
+// ChexTrek_NoteTryOpenDoor above: it counts calls and remembers the last door's name, it doesn't
+// change what OpenDoors does.
+void ChexTrek_NoteAIOpenDoor( const char *doorName );
+
 #endif /* !__CHEXTREK_DUMP_H__ */

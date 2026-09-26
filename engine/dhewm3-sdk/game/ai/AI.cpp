@@ -33,6 +33,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "Moveable.h"
 #include "SmokeParticles.h"
 #include "Mover.h"		// chextrek: spec #30, decomp-so/reference/door-opening.md (idAI::OpenDoors needs idDoor)
+#include "ChexTrekDump.h"	// chextrek: spec #42, test-only ChexTrek_NoteAIOpenDoor hook
 
 #include "ai/AI.h"
 
@@ -290,6 +291,10 @@ idAI::idAI() {
 	aas					= NULL;
 	travelFlags			= TFL_WALK|TFL_AIR;
 
+	// chextrek: spec #42, decomp-so/reference/door-opening.md. Overwritten by idAI::Spawn from
+	// the "canopendoors" spawnArg (default "1"); initialized here too so a restored save (which
+	// constructs the object and calls Restore, not Spawn) never leaves it uninitialized.
+	canOpenDoors		= true;
 	kickForce			= 2048.0f;
 	ignore_obstacles	= false;
 	blockedRadius		= 0.0f;
@@ -414,6 +419,7 @@ void idAI::Save( idSaveGame *savefile ) const {
 	move.Save( savefile );
 	savedMove.Save( savefile );
 	savefile->WriteFloat( kickForce );
+	savefile->WriteBool( canOpenDoors );	// chextrek: spec #42
 	savefile->WriteBool( ignore_obstacles );
 	savefile->WriteFloat( blockedRadius );
 	savefile->WriteInt( blockedMoveTime );
@@ -549,6 +555,7 @@ void idAI::Restore( idRestoreGame *savefile ) {
 	move.Restore( savefile );
 	savedMove.Restore( savefile );
 	savefile->ReadFloat( kickForce );
+	savefile->ReadBool( canOpenDoors );	// chextrek: spec #42
 	savefile->ReadBool( ignore_obstacles );
 	savefile->ReadFloat( blockedRadius );
 	savefile->ReadInt( blockedMoveTime );
@@ -739,6 +746,14 @@ void idAI::Spawn( void ) {
 	spawnArgs.GetFloat( "turn_rate",			"360",		turnRate );
 
 	spawnArgs.GetBool( "talks",					"0",		talks );
+
+	// chextrek: spec #42, decomp-so/reference/door-opening.md Notes ("idAI::Spawn (0x1c99e4):
+	// spawnArgs.GetBool( "canopendoors", "1", <+0x1058> ), between the stock "talks" and
+	// "npc_name" reads"). No map/def in this repo sets "canopendoors", so this default applies to
+	// every monster: they open doors they bump into (AnimMove/FlyMove/SlideMove below) unless a
+	// scenario or future def sets "canopendoors" "0".
+	spawnArgs.GetBool( "canopendoors",			"1",		canOpenDoors );
+
 	if ( spawnArgs.GetString( "npc_name", NULL ) != NULL ) {
 		if ( talks ) {
 			talk_state = TALK_OK;
@@ -2716,6 +2731,14 @@ void idAI::AnimMove( void ) {
 		DirectDamage( attack, enemy.GetEntity() );
 	} else {
 		idEntity *blockEnt = physicsObj.GetSlideMoveEntity();
+		// chextrek: spec #42, decomp-so/reference/door-opening.md Notes ("AnimMove/FlyMove/
+		// SlideMove test the +0x1058 byte, and the calls to OpenDoors pass the result of
+		// physicsObj.GetSlideMoveEntity() ... blockEnt = physicsObj.GetSlideMoveEntity(); if
+		// (canOpenDoors) OpenDoors(blockEnt); just before the stock idMoveable kick test"). Runs
+		// before the stock kick-obstacles test below, matching the reference's ordering.
+		if ( canOpenDoors ) {
+			OpenDoors( blockEnt );
+		}
 		if ( blockEnt && blockEnt->IsType( idMoveable::Type ) && blockEnt->GetPhysics()->IsPushable() ) {
 			KickObstacles( viewAxis[ 0 ], kickForce, blockEnt );
 		}
@@ -2842,6 +2865,14 @@ void idAI::SlideMove( void ) {
 		DirectDamage( attack, enemy.GetEntity() );
 	} else {
 		idEntity *blockEnt = physicsObj.GetSlideMoveEntity();
+		// chextrek: spec #42, decomp-so/reference/door-opening.md Notes ("AnimMove/FlyMove/
+		// SlideMove test the +0x1058 byte, and the calls to OpenDoors pass the result of
+		// physicsObj.GetSlideMoveEntity() ... blockEnt = physicsObj.GetSlideMoveEntity(); if
+		// (canOpenDoors) OpenDoors(blockEnt); just before the stock idMoveable kick test"). Runs
+		// before the stock kick-obstacles test below, matching the reference's ordering.
+		if ( canOpenDoors ) {
+			OpenDoors( blockEnt );
+		}
 		if ( blockEnt && blockEnt->IsType( idMoveable::Type ) && blockEnt->GetPhysics()->IsPushable() ) {
 			KickObstacles( viewAxis[ 0 ], kickForce, blockEnt );
 		}
@@ -3090,6 +3121,14 @@ void idAI::FlyMove( void ) {
 		DirectDamage( attack, enemy.GetEntity() );
 	} else {
 		idEntity *blockEnt = physicsObj.GetSlideMoveEntity();
+		// chextrek: spec #42, decomp-so/reference/door-opening.md Notes ("AnimMove/FlyMove/
+		// SlideMove test the +0x1058 byte, and the calls to OpenDoors pass the result of
+		// physicsObj.GetSlideMoveEntity() ... blockEnt = physicsObj.GetSlideMoveEntity(); if
+		// (canOpenDoors) OpenDoors(blockEnt); just before the stock idMoveable kick test"). Runs
+		// before the stock kick-obstacles test below, matching the reference's ordering.
+		if ( canOpenDoors ) {
+			OpenDoors( blockEnt );
+		}
 		if ( blockEnt && blockEnt->IsType( idMoveable::Type ) && blockEnt->GetPhysics()->IsPushable() ) {
 			KickObstacles( viewAxis[ 0 ], kickForce, blockEnt );
 		} else if ( moveResult == MM_BLOCKED ) {
@@ -3618,6 +3657,8 @@ void idAI::OpenDoors( idEntity *ent ) {
 			// `other` is the door itself (reference: the binary passes the same register as
 			// `this` and as `other`).
 			door->Use( ent, this );
+			// chextrek: spec #42, test-only. See ChexTrek_NoteAIOpenDoor in ChexTrekDump.h.
+			ChexTrek_NoteAIOpenDoor( door->name.c_str() );
 		}
 	}
 }
