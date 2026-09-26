@@ -45,6 +45,11 @@ If you have questions concerning this license or the applicable additional terms
 #include "Pvs.h"
 #include "MultiplayerGame.h"
 
+// chextrek: spec #16/#43 (decomp-so/reference/trails.md). mkTrail *, declared in Trail.h/Trail.cpp;
+// forward-declared here so idGameLocal doesn't need to include Trail.h just for a pointer member -
+// same pattern Player.h uses for mkObjective (see the comment there).
+class mkTrail;
+
 #ifdef ID_DEBUG_UNINITIALIZED_MEMORY
 // This is real evil but allows the code to inspect arbitrary class variables.
 #define private		public
@@ -239,6 +244,11 @@ public:
 	idWorldspawn *			world;					// world entity
 	idLinkList<idEntity>	spawnedEntities;		// all spawned entities
 	idLinkList<idEntity>	activeEntities;			// all thinking entities (idEntity::thinkFlags != 0)
+	// chextrek: spec #16/#43 (decomp-so/reference/trails.md). Every live mkTrail (not an idEntity,
+	// so not in spawnedEntities/activeEntities above). RunFrame below Think()s each one every
+	// frame; BabySitTrail/RemoveTrail (Game_local.cpp) are the only things that add to or remove
+	// from it. UNCERTAIN (reference): name; kept from the reference as-is.
+	idList<mkTrail *>		trails;
 	int						numEntitiesToDeactivate;// number of entities that became inactive in current frame
 	bool					sortPushers;			// true if active lists needs to be reordered to place pushers at the front
 	bool					sortTeamMasters;		// true if active lists needs to be reordered to place physics team masters before their slaves
@@ -421,6 +431,12 @@ public:
 	void					RadiusDamage( const idVec3 &origin, idEntity *inflictor, idEntity *attacker, idEntity *ignoreDamage, idEntity *ignorePush, const char *damageDefName, float dmgPower = 1.0f );
 	void					RadiusPush( const idVec3 &origin, const float radius, const float push, const idEntity *inflictor, const idEntity *ignore, float inflictorScale, const bool quake );
 	void					RadiusPushClipModel( const idVec3 &origin, const float push, const idClipModel *clipModel );
+
+	// chextrek: spec #16/#43 (decomp-so/reference/trails.md). Add/remove a trail from the `trails`
+	// list above. Called only from mkTrail::Spawn / ~mkTrail (Trail.cpp) - see the reference's
+	// Notes, which found no other caller over every function's direct calls.
+	void					BabySitTrail( mkTrail *trail );
+	void					RemoveTrail( mkTrail *trail );
 
 	void					ProjectDecal( const idVec3 &origin, const idVec3 &dir, float depth, bool parallel, float size, const char *material, float angle = 0 );
 	// chextrek: spec #30, decomp-so/reference/script-events.md. The stock overload above with the

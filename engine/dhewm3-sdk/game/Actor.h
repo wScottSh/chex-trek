@@ -33,6 +33,11 @@ If you have questions concerning this license or the applicable additional terms
 #include "IK.h"
 #include "PlayerView.h"
 
+// chextrek: spec #16/#43 (decomp-so/reference/trails.md). mkTrail *, declared in Trail.h/Trail.cpp;
+// forward-declared here so Actor.h doesn't need to include Trail.h just for a pointer member - same
+// pattern Player.h uses for mkObjective (see the comment there).
+class mkTrail;
+
 /*
 ===============================================================================
 
@@ -278,6 +283,18 @@ protected:
 	bool					footprintRight;
 	int						footprintEndTime;
 	int						footprintSurfaceType;
+
+	// chextrek: trail state (spec #16/#43, decomp-so/reference/trails.md). idActor::Spawn allocates
+	// a mkTrail here when spawnArgs' "hasTrail" is set (its "trailDef" spawnArg names which
+	// entityDef to copy into the trail's own spawnArgs, e.g. def/chex_monster_flemoid.def's
+	// "trailDef" "trail"); ~idActor calls trail->FadeTrail() so the trail detaches from this actor
+	// and starts fading instead of being left pointing at a doomed one. hasTrail mirrors the
+	// reference's idActor+0xf6c bool; trail is idActor+0x920's mkTrail *. Initialized in the
+	// constructor (not covered by the reference, which only documents idActor::Spawn/~idActor's
+	// use of these two fields) so ~idActor never calls FadeTrail() through an uninitialized pointer
+	// on an actor whose def never sets "hasTrail" at all.
+	bool					hasTrail;
+	mkTrail *				trail;
 
 	virtual void			Gib( const idVec3 &dir, const char *damageDefName );
 

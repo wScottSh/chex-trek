@@ -10,6 +10,7 @@
 #include "Game_local.h"
 #include "Player.h"
 #include "Target.h"
+#include "Trail.h" // chextrek: spec #43
 
 #include "ChexTrekDump.h"
 
@@ -254,6 +255,14 @@ state, the same technique #40/#41's door_tryopen_count/_last use for idPlayer::t
 the canOpenDoors check runs: with "canopendoors 0", OpenDoors never runs at all, so
 ai_opendoor_count/_last alone can't tell "the monster was blocked by func_door_1 specifically" from
 "the monster stopped for some unrelated reason".
+
+#43 adds `trails` (idGameLocal::trails.Num(), decomp-so/reference/trails.md) and `anchors` (the sum
+of every live trail's mkTrail::anchors.Num()), so a scenario can assert an actor's own trail exists
+(`trails` rises by one on spawn) and, once the actor is removed and the fade finishes, is fully
+cleaned up (`trails` back down
+to whatever it was before that actor's own trail existed - not necessarily 0: real content's
+"trailDef" never fades on its own, decomp-so/reference/trails.md's Notes, so any already-placed
+actor with a trail keeps counting toward this the whole time) - without depending on render state.
 ==================
 */
 void ChexTrek_Dump_f( const idCmdArgs &args ) {
@@ -359,6 +368,22 @@ void ChexTrek_Dump_f( const idCmdArgs &args ) {
 		gameLocal.Printf( "hud_tip_up: %s\n", player->IsTipVisible() ? "1" : "0" );
 		gameLocal.Printf( "hud_tip_title: %s\n", player->hud->GetStateString( "tiptitle", "" ) );
 		gameLocal.Printf( "hud_tip_text: %s\n", player->hud->GetStateString( "tip", "" ) );
+	}
+
+	// chextrek: spec #16/#43 (decomp-so/reference/trails.md). idGameLocal::trails (every live
+	// mkTrail) and the total number of anchors across them all, so a scenario can assert a moving
+	// actor's trail is being created (trails/anchors rise) and, once its actor is removed and the
+	// fade finishes, fully cleaned up (trails falls back to its pre-existing baseline - not
+	// necessarily 0, since real content's trails never fade on their own) - the AC #43 needs,
+	// independent of GUI/render state. No NULL check on gameLocal.trails[ i ]: BabySitTrail/
+	// RemoveTrail (Game_local.cpp) are the list's only writers and never leave a NULL entry in it.
+	{
+		int chextrekAnchorTotal = 0;
+		for ( int i = 0; i < gameLocal.trails.Num(); i++ ) {
+			chextrekAnchorTotal += gameLocal.trails[ i ]->anchors.Num();
+		}
+		gameLocal.Printf( "trails: %d\n", gameLocal.trails.Num() );
+		gameLocal.Printf( "anchors: %d\n", chextrekAnchorTotal );
 	}
 
 	// chextrek: spec #33 (decomp-so/reference/custom-ui.md, end-level-stats.md). The local

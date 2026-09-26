@@ -51,6 +51,7 @@ If you have questions concerning this license or the applicable additional terms
 
 #include "Game_local.h"
 #include "ChexTrekDump.h" // chextrek
+#include "Trail.h" // chextrek: spec #43
 
 const int NUM_RENDER_PORTAL_BITS	= idMath::BitsForInteger( PS_BLOCK_ALL );
 
@@ -1480,6 +1481,24 @@ void idGameLocal::MapClear( bool clearClients ) {
 		spawnIds[ i ] = -1;
 	}
 
+	// chextrek: spec #16/#43 (decomp-so/reference/trails.md). Not itself an idEntity, so the
+	// entities[] loop above never reaches it directly: each hasTrail actor's own ~idActor calls
+	// trail->FadeTrail() as part of that loop, but with a real "trail" def's "fadeTime" "-1"
+	// FadeTrail only clears TH_THINK and returns (it never deletes itself - by design, a real trail
+	// outlives its actor for the rest of the level, decomp-so/reference/trails.md's Notes) - so
+	// every real trail is still sitting in this list right now, about to become stale across the
+	// map change this function is part of. The reference's own Notes call "where the list is
+	// emptied at map end" an open question it never checked; leaving it unanswered here would leak
+	// every map's own trails into the next one and, for a trail whose fadeTime isn't -1 and is still
+	// actively fading through a map change, risk RunFrame's Think() loop calling into the *next*
+	// map's gameRenderWorld with a modelDefHandle that belonged to the old one. Deleting what's left
+	// (trails.Num() drops as each ~mkTrail calls RemoveTrail) closes both, matching how every other
+	// per-map allocation in this function (entities, frameCommandThread, editEntities,
+	// locationEntities) is cleared here too.
+	while ( trails.Num() ) {
+		delete trails[ 0 ];
+	}
+
 	entityHash.Clear( 1024, MAX_GENTITIES );
 
 	if ( !clearClients ) {
@@ -2410,6 +2429,16 @@ gameReturn_t idGameLocal::RunFrame( const usercmd_t *clientCmds ) {
 	if ( skipCinematic ) {
 		soundSystem->SetMute( false );
 		skipCinematic = false;
+	}
+
+	// chextrek: spec #16/#43 (decomp-so/reference/trails.md). Think() every live trail once a
+	// frame - a virtual call, matching the reference's placement just before RunDebugInfo below.
+	// Note (reference Notes, preserved as-is): Think() can `delete this` when a trail finishes
+	// fading, which makes RemoveTrail shift trails[] while this loop walks it with an increasing
+	// index, so the trail right after a just-deleted one skips one Think() call that frame. Not a
+	// crash, not fixed - matches the original's own documented behavior.
+	for ( int chextrekTrailIdx = 0; chextrekTrailIdx < trails.Num(); chextrekTrailIdx++ ) {
+		trails[ chextrekTrailIdx ]->Think();
 	}
 
 	// show any debug info for this frame
@@ -3864,6 +3893,30 @@ void idGameLocal::RadiusPushClipModel( const idVec3 &origin, const float push, c
 
 		clipModel->GetEntity()->ApplyImpulse( world, clipModel->GetId(), center, impulse );
 	}
+}
+
+/*
+================
+idGameLocal::BabySitTrail
+
+chextrek: spec #16/#43 (decomp-so/reference/trails.md). Registers a trail so RunFrame Think()s it.
+Called only from mkTrail::Spawn.
+================
+*/
+void idGameLocal::BabySitTrail( mkTrail *trail ) {
+	trails.Append( trail );
+}
+
+/*
+================
+idGameLocal::RemoveTrail
+
+chextrek: spec #16/#43 (decomp-so/reference/trails.md). Called only from ~mkTrail. Does nothing if
+the trail is not in the list.
+================
+*/
+void idGameLocal::RemoveTrail( mkTrail *trail ) {
+	trails.Remove( trail );
 }
 
 /*

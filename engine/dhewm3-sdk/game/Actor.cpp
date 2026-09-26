@@ -34,6 +34,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "Projectile.h"
 #include "WorldSpawn.h"
 #include "ChexTrekDump.h"		// chextrek: spec #30, ChexTrek_NoteFootprintProjected
+#include "Trail.h"				// chextrek: spec #43, mkTrail
 
 #include "Actor.h"
 
@@ -476,6 +477,12 @@ idActor::idActor( void ) {
 	footprintEndTime	= 0;
 	footprintSurfaceType = -1;
 
+	// chextrek: spec #43. Not documented in the reference (Actor.h has the fuller comment); a safe
+	// default so ~idActor's hasTrail check below never reads trail through garbage memory on an
+	// actor whose def leaves "hasTrail" unset.
+	hasTrail			= false;
+	trail				= NULL;
+
 	attachments.SetGranularity( 1 );
 
 	enemyNode.SetOwner( this );
@@ -510,6 +517,14 @@ idActor::~idActor( void ) {
 		if ( ent ) {
 			ent->PostEventMS( &EV_Remove, 0 );
 		}
+	}
+
+	// chextrek: spec #16/#43 (decomp-so/reference/trails.md's Notes, "edits inside stock functions"
+	// lead). Binary evidence: all three ~idActor clones (e.g. 0xb5c1f-0xb5c39) run
+	// `if ( hasTrail ) trail->FadeTrail();` - this actor is going away, so its trail detaches
+	// (owner = NULL) and starts fading instead of outliving a dangling owner pointer.
+	if ( hasTrail && trail ) {
+		trail->FadeTrail();
 	}
 
 	ShutdownThreads();
@@ -648,6 +663,20 @@ void idActor::Spawn( void ) {
 	}
 
 	finalBoss = spawnArgs.GetBool( "finalBoss" );
+
+	// chextrek: spec #16/#43 (decomp-so/reference/trails.md's Notes, "edits inside stock functions"
+	// lead). Binary evidence: idActor::Spawn (0xb951e-0xb95b2) allocates a mkTrail when "hasTrail"
+	// is set, copies the entityDef named by "trailDef" into the trail's own spawnArgs (a fresh copy,
+	// not merged with this actor's), sets owner = this and calls Spawn() - no NULL check on the def
+	// in the reference, preserved as-is (def/chex_monster_flemoid.def's "trailDef" "trail" always
+	// resolves, and no other def sets "hasTrail" "1").
+	hasTrail = spawnArgs.GetBool( "hasTrail" );
+	if ( hasTrail ) {
+		trail = new mkTrail();
+		trail->owner = this;
+		trail->spawnArgs = *gameLocal.FindEntityDefDict( spawnArgs.GetString( "trailDef" ), false );
+		trail->Spawn();
+	}
 
 	FinishSetup();
 }

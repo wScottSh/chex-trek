@@ -21,6 +21,7 @@ set(src_game_mod
 	# (that you added to the ones already existant in the SDK/in dhewm3)
 	# like "game/MyFile.cpp" (without quotes, one file per line)
 	game/ChexTrekDump.cpp # chextrek
+	game/Trail.cpp # chextrek: spec #43 (mkTrail; not a stock dhewm3-sdk file, see Trail.h)
 )
 
 set(src_d3xp_mod
