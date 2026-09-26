@@ -28,7 +28,10 @@
 # drives directly - so this scenario boots to the main menu (proving AC1's own "from the main
 # menu" half: no map is loaded and chextrek_dump's level_stats/hud_map/customui lines all read
 # "none" at that point) and then uses the same `map sf_923` every other scenario uses, rather than
-# guessing at further GUI-only plumbing this sub-issue's AC doesn't ask for.
+# guessing at further GUI-only plumbing this sub-issue's AC doesn't ask for. (What "startgame"
+# itself does beyond that - e.g. whether it also touches `g_skill` from the menu's skill picker -
+# isn't confirmed against this engine build's own source, which isn't in this repo; the claim above
+# is id Tech 4's documented general behavior, not something read out of this build's binary.)
 #
 # --- "its exit (nextMap e1m1) loads e1m1": drives the real exit entity directly, not the GUI chain ---
 # The real, shipped path from sf_923's stats screen to e1m1 is a multi-step GUI chain (trigger
@@ -118,77 +121,98 @@ if [ -z "$LOCAL_LOG" ] || [ ! -f "$LOCAL_LOG" ]; then
 	exit 1
 fi
 
-# --- AC1: at the main menu (before "map sf_923"), no map/level is loaded yet ---
-# The first chextrek_dump (right after boot, before any map command) should show a level-less
-# state - proving this run really started "from the main menu", not from some already-loaded map
-# left over by a previous run. Checked by line position (the first "level_stats: none"/"hud_map:
-# none" pair must come before sf_923's own load line), not by counting "CHEXTREK-STATE-DUMP v1"
-# header occurrences: this build's log writer was observed, on a live run, to flush an extra bare
-# header line (no body) ahead of its own dump's real field lines during the heavy script-reload
-# spam a "map" command causes - a log-buffering quirk, not a missing/extra dump (every dump's own
-# "entities:"/"level_stats:"/etc. field lines, which is what the assertions below actually check,
-# were still all present, in order, and correctly paired with their own header).
-NONE_LINE="$(grep -nE '^level_stats: none$' "$LOCAL_LOG" | head -1 | cut -d: -f1)"
-HUD_NONE_LINE="$(grep -nE '^hud_map: none$' "$LOCAL_LOG" | head -1 | cut -d: -f1)"
-SF923_LOAD_LINE_PRECHECK="$(grep -nE '^ *[0-9]+ msec to load sf_923$' "$LOCAL_LOG" | head -1 | cut -d: -f1)"
-if [ -n "$NONE_LINE" ] && [ -n "$HUD_NONE_LINE" ] && [ -n "$SF923_LOAD_LINE_PRECHECK" ] && [ "$NONE_LINE" -lt "$SF923_LOAD_LINE_PRECHECK" ] && [ "$HUD_NONE_LINE" -lt "$SF923_LOAD_LINE_PRECHECK" ]; then
-	echo "PASS: the run started at the main menu with no level loaded (level_stats/hud_map both 'none' before 'map sf_923')"
-else
-	echo "FAIL: expected the first chextrek_dump (before 'map sf_923') to show level_stats/hud_map as 'none' (no level loaded yet)"
-	FAIL=1
-fi
+# shellcheck source=tools/lib-harness.sh
+source "${SCRIPT_DIR}/lib-harness.sh"
 
-# --- AC1: New Game loads sf_923 and it finishes loading ---
-if grep -qE '^ *[0-9]+ msec to load sf_923$' "$LOCAL_LOG"; then
+# --- AC1: New Game loads sf_923 and it finishes loading; AC2: its exit loads e1m1, and it comes
+# strictly after sf_923's own load in the log (not a stale artifact of a previous run, and not a
+# coincidental map switch that happened before the scenario ever triggered the exit) ---
+SF923_LINE="$(grep -nE '^ *[0-9]+ msec to load sf_923$' "$LOCAL_LOG" | head -1 | cut -d: -f1)"
+E1M1_LINE="$(grep -nE '^ *[0-9]+ msec to load e1m1$' "$LOCAL_LOG" | head -1 | cut -d: -f1)"
+if [ -n "$SF923_LINE" ]; then
 	echo "PASS: sf_923 finished loading"
 else
 	echo "FAIL: expected to see '<N> msec to load sf_923' in the log"
 	FAIL=1
 fi
-
-# --- AC1: sf_923 plays clean for N frames (three dumps survive with the always-on checks green
-# across the whole log; here, additionally, confirm sf_923's own known blockers are actually alive
-# and error-free: trigger_objective's objective slots and target_endlevelgui's stats-screen
-# wiring are reachable, matching #31/#33's own dumps on this same map) ---
-SF923_DUMP_COUNT="$(grep -cE '^ *[0-9]+ msec to load sf_923$|^ *[0-9]+ msec to load e1m1$' "$LOCAL_LOG")"
-if [ "$SF923_DUMP_COUNT" -ge 2 ]; then
-	echo "PASS: both sf_923 and e1m1 load messages are present in the log (sf_923 first, e1m1 after triggering its exit)"
-else
-	echo "FAIL: expected both '<N> msec to load sf_923' and '<N> msec to load e1m1' in the log, only found ${SF923_DUMP_COUNT} of the two"
-	FAIL=1
-fi
-
-# --- ordering: sf_923 must load strictly before e1m1 (not some stale artifact of a previous run,
-# and not a coincidental map switch that happened before the scenario ever triggered the exit) ---
-SF923_LINE="$(grep -nE '^ *[0-9]+ msec to load sf_923$' "$LOCAL_LOG" | head -1 | cut -d: -f1)"
-E1M1_LINE="$(grep -nE '^ *[0-9]+ msec to load e1m1$' "$LOCAL_LOG" | head -1 | cut -d: -f1)"
 if [ -n "$SF923_LINE" ] && [ -n "$E1M1_LINE" ] && [ "$E1M1_LINE" -gt "$SF923_LINE" ]; then
 	echo "PASS: e1m1's load message comes after sf_923's in the log (the real order a player reaches them)"
 else
-	echo "FAIL: expected e1m1's load line (${E1M1_LINE:-<none>}) to come after sf_923's (${SF923_LINE:-<none>})"
+	echo "FAIL: expected e1m1's load line (${E1M1_LINE:-<none>}) to come strictly after sf_923's (${SF923_LINE:-<none>})"
 	FAIL=1
 fi
 
-# --- AC2: e1m1 plays clean for N frames after loading (three post-load dumps, same technique as
-# sf_923 above) ---
-DUMP_HEADER_COUNT="$(grep -cF "CHEXTREK-STATE-DUMP v1" "$LOCAL_LOG")"
-# 1 (main menu) + 3 (sf_923) + 3 (e1m1) = 7 dumps total.
-if [ "$DUMP_HEADER_COUNT" -ge 7 ]; then
-	echo "PASS: all 7 expected chextrek_dump calls (1 main menu + 3 sf_923 + 3 e1m1) show up in the log"
+# --- Per-map state, checked by dump *position* rather than log line-number ranges: the console
+# script (above) issues exactly 7 chextrek_dump calls, in a fixed order - 1 at the main menu
+# (before "map sf_923"), 3 on sf_923, 3 on e1m1 - and every field chextrek_dump prints (including
+# "trails"/"level_stats") appears exactly once per dump, in that same order, so the Nth value
+# chextrek_line_field_values returns for any field is unambiguously that dump's own value. This is
+# more robust than bounding by the load-message line numbers: a stray, bodyless
+# "CHEXTREK-STATE-DUMP v1" header line was observed, on a live run, flushed to the log ahead of its
+# own dump's real field lines during the heavy script-reload spam a "map" command causes (a
+# log-buffering quirk, not a missing/extra dump - every dump's own field lines were still all
+# present, in order, paired with a header), which would have thrown off a scheme that counted
+# headers or bounded by raw line numbers instead.
+TRAILS_VALUES="$(chextrek_line_field_values "$LOCAL_LOG" trails)"
+LEVEL_STATS_VALUES="$(chextrek_line_field_values "$LOCAL_LOG" level_stats)"
+HUD_MAP_VALUES="$(chextrek_line_field_values "$LOCAL_LOG" hud_map)"
+
+DUMP_COUNT="$(echo "$TRAILS_VALUES" | grep -c .)"
+if [ "$DUMP_COUNT" -eq 7 ]; then
+	echo "PASS: all 7 expected chextrek_dump calls (1 main menu + 3 sf_923 + 3 e1m1) show up in the log, one 'trails:' line each"
 else
-	echo "FAIL: expected at least 7 'CHEXTREK-STATE-DUMP v1' headers (1 main menu + 3 sf_923 + 3 e1m1), got ${DUMP_HEADER_COUNT}"
+	echo "FAIL: expected exactly 7 'trails:' lines (1 main menu + 3 sf_923 + 3 e1m1 chextrek_dump calls), got ${DUMP_COUNT}"
 	FAIL=1
 fi
 
-# --- e1m1's own trailDef flemoids (spec #46's own "flemoids with trailDef (both)" blocker) are
-# alive post-load: e1m1 places 19 monster_flemoid, none overriding "hasTrail" (#43's own coverage
-# row notes this matches sf_923's own 19-minus-one-override baseline), so trails should read 19
-# once e1m1 has had a few frames to spawn them all. ---
-LAST_TRAILS="$(grep -oE '^trails: [0-9]+$' "$LOCAL_LOG" | tail -1 | grep -oE '[0-9]+$')"
-if [ "$LAST_TRAILS" = "19" ]; then
-	echo "PASS: e1m1's own 19 trailDef-carrying flemoids are alive post-load (trails=19 in the final dump)"
+# --- AC1: at the main menu (before "map sf_923"), no map/level is loaded yet - dump #1 ---
+DUMP1_LEVEL_STATS="$(echo "$LEVEL_STATS_VALUES" | sed -n '1p')"
+DUMP1_HUD_MAP="$(echo "$HUD_MAP_VALUES" | sed -n '1p')"
+if [ "$DUMP1_LEVEL_STATS" = "none" ] && [ "$DUMP1_HUD_MAP" = "none" ]; then
+	echo "PASS: the run started at the main menu with no level loaded (dump #1's level_stats/hud_map both 'none', before 'map sf_923')"
 else
-	echo "FAIL: expected the final dump's trails count to read 19 (e1m1's own placed flemoids, per #43's coverage row), got '${LAST_TRAILS}'"
+	echo "FAIL: expected dump #1 (before 'map sf_923') to show level_stats/hud_map as 'none' (no level loaded yet), got level_stats='${DUMP1_LEVEL_STATS}' hud_map='${DUMP1_HUD_MAP}'"
+	FAIL=1
+fi
+
+# --- AC1: sf_923 plays clean for N frames - dumps #2-#4, all three showing the same, stable,
+# map-specific state (sf_923 places 27 monster_flemoid... no, 27 total across monsters/items/
+# secrets found/total isn't a single count; the values below are sf_923's own real level_stats
+# totals and #43's own recorded trail baseline for this map - 18 live trails, one placed flemoid
+# short of e1m1's own 19 because sf_923 overrides "hasTrail" "0" on one of them). Checking all
+# three dumps (not just one) is what "sustained", not just "instantaneous", clean running means
+# here - the always-on checks already scan the whole log for ERROR/unknown-event/unknown-
+# spawnclass/script-compile lines, so this adds the map-specific evidence they don't.
+SF923_TRAILS="$(echo "$TRAILS_VALUES" | sed -n '2p;3p;4p')"
+SF923_LEVEL_STATS="$(echo "$LEVEL_STATS_VALUES" | sed -n '2p;3p;4p')"
+if [ "$(echo "$SF923_TRAILS" | sort -u)" = "18" ]; then
+	echo "PASS: sf_923's own 18 live trailDef-carrying flemoids stay alive across all 3 post-load dumps (trails=18 each time)"
+else
+	echo "FAIL: expected all 3 of sf_923's post-load dumps to read trails=18, got: $(echo "$SF923_TRAILS" | tr '\n' ' ')"
+	FAIL=1
+fi
+if [ "$(echo "$SF923_LEVEL_STATS" | sort -u | grep -c .)" = "1" ] && echo "$SF923_LEVEL_STATS" | head -1 | grep -qE '^monsters=[0-9]+/27 items=[0-9]+/30 secrets=[0-9]+/1$'; then
+	echo "PASS: sf_923's own level_stats totals (27 monsters/30 items/1 secret) are stable across all 3 post-load dumps"
+else
+	echo "FAIL: expected all 3 of sf_923's post-load dumps to show stable level_stats totals (.../27 .../30 .../1), got: $(echo "$SF923_LEVEL_STATS" | tr '\n' ' ')"
+	FAIL=1
+fi
+
+# --- AC2: e1m1 plays clean for N frames - dumps #5-#7, same technique as sf_923 above. e1m1's own
+# 19 placed monster_flemoid (spec #46's own "flemoids with trailDef (both)" blocker), none
+# overriding "hasTrail" (per #43's own coverage row), so trails should read 19 throughout. ---
+E1M1_TRAILS="$(echo "$TRAILS_VALUES" | sed -n '5p;6p;7p')"
+E1M1_LEVEL_STATS="$(echo "$LEVEL_STATS_VALUES" | sed -n '5p;6p;7p')"
+if [ "$(echo "$E1M1_TRAILS" | sort -u)" = "19" ]; then
+	echo "PASS: e1m1's own 19 trailDef-carrying flemoids stay alive across all 3 post-load dumps (trails=19 each time)"
+else
+	echo "FAIL: expected all 3 of e1m1's post-load dumps to read trails=19, got: $(echo "$E1M1_TRAILS" | tr '\n' ' ')"
+	FAIL=1
+fi
+if [ "$(echo "$E1M1_LEVEL_STATS" | sort -u | grep -c .)" = "1" ] && echo "$E1M1_LEVEL_STATS" | head -1 | grep -qE '^monsters=[0-9]+/22 items=[0-9]+/34 secrets=[0-9]+/3$'; then
+	echo "PASS: e1m1's own level_stats totals (22 monsters/34 items/3 secrets) are stable across all 3 post-load dumps"
+else
+	echo "FAIL: expected all 3 of e1m1's post-load dumps to show stable level_stats totals (.../22 .../34 .../3), got: $(echo "$E1M1_LEVEL_STATS" | tr '\n' ' ')"
 	FAIL=1
 fi
 
