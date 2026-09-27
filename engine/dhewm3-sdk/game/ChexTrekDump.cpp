@@ -94,6 +94,7 @@ idCVar chextrek_test_str14( "chextrek_test_str14", "\"chextrek_test_ai_monster\"
 // command (the same technique tools/test-door-open.sh uses for g_doorTraceDist) rather than
 // hardcoding one vector per scenario.
 idCVar chextrek_test_str15( "chextrek_test_str15", "'-256 184 64'", CVAR_GAME, "chextrek: test-only vector-literal holder for AFK harness scenarios (spec #42) - see ChexTrekDump.cpp" );
+idCVar chextrek_test_str16( "chextrek_test_str16", "\"flemriser\"", CVAR_GAME, "chextrek: test-only string-literal holder for AFK harness scenarios (bug #49) - see ChexTrekDump.cpp" );
 
 /*
 ==================
