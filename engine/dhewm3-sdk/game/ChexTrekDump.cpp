@@ -382,6 +382,15 @@ void ChexTrek_Dump_f( const idCmdArgs &args ) {
 	gameLocal.Printf( "ai_opendoor_last: %s\n", chextrekAIOpenDoorCount > 0 ? chextrekAIOpenDoorLast.c_str() : "none" );
 	gameLocal.Printf( "ai_blocked_last: %s\n", chextrekAIBlockedLast.c_str() );
 
+	// chextrek: bug #49. The projectile the player's current weapon fires - script/
+	// map_storage_facility.script's weap_disable() swaps it to a "_nodamage" def via setProj until
+	// weap_enable() runs.
+	if ( !player || !player->weapon.GetEntity() ) {
+		gameLocal.Printf( "weapon_projectile: none\n" );
+	} else {
+		gameLocal.Printf( "weapon_projectile: %s\n", player->weapon.GetEntity()->ChexTrek_GetProjectileDict().GetString( "classname", "none" ) );
+	}
+
 	// chextrek: spec #41 (decomp-so/reference/door-opening.md). idPlayer::tryOpen's locked-door
 	// branches call the already-stock idPlayer::ShowTip, which only sets HUD gui state - read
 	// directly here instead of adding a new hook, see the ChexTrek_Dump_f header comment above.
