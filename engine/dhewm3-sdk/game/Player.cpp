@@ -1128,6 +1128,28 @@ playerStats_s *idPlayer::getLevelStats( void ) {
 
 /*
 ==============
+SetLevelStatsVars
+
+chextrek: #52. The GUI state variable names idTarget_EndLevelGUI shows each levelStats line
+through. Set by idPlayer::Spawn (as the binary does) and again by idPlayer::Restore, which
+saves only the counts, not these pointers.
+==============
+*/
+static void SetLevelStatsVars( playerStats_s *stats ) {
+	stats[ 0 ].totalVar		= "ai_total";
+	stats[ 0 ].foundVar		= "ai_killed";
+	stats[ 0 ].percentVar	= "ai_percent";
+	stats[ 1 ].totalVar		= "items_total";
+	stats[ 1 ].foundVar		= "items_found";
+	stats[ 1 ].percentVar	= "items_percent";
+	stats[ 2 ].totalVar		= "secrets_total";
+	stats[ 2 ].foundVar		= "secrets_found";
+	stats[ 2 ].percentVar	= "secrets_percent";
+	stats[ 3 ].totalVar		= "level_time";
+}
+
+/*
+==============
 idPlayer::useCustomUI
 
 chextrek: spec #16/#33 (decomp-so/reference/custom-ui.md).
@@ -1986,16 +2008,7 @@ void idPlayer::Spawn( void ) {
 	// idTarget_EndLevelGUI::Event_Activate) and sets the 10 GUI state variable names).
 	gameLocal.GetLevelStats( levelStats );
 	levelStats[ 3 ].total			= gameLocal.time;
-	levelStats[ 0 ].totalVar		= "ai_total";
-	levelStats[ 0 ].foundVar		= "ai_killed";
-	levelStats[ 0 ].percentVar		= "ai_percent";
-	levelStats[ 1 ].totalVar		= "items_total";
-	levelStats[ 1 ].foundVar		= "items_found";
-	levelStats[ 1 ].percentVar		= "items_percent";
-	levelStats[ 2 ].totalVar		= "secrets_total";
-	levelStats[ 2 ].foundVar		= "secrets_found";
-	levelStats[ 2 ].percentVar		= "secrets_percent";
-	levelStats[ 3 ].totalVar		= "level_time";
+	SetLevelStatsVars( levelStats );
 
 	SetLastHitTime( 0 );
 
@@ -2354,6 +2367,15 @@ void idPlayer::Save( idSaveGame *savefile ) const {
 	savefile->WriteString( mapMaterial );
 	savefile->Write( hudmap_alpha, sizeof( hudmap_alpha ) );
 
+	// chextrek: #52 (decomp-so/reference/end-level-stats.md). The binary writes all 0x50 bytes
+	// of levelStats right here (0x152efb-0x152f14); without them a loaded game's stats screen had
+	// no counts and NULL GUI variable names. The counts only: the name pointers are re-set by
+	// Restore instead of being read back as raw pointers into a DLL that may load elsewhere.
+	for ( i = 0; i < 4; i++ ) {
+		savefile->WriteInt( levelStats[ i ].total );
+		savefile->WriteInt( levelStats[ i ].found );
+	}
+
 	if ( hud ) {
 		hud->SetStateString( "message", common->GetLanguageDict()->GetString( "#str_02916" ) );
 		hud->HandleNamedEvent( "Message" );
@@ -2615,6 +2637,13 @@ void idPlayer::Restore( idRestoreGame *savefile ) {
 	savefile->ReadVec4( mapCoords );
 	savefile->ReadString( mapMaterial );
 	savefile->Read( hudmap_alpha, sizeof( hudmap_alpha ) );
+	// chextrek: #52. Same order Save wrote them in (the binary reads levelStats here,
+	// 0x168c8e-0x168cab).
+	for ( i = 0; i < 4; i++ ) {
+		savefile->ReadInt( levelStats[ i ].total );
+		savefile->ReadInt( levelStats[ i ].found );
+	}
+	SetLevelStatsVars( levelStats );
 	// Not re-uploaded to the render texture here, same as Cmd_ShowMap_f (above) - only
 	// updateHudMapAlpha's own reveal does that. In practice that happens on the very next frame
 	// for almost any restored position: the constructor above zeroes lastRevealOrigin, so

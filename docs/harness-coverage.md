@@ -64,7 +64,8 @@ Detail lives where each bullet points; this list is the index.
 
 **Port choices and fixes beyond the reconstruction** (each in that reference file's Notes).
 - `idTarget_EndLevelGUI::Spawn` zeroes `ticSound` (crash fix); `idMover_Binary` `secret`/
-  `secretFound` are saved (binary unchecked): `decomp-so/reference/end-level-stats.md`.
+  `secretFound` are saved (binary unchecked); `idPlayer` saves `levelStats` counts, not its
+  name pointers (#52): `decomp-so/reference/end-level-stats.md`.
 - `idPlayer` constructor defaults for the unsaved HUD-map members (a savegame load never runs
   `Spawn`/`Init`); `hudmap_alpha` saved in one bulk write: `decomp-so/reference/hud-map.md`.
 - `mkTrail`: `callbackData` instead of the `entityNum` pointer cast; `addNewAnchor` bounds guard
