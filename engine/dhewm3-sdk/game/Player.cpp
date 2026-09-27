@@ -4210,6 +4210,12 @@ void idPlayer::SelectWeapon( int num, bool force ) {
 		return;
 	}
 
+	// chextrek: #51/#52 (decomp-so/reference/custom-ui.md; edits-inside-stock-functions lead,
+	// 0x161374): no weapon switching while a custom UI (the end-level stats screen) is up.
+	if ( customUI ) {
+		return;
+	}
+
 	if ( ( num < 0 ) || ( num >= MAX_WEAPONS ) ) {
 		return;
 	}
@@ -5517,7 +5523,9 @@ void idPlayer::UpdateViewAngles( void ) {
 	int i;
 	idAngles delta;
 
-	if ( !noclip && ( gameLocal.inCinematic || privateCameraView || gameLocal.GetCamera() || influenceActive == INFLUENCE_LEVEL2 || objectiveSystemOpen ) ) {
+	// chextrek: #51/#52 (decomp-so/reference/custom-ui.md; edits-inside-stock-functions lead,
+	// 0x155310): no view changes while a custom UI is up.
+	if ( !noclip && ( gameLocal.inCinematic || privateCameraView || gameLocal.GetCamera() || influenceActive == INFLUENCE_LEVEL2 || objectiveSystemOpen || customUI ) ) {
 		// no view changes at all, but we still want to update the deltas or else when
 		// we get out of this mode, our view will snap to a kind of random angle
 		UpdateDeltaViewAngles( viewAngles );
@@ -6886,7 +6894,9 @@ void idPlayer::Think( void ) {
 		oldFlags = usercmd.flags;
 	}
 
-	if ( objectiveSystemOpen || gameLocal.inCinematic || influenceActive ) {
+	// chextrek: #51/#52 (decomp-so/reference/custom-ui.md; edits-inside-stock-functions lead,
+	// 0x16e851): no movement while a custom UI is up.
+	if ( objectiveSystemOpen || gameLocal.inCinematic || influenceActive || customUI ) {
 		if ( objectiveSystemOpen && AI_PAIN ) {
 			TogglePDA();
 		}
@@ -8487,7 +8497,10 @@ void idPlayer::ClientPredictionThink( void ) {
 	buttonMask &= usercmd.buttons;
 	usercmd.buttons &= ~buttonMask;
 
-	if ( objectiveSystemOpen ) {
+	// chextrek: #51/#52 (decomp-so/reference/custom-ui.md; edits-inside-stock-functions lead,
+	// 0x16cebf): no movement while a custom UI is up. The binary tests only customUI here; the
+	// stock objectiveSystemOpen test is kept, as in ActiveGui.
+	if ( objectiveSystemOpen || customUI ) {
 		usercmd.forwardmove = 0;
 		usercmd.rightmove = 0;
 		usercmd.upmove = 0;
