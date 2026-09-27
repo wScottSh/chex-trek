@@ -23901,7 +23901,7 @@ Version 2
 "name" "trigger_relay_2"
 "origin" "-1032 264 96"
 "target" "target_tip_1"
-"delay" "7"
+"delay" "4"
 "target1" "trigger_relay_3"
 "target2" "speaker_17"
 }
@@ -34473,7 +34473,7 @@ Version 2
 "classname" "trigger_relay"
 "name" "trigger_relay_3"
 "origin" "-1064 320 96"
-"delay" "15"
+"delay" "11"
 "target" "target_tip_2"
 "call" "map_storage_facility::weap_enable"
 "target2" "speaker_18"
