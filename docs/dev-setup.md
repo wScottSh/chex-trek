@@ -5,7 +5,9 @@ one-time, per-machine setup the build and harness scripts assume. Everything her
 repo on purpose - see "Why none of this lives in the repo" below. The harness's *interface*
 (`tools/build-chextrek.sh`, `tools/run-harness.sh`, `tools/run-all-tests.sh`, every
 `tools/test-*.sh`) is identical on both machines; only the one-time setup and a few internals
-differ.
+differ. The one current exception is `tools/build-chextrek.sh` itself, which only knows how to
+build on Windows - see "Unicron (Linux/Wine)" below for what that means for `run-all-tests.sh`
+until the Linux build step exists.
 
 ## Windows dev machine
 
