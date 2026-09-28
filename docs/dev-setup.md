@@ -53,12 +53,12 @@ Environment variables (all optional; Linux-specific defaults live in `tools/lib-
 
 One-time setup: `tools/msvc-wine/build-image.sh` builds the `chextrek-msvc-wine:14.50.18.0-x86`
 Docker image from `tools/msvc-wine/Dockerfile`. That Dockerfile pins everything a rebuild needs to
-reproduce the same compiler months later:
+reproduce the same MSVC toolset months later:
 
 - **msvc-wine** (https://github.com/mstorsjo/msvc-wine, ISC license, not vendored into this repo),
   pinned at a fixed commit, fetches and wraps the real MSVC toolchain so `cl`/`link`/`lib`/etc. run
   transparently under Wine from Linux.
-- **MSVC 14.50.18.0 (VS 18), x86-only** - the exact compiler version `tools/build-chextrek.sh`'s
+- **MSVC 14.50.18.0 (VS 18), x86-only** - the same MSVC toolset `tools/build-chextrek.sh`'s
   Windows branch gets from the "Visual Studio 18 2026" generator (spec #28's pin). Downloading it
   requires accepting the Visual Studio Build Tools license terms
   (https://go.microsoft.com/fwlink/?LinkId=2327714 at the time of pinning) - spec #64's AC requires

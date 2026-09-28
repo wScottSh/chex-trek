@@ -51,8 +51,11 @@ RUN PYTHONUNBUFFERED=1 /opt/msvc-wine-src/vsdownload.py --accept-license \
 
 # vsdownload.py falls back to "whatever's latest" (silently) if the pinned MSVC_VERSION isn't in
 # the manifest it fetches live from Microsoft at build time, instead of failing - guard against
-# that quietly drifting this "pinned" image onto a different compiler.
+# that quietly drifting this "pinned" image onto a different compiler. `cl` itself is a wine
+# invocation (msvc-wine's wrapper script), so wait for wineserver to exit after, same as the
+# wineboot step above, or this layer can close with an unflushed prefix.
 RUN CL_VERSION="$(/opt/msvc/bin/x86/cl 2>&1)"; \
+	while pgrep wineserver > /dev/null; do sleep 1; done; \
 	echo "$CL_VERSION" | grep -qE "Version 19\.50\." || \
 	(echo "error: expected MSVC 14.50.x (cl reporting Version 19.50.x), got:" >&2 && \
 	 echo "$CL_VERSION" >&2 && exit 1)

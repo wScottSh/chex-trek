@@ -23,7 +23,7 @@ Linux*)
 	# Unicron (Linux/Wine, spec #58/#64): same CMake project options as Windows
 	# (BASE=ON, BASE_NAME=chextrek, D3XP=OFF, 32-bit), built with Ninja against the pinned
 	# MSVC-14.50.18.0-x86-under-Wine toolchain, packaged as a container image so a rebuild
-	# months later reproduces the same compiler. One-time setup: tools/msvc-wine/build-image.sh
+	# months later reproduces the same MSVC toolset. One-time setup: tools/msvc-wine/build-image.sh
 	# (see docs/dev-setup.md). Keep this tag in sync with tools/msvc-wine/build-image.sh.
 	CHEXTREK_MSVC_IMAGE="chextrek-msvc-wine:14.50.18.0-x86"
 
