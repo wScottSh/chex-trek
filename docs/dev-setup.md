@@ -61,7 +61,7 @@ reproduce the same compiler months later:
 - **MSVC 14.50.18.0 (VS 18), x86-only** - the exact compiler version `tools/build-chextrek.sh`'s
   Windows branch gets from the "Visual Studio 18 2026" generator (spec #28's pin). Downloading it
   requires accepting the Visual Studio Build Tools license terms
-  (https://go.microsoft.com/fwlink/?LinkId=2327714 at the time of pinning) - spec #58 AC requires
+  (https://go.microsoft.com/fwlink/?LinkId=2327714 at the time of pinning) - spec #64's AC requires
   the owner to confirm this use is acceptable before this lands; record that confirmation on this
   sub-issue's PR, not here.
 - `winbind`, needed for CMake's MSVC probe (`/Zi`+`/FS` spawn a background `mspdbsrv.exe` under
@@ -80,17 +80,17 @@ rather than adding the dependency) then:
    `/MANIFEST:NO`: this MSVC-under-Wine `link.exe` doesn't produce the side-car manifest CMake's
    default rule expects to feed to `mt.exe` afterwards (`mt` then fails, "File not found") -
    `chextrek.dll` doesn't need a manifest embedded, so the fix is to not ask for one.
-3. Builds with `cmake --build engine/build --target base`, then `chown`s `engine/build` back from
-   `root` (the container's user - it needs `root`'s own wine prefix, baked into the image at
-   image-build time) to the invoking user before the container exits.
+3. Builds with `cmake --build engine/build --target base`. An `EXIT` trap `chown`s `engine/build`
+   back from `root` (the container's user - it needs `root`'s own wine prefix, baked into the
+   image at image-build time) to the invoking user before the container exits either way, so a
+   failed configure or build doesn't leave it un-owned by the invoking user.
 4. The same shared copy step as Windows then copies the resulting `chextrek.dll`/`.pdb` from
    `engine/build` to the repo root.
 
 The result is a `PE32 executable (DLL), Intel 80386` - the same MSVC-ABI binary format the official
-win32 dhewm3 1.5.5 (spec #59) loads. Prove it by running `tools/test-menu-smoke.sh` on Unicron
-without `CHEXTREK_SKIP_BUILD` set: it builds via this Linux branch, then passes every always-on
-check against the result - this was confirmed while developing #64, and the same run reproduces it
-on demand.
+win32 dhewm3 1.5.5 (spec #59) loads. `tools/test-menu-smoke.sh` on Unicron, run without
+`CHEXTREK_SKIP_BUILD` set, is the reproducible proof: it builds via this Linux branch, then checks
+that result against every always-on check. See the #64 PR for a run of it.
 
 **This is noticeably slower than the Windows/MSBuild build** - every `cl`/`link` invocation pays
 Wine per-process startup overhead - expect it to take much longer wall-clock than a native Windows

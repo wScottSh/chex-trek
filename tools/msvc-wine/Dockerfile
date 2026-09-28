@@ -1,16 +1,17 @@
 # Pinned Linux build toolchain for chex-trek spec #58/#64: MSVC 14.50.18.0 (VS 18), x86-only
 # target - the same compiler version tools/build-chextrek.sh's Windows branch gets from the
 # "Visual Studio 18 2026" generator. The RUN step below fails the image build outright if
-# vsdownload.py can't get exactly that version (it falls back to "whatever's latest" instead of
-# erroring by default) - see that step's comment. The rest of this image (Ubuntu base image,
-# apt packages, the msvc-wine commit) is a normal, not cryptographically pinned, dependency set;
-# rebuilding it later gets the same MSVC/SDK version, not necessarily identical package builds.
+# vsdownload.py doesn't land on that toolset (it falls back to "whatever's latest" instead of
+# erroring by default) - see that step's comment. The check is toolset-granularity (MSVC 14.50.x,
+# i.e. cl reporting 19.50.x - Microsoft ships several compiler point releases within one toolset),
+# not byte-for-byte; the rest of this image (Ubuntu base image, apt packages, the msvc-wine commit)
+# is a normal, not cryptographically pinned, dependency set.
 #
 # This image is built once per Unicron setup (tools/msvc-wine/build-image.sh; see
 # docs/dev-setup.md's "Unicron (Linux/Wine)" section), then reused by every
 # tools/build-chextrek.sh run - it is never rebuilt as part of an ordinary build. Record the
 # resulting `docker image inspect --format '{{.Id}}'` digest alongside the version pin when you
-# do a setup (spec #58 AC3: "the toolchain is pinned ... and recorded").
+# do a setup (spec #64's AC: "the toolchain is pinned (image and MSVC version recorded)").
 #
 # msvc-wine (https://github.com/mstorsjo/msvc-wine, ISC license) does the actual MSVC
 # download/unpack/wine-wrapping; it is a separate upstream project, pinned by commit below and
@@ -40,8 +41,8 @@ RUN mkdir -p /opt/msvc-wine-src && \
 # Downloads and unpacks the pinned MSVC/WinSDK (x86 host+target only - this repo never needs
 # x64/ARM), then wraps it with wine-invoking cl/link/lib/etc scripts under /opt/msvc/bin/x86.
 # --accept-license: downloading VS Build Tools components requires accepting Microsoft's license
-# terms (https://go.microsoft.com/fwlink/?LinkId=2327714 at the time of pinning). Per spec #58 AC,
-# the owner must confirm this use is acceptable before this lands - see docs/dev-setup.md and
+# terms (https://go.microsoft.com/fwlink/?LinkId=2327714 at the time of pinning). Per spec #64's
+# AC, the owner must confirm this use is acceptable before this lands - see docs/dev-setup.md and
 # record that confirmation on the #64 PR, not here.
 RUN PYTHONUNBUFFERED=1 /opt/msvc-wine-src/vsdownload.py --accept-license \
 		--msvc-version "${MSVC_VERSION}" --architecture "${MSVC_ARCH}" --dest /opt/msvc && \
@@ -51,7 +52,9 @@ RUN PYTHONUNBUFFERED=1 /opt/msvc-wine-src/vsdownload.py --accept-license \
 # vsdownload.py falls back to "whatever's latest" (silently) if the pinned MSVC_VERSION isn't in
 # the manifest it fetches live from Microsoft at build time, instead of failing - guard against
 # that quietly drifting this "pinned" image onto a different compiler.
-RUN /opt/msvc/bin/x86/cl 2>&1 | grep -qE "Version 19\.50\." || \
-	(echo "error: expected MSVC 14.50.x (cl 19.50.x), got a different version - see cl output above" >&2 && exit 1)
+RUN CL_VERSION="$(/opt/msvc/bin/x86/cl 2>&1)"; \
+	echo "$CL_VERSION" | grep -qE "Version 19\.50\." || \
+	(echo "error: expected MSVC 14.50.x (cl reporting Version 19.50.x), got:" >&2 && \
+	 echo "$CL_VERSION" >&2 && exit 1)
 
 ENV PATH="/opt/msvc/bin/x86:${PATH}"
