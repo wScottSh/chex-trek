@@ -261,6 +261,59 @@ repo/a real `gh` outside that self-test):
 The DLL is still never committed (same as always - see "Why none of this lives in the repo"); the
 release is the only place a built `chextrek.dll` is ever published.
 
+### Playing the latest green build (Windows, spec #58/#69)
+
+On the Windows PC, in Git Bash, from the checkout the `Doom 3\chextrek` symlink points at:
+
+```
+bash tools/fetch-and-play.sh
+```
+
+This is spec #58's final piece - the owner's one command to play the latest Unicron-built,
+harness-proven `chextrek.dll`. It:
+
+1. **Refuses on a dirty working tree** (uncommitted changes) before touching anything else - it
+   never discards local work. #70 later adds an explicit AC, its own self-test coverage, and a
+   commit argument (play/bisect a specific release, not just Latest) on top of this; this refusal
+   ships now anyway, because running without it in the meantime would mean every play session
+   silently threw away whatever the owner had checked out and hadn't committed - not a missing
+   feature, an active hazard.
+2. Resolves the release marked Latest (`gh release view`, no tag) and checks both `chextrek.dll`
+   and `chextrek.pdb` are attached to it, before touching `HEAD`.
+3. Fetches and checks out that release's target commit, detached, so mod data (maps/scripts/defs)
+   matches the DLL about to be played.
+4. Downloads `chextrek.dll` + `chextrek.pdb` from that release into the checkout root (the same
+   gitignored place `tools/build-chextrek.sh` writes to).
+5. Points the `chextrek` mount at this checkout (`tools/lib-harness.sh`'s
+   `chextrek_ensure_mount_or_exit` - the same mount every harness run uses, factored out so this
+   command and the harness share exactly one mount implementation) and launches `dhewm3` with
+   `+set fs_basepath`/`+set fs_game chextrek`/`+set fs_gameDllPath` pointed at this checkout, the
+   same engine conventions as `tools/run-harness.sh` - but interactively: no console script, no
+   timeout. The owner plays until they quit; the script's own exit status is whatever `dhewm3`
+   exits with.
+
+**Exit status:** `0` once `dhewm3` has been launched (its own exit status is passed through once
+the owner quits). `1` on any refusal before ever launching anything - a dirty working tree, no
+Latest release (or one missing an asset), a git/gh failure, or a missing engine/mount problem. On a
+`1`, the working tree, `HEAD`, and `chextrek.dll`/`chextrek.pdb` are all left exactly as they were.
+
+Also injectable, mainly for `tools/test-fetch-and-play.sh` (never point this at the real
+repo/a real `gh` outside that self-test):
+
+- `CHEXTREK_FETCH_REPO` - `owner/repo` passed to every `gh` call. Defaults to the `owner/repo`
+  parsed from this checkout's own `origin` remote, the same parsing
+  `tools/pipeline-process-commit.sh` uses.
+
+**What's proven where:** `tools/test-fetch-and-play.sh` runs on Unicron against a local bare git
+repo standing in for the real GitHub remote, a stubbed `gh`, and stubbed `wine`/`winepath`/
+`dhewm3.exe` that record the engine invocation instead of launching anything - it proves the dirty-
+tree refusal, the release/asset resolution, the detached checkout landing on the release's exact
+commit (not just the branch tip), the download, the mount, and the exact engine launch arguments
+(`fs_basepath`/`fs_game`/`fs_gameDllPath`), all without a display, a real engine, or a real repo.
+It cannot prove the two things only the owner, on real Windows, can: that the engine log shows
+`chextrek.dll loaded`, and that the game is actually playable. Those are spec #58's own final
+acceptance checks - see the #69 PR/issue for the exact command and what to look for in the log.
+
 ## Building
 
 ```

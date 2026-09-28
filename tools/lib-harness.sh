@@ -7,6 +7,9 @@
 #     a timeout, archives the run's log/screenshots/cfg outside the repo, and asserts the spec #28
 #     always-on checks (chextrek.dll loaded, state-dump header present, no ERROR/unknown-event/
 #     unknown-spawnclass/script-compile lines, no timeout kill).
+#   chextrek_ensure_mount_or_exit - just the "chextrek" mount step on its own (#69): shared by
+#     chextrek_run_console_script and tools/fetch-and-play.sh, which needs the mount but not a
+#     console script, a timeout or the display/lock machinery.
 #   chextrek_log_has_no_display / chextrek_exit_no_display - the no-display environment stop
 #     (exit 3) the run makes when there's no way to open a window (Windows: this session has no
 #     active desktop; Linux/Wine: the display this run had died mid-run).
@@ -407,6 +410,55 @@ _chextrek_release_lock() {
 	CHEXTREK_LOCK_FD=""
 }
 
+# chextrek_ensure_mount_or_exit REPO_ROOT
+#
+# Points the ${DOOM3_BASEPATH}/chextrek mount at REPO_ROOT, creating or repointing the symlink as
+# needed. On Windows this must be a real NTFS symlink (`MSYS=winsymlinks:nativestrict ln -s`) -
+# plain `ln -s` on a directory silently falls back to a full recursive copy on this toolchain when
+# it can't get symlink privilege, which would test stale content instead of failing loudly; Unicron
+# (Linux/Wine, #60) has no such privilege quirk, a plain `ln -s` creates a real symlink outright.
+# Either way the result is verified with `readlink` before it's trusted, so a silent fallback is
+# caught the same way on both platforms. See docs/dev-setup.md's "Why none of this lives in the
+# repo" for the full story.
+#
+# Shared by chextrek_run_console_script (every scenario run) and tools/fetch-and-play.sh (#69) -
+# the owner's play command needs exactly this same mount, not a scenario run, so it calls this
+# directly rather than going through the console-script/timeout/display machinery below, which it
+# doesn't want (interactive play has no console script and no timeout).
+#
+# Never exits: prints an `error:` line and returns 1 on failure so each caller decides what "the
+# mount failed" becomes (the harness turns it into CHEXTREK_RUN_STATUS=1; fetch-and-play into its
+# own exit 1). Returns 0 (no-op, nothing printed) when the mount already points at REPO_ROOT.
+chextrek_ensure_mount_or_exit() {
+	local REPO_ROOT="$1"
+	local MOD_LINK="${DOOM3_BASEPATH}/chextrek"
+	local CURRENT_TARGET=""
+	if [ -L "$MOD_LINK" ]; then
+		CURRENT_TARGET="$(readlink "$MOD_LINK" 2>/dev/null || true)"
+	fi
+	local WANT_TARGET
+	WANT_TARGET="$(cd "$REPO_ROOT" && pwd -P)"
+	if [ "$CURRENT_TARGET" = "$WANT_TARGET" ]; then
+		return 0
+	fi
+	if [ -e "$MOD_LINK" ] && [ ! -L "$MOD_LINK" ]; then
+		echo "error: ${MOD_LINK} exists and is a real directory, not a symlink. Refusing to touch it - remove it by hand (see docs/dev-setup.md) and re-run." >&2
+		return 1
+	fi
+	echo "==> Pointing ${MOD_LINK} at ${WANT_TARGET}"
+	rm -f "$MOD_LINK"
+	if chextrek_is_linux; then
+		ln -s "$WANT_TARGET" "$MOD_LINK"
+	else
+		MSYS=winsymlinks:nativestrict ln -s "$WANT_TARGET" "$MOD_LINK"
+	fi
+	if [ "$(readlink "$MOD_LINK" 2>/dev/null)" != "$WANT_TARGET" ]; then
+		echo "error: couldn't create a real symlink at ${MOD_LINK} (no symlink privilege?). See docs/dev-setup.md." >&2
+		return 1
+	fi
+	return 0
+}
+
 # chextrek_run_console_script REPO_ROOT CONSOLE_SCRIPT_BODY TIMEOUT_SECS RUN_LABEL
 #
 # CONSOLE_SCRIPT_BODY is the full text written to the .cfg file dhewm3 execs (including
@@ -519,31 +571,9 @@ _chextrek_run_console_script_impl() {
 	# creates a real symlink outright (spike #59 confirmed this "just works" unmodified) - but the
 	# readlink verification below still applies on both, so a silent fallback would be caught the
 	# same way.
-	local MOD_LINK="${DOOM3_BASEPATH}/chextrek"
-	local CURRENT_TARGET=""
-	if [ -L "$MOD_LINK" ]; then
-		CURRENT_TARGET="$(readlink "$MOD_LINK" 2>/dev/null || true)"
-	fi
-	local WANT_TARGET
-	WANT_TARGET="$(cd "$REPO_ROOT" && pwd -P)"
-	if [ "$CURRENT_TARGET" != "$WANT_TARGET" ]; then
-		if [ -e "$MOD_LINK" ] && [ ! -L "$MOD_LINK" ]; then
-			echo "error: ${MOD_LINK} exists and is a real directory, not a symlink. Refusing to touch it - remove it by hand (see docs/dev-setup.md) and re-run." >&2
-			CHEXTREK_RUN_STATUS=1
-			return 1
-		fi
-		echo "==> Pointing ${MOD_LINK} at ${WANT_TARGET}"
-		rm -f "$MOD_LINK"
-		if chextrek_is_linux; then
-			ln -s "$WANT_TARGET" "$MOD_LINK"
-		else
-			MSYS=winsymlinks:nativestrict ln -s "$WANT_TARGET" "$MOD_LINK"
-		fi
-		if [ "$(readlink "$MOD_LINK" 2>/dev/null)" != "$WANT_TARGET" ]; then
-			echo "error: couldn't create a real symlink at ${MOD_LINK} (no symlink privilege?). See docs/dev-setup.md." >&2
-			CHEXTREK_RUN_STATUS=1
-			return 1
-		fi
+	if ! chextrek_ensure_mount_or_exit "$REPO_ROOT"; then
+		CHEXTREK_RUN_STATUS=1
+		return 1
 	fi
 
 	# --- dhewm3 hardcodes its per-user save folder (Documents/My Games/dhewm3); that's our
