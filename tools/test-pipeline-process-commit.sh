@@ -316,20 +316,23 @@ run_pipeline() {
 	# silently inherit that and this case would test nothing). Same reasoning for
 	# CHEXTREK_PIPELINE_TAG_PREFIX below - none of these fake suites care about it, but this
 	# self-test's own tag-computing helpers all hardcode the "win-" default, so a stray ambient
-	# override would break their assertions, not the pipeline itself.
+	# override would break their assertions, not the pipeline itself. Same reasoning for
+	# CHEXTREK_PIPELINE_RED_LABEL/CHEXTREK_PIPELINE_RED_TITLE: every issue-related assertion in
+	# this self-test hardcodes "pipeline:red" and the default title, so a stray ambient override of
+	# either would fail those assertions without the pipeline itself doing anything wrong.
 	#
 	# CHEXTREK_SKIP_BUILD is deliberately *not* scrubbed here - case "ambient CHEXTREK_SKIP_BUILD"
 	# below needs it to reach the real pipeline script un-stripped, to prove that script's own
 	# internal `unset` (not this test harness) is what protects the suite command from it.
 	local SHA="$1" SUITE="$2" REPO_OVERRIDE="${3-stub/testrepo}" REPO_DIR="${4:-$REPO}"
 	if [ -n "$REPO_OVERRIDE" ]; then
-		env -u CHEXTREK_PIPELINE_TAG_PREFIX \
+		env -u CHEXTREK_PIPELINE_TAG_PREFIX -u CHEXTREK_PIPELINE_RED_LABEL -u CHEXTREK_PIPELINE_RED_TITLE \
 			CHEXTREK_PIPELINE_REPO="$REPO_OVERRIDE" \
 			CHEXTREK_PIPELINE_STATE_DIR="$STATE_DIR" \
 			CHEXTREK_PIPELINE_SUITE_CMD="bash \"$SUITE\"" \
 			bash "${REPO_DIR}/tools/pipeline-process-commit.sh" "$SHA"
 	else
-		env -u CHEXTREK_PIPELINE_REPO -u CHEXTREK_PIPELINE_TAG_PREFIX \
+		env -u CHEXTREK_PIPELINE_REPO -u CHEXTREK_PIPELINE_TAG_PREFIX -u CHEXTREK_PIPELINE_RED_LABEL -u CHEXTREK_PIPELINE_RED_TITLE \
 			CHEXTREK_PIPELINE_STATE_DIR="$STATE_DIR" \
 			CHEXTREK_PIPELINE_SUITE_CMD="bash \"$SUITE\"" \
 			bash "${REPO_DIR}/tools/pipeline-process-commit.sh" "$SHA"
@@ -625,7 +628,7 @@ CODE6E=$?
 if [ $CODE6E -eq 0 ]; then pass "exits 0 - the recheck after the failed create found the release"; else fail "exit code $CODE6E, want 0"; echo "$OUT6E"; fi
 if [ "$(count_create_calls "$TAG_CREATE_RACE")" = "1" ]; then pass "the recheck itself never re-attempted a create - one release, not a duplicate"; else fail "expected exactly one create attempt, found $(count_create_calls "$TAG_CREATE_RACE")"; fi
 if [ -z "$OPEN_ISSUE_BEFORE_6E" ]; then
-	fail "expected an open pipeline:red issue going into case 6e (case 4e should have left one open)"
+	fail "expected an open pipeline:red issue going into case 6e (the dedicated red run just above should have opened one)"
 elif [ "$(count_gh_calls issue close)" = "$((CLOSE_CALLS_BEFORE_6E + 1))" ] && [ "$(issue_state "$OPEN_ISSUE_BEFORE_6E")" = "closed" ]; then
 	pass "the 'lost the race but the release exists' recheck also closed the still-open red issue"
 else

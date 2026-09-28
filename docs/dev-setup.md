@@ -293,23 +293,32 @@ notification, without ever spamming a second issue for the same ongoing problem:
   tracker rather than risk a duplicate open or a wrongly-skipped close - the failure is logged as a
   WARNING in that run's own archive log, and a still-open issue waits for a later run.
 
+This all assumes commits are processed in order, one at a time - true for a by-hand run today, and
+for #68's poller (one commit fully processed before the next is picked up). It isn't proven safe
+against two *different* commits being processed concurrently: e.g. two red commits racing could
+both see no issue open and both create one, or a fresh green publish of an old, out-of-order commit
+could close an issue a genuinely later, still-red commit opened. The per-commit lock above only
+serializes two runs of the *same* commit.
+
 `tools/test-pipeline-process-commit.sh` covers the label/issue create-vs-comment-vs-close logic end
 to end against a stubbed `gh` (never the real repo), including the `gh issue list` failure case and
 the idempotent-path-doesn't-falsely-close case above. **Live-verified** against the real
-`wScottSh/chex-trek` repo and a real `gh`: opening a real `pipeline:red` issue, commenting on it
-instead of duplicating for a second red run, commenting on it again worded as an environment
-blocker, and finally closing it with a comment. All four `gh label`/`gh issue` calls (create,
-comment x2, close) were real, against real throwaway branch commits (all four ran successfully
-against the real repo whether or not the underlying commit would itself have built and passed).
+`wScottSh/chex-trek` repo and a real `gh`: opening a real `pipeline:red` issue from a throwaway
+branch commit, commenting on it instead of duplicating for a second red run (another throwaway
+commit), commenting on it again worded as an environment blocker, and finally closing it with a
+comment - that last run against `a39130d` itself (already known-green, not a throwaway commit).
+All four `gh label`/`gh issue` calls (create, comment x2, close) were real, against the real repo.
 Two things stayed simulated/dry-run rather than real, for this verification specifically, so it
 didn't wait on a full ~25-minute suite run four times over: the suite outcome itself (red/blocked/
-green) was chosen via `CHEXTREK_PIPELINE_SUITE_CMD`, not by actually building and testing each
-throwaway commit - that build+test path was separately, genuinely proven 24/24 green (see "Running
-the tests" below); and release publishing stayed stubbed/dry-run (no real release/tag is allowed
-yet - see "Publishing pipeline" above), so the closing comment's release link is a dry-run URL, not
-a real one. That verification issue was `wScottSh/chex-trek#72` - left closed, with a summary
-comment identifying it as this run and spelling out exactly what was real vs. simulated, once the
-verification finished (not the same issue as this spec ticket, #67).
+green) was chosen via `CHEXTREK_PIPELINE_SUITE_CMD` for all four runs, not by actually building and
+testing each commit - `bash tools/run-all-tests.sh` was separately run directly (not through this
+pipeline script) on this same branch during development and passed 24/24, proving the real
+build+test path independent of this issue-tracking verification; and release publishing stayed
+stubbed/dry-run (no real release/tag is allowed yet - see "Publishing pipeline" above), so the
+closing comment's release link is a dry-run URL, not a real one. That verification issue was
+`wScottSh/chex-trek#72` - left closed, with a summary comment identifying it as this run and
+spelling out exactly what was real vs. simulated, once the verification finished (not the same
+issue as this spec ticket, #67).
 
 ## Building
 
