@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Self-test for tools/run-all-tests.sh's build step (spec #58/#61): on Unicron there is no Linux
-# build step yet, so a caller pre-sets CHEXTREK_SKIP_BUILD=1 and copies a prebuilt chextrek.dll to
-# the repo root themselves before calling tools/run-all-tests.sh, which must then skip
+# Self-test for tools/run-all-tests.sh's build step (spec #58/#61): to run against a prebuilt
+# chextrek.dll instead of building (optional on either machine since #64 builds on Unicron too), a
+# caller pre-sets CHEXTREK_SKIP_BUILD=1 and copies that DLL to the repo root themselves before
+# calling tools/run-all-tests.sh, which must then skip
 # build-chextrek.sh and run the suite against that prebuilt DLL as-is - see docs/dev-setup.md's
 # "Unicron (Linux/Wine)" section. This never launches the game: it copies run-all-tests.sh into a
 # scratch dir alongside a fake build-chextrek.sh (touches a marker instead of building) and fake

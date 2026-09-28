@@ -6,12 +6,11 @@
 #
 # Usage: tools/run-all-tests.sh
 #
-# tools/build-chextrek.sh only knows how to build on Windows (spec #58/#61) - there is no Linux
-# build step yet. On Unicron, set CHEXTREK_SKIP_BUILD=1 *before* calling this script (in addition
-# to copying a prebuilt chextrek.dll to the repo root yourself, same as any tools/test-*.sh run -
-# see docs/dev-setup.md's "Unicron (Linux/Wine)" section) to skip the build step and run the whole
-# suite against that prebuilt DLL as-is. Left unset (the default - nobody sets this before calling
-# run-all-tests.sh on the Windows dev machine), this always builds first, exactly as before.
+# To run the whole suite against a prebuilt chextrek.dll instead of building (either machine -
+# tools/build-chextrek.sh builds on Unicron too since spec #64), copy it to the repo root and set
+# CHEXTREK_SKIP_BUILD=1 *before* calling this script (see docs/dev-setup.md's "Unicron (Linux/Wine)"
+# section); it then skips the build step and runs every script against that DLL as-is. Left unset
+# (the default), this always builds first.
 #
 # Exit status: 0 if every script passed, 1 if any failed, 3 if a run stopped on a broken-
 # environment blocker - not a test result - the suite stops at once (no display; Linux-only,

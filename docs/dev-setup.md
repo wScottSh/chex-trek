@@ -1,13 +1,13 @@
 # Dev-machine setup: building and testing `chextrek.dll`
 
-Spec #28/#29 (Windows dev machine), extended by spec #58/#60/#61 (Unicron, Linux/Wine). This is
-the one-time, per-machine setup the build and harness scripts assume. Everything here is outside
+Spec #28/#29 (Windows dev machine), extended by spec #58/#60/#61/#64 (Unicron, Linux/Wine). This
+is the one-time, per-machine setup the build and harness scripts assume. Everything here is outside
 this repo on purpose - see "Why none of this lives in the repo" below. The harness's *interface*
 (`tools/build-chextrek.sh`, `tools/run-harness.sh`, `tools/run-all-tests.sh`, every
-`tools/test-*.sh`) is identical on both machines; only the one-time setup and a few internals
-differ. The one current exception is `tools/build-chextrek.sh` itself, which only knows how to
-build on Windows - see "Unicron (Linux/Wine)" below for what that means for `run-all-tests.sh`
-until the Linux build step exists.
+`tools/test-*.sh`) is identical on both machines, including `tools/build-chextrek.sh`: same
+one-command invocation, same optional build-config argument, same output
+(`chextrek.dll`/`chextrek.pdb` at the repo root, gitignored) - only the one-time setup and a few
+internals differ.
 
 ## Windows dev machine
 
@@ -28,30 +28,29 @@ Environment variables the scripts read (all optional, default to the table above
 
 ## Unicron (Linux/Wine)
 
-Spec #58/#60/#61. Unicron builds and runs the harness unattended, with nobody ever logged in to a
-desktop; the platform layer this needs lives in `tools/lib-harness.sh` behind `chextrek_is_linux`.
-Building `chextrek.dll` itself on Linux is a later sub-issue (#64) - #60/#61 only cover running the
-harness, and the whole suite, against a prebuilt DLL (built on the Windows dev machine and copied
-over, or produced by that later Linux build step once it exists). Until that build step exists,
-`tools/build-chextrek.sh` only knows how to build on Windows, so on Unicron: copy a Windows-built
-`chextrek.dll` (+ `.pdb`) to the repo root yourself, same gitignored place the Windows build writes
-to, and set `CHEXTREK_SKIP_BUILD=1` before running an individual `tools/test-*.sh` (or
-`tools/run-harness.sh`, which never builds) so it skips the build step and uses the prebuilt DLL
-as-is. `tools/run-all-tests.sh` (#61) honors a `CHEXTREK_SKIP_BUILD=1` set *before* it's called the
-same way: it skips `build-chextrek.sh` and runs the whole suite against whatever `chextrek.dll`
-already sits at the repo root, failing fast with a clear error if there isn't one. Left unset (the
-default - nobody sets this before calling `run-all-tests.sh` on the Windows dev machine), it always
-builds first, exactly as before.
+Spec #58/#60/#61/#64. Unicron builds and runs the harness unattended, with nobody ever logged in to
+a desktop; the platform layer this needs lives in `tools/lib-harness.sh` behind `chextrek_is_linux`.
+`tools/build-chextrek.sh` builds `chextrek.dll` on Unicron too (#64 - see "Building `chextrek.dll`
+on Unicron" below), so `tools/run-all-tests.sh` and every `tools/test-*.sh` build first by default,
+same as on Windows. To run against a prebuilt DLL instead (e.g. one built on the Windows dev machine
+and copied to the repo root, the same gitignored place the build writes to), set
+`CHEXTREK_SKIP_BUILD=1` before running an individual `tools/test-*.sh` (`tools/run-harness.sh` never
+builds) so it skips the build step and uses that DLL as-is. `tools/run-all-tests.sh` (#61) honors a
+`CHEXTREK_SKIP_BUILD=1` set *before* it's called the same way: it skips `build-chextrek.sh` and runs
+the whole suite against whatever `chextrek.dll` already sits at the repo root, failing fast with a
+clear error if there isn't one. Left unset (the default), it always builds first.
 
 | Thing | Location | Notes |
 |---|---|---|
-| Wine 11.0, new-WoW64 | `/opt/wine-11.0-wow64` (built from source; add `.../bin` to `PATH`) | The WineHQ `noble` packages can't do new-WoW64 (see spike #59's comment on #58 for the full build recipe). Provides `wine`, `winepath` and `wineserver`, all required on `PATH` - without `wineserver` on `PATH` the post-run cleanup below can't run, and a run can hang forever (see "Wine process cleanup"). |
+| Wine 11.0, new-WoW64 | `/opt/wine-11.0-wow64` (built from source; add `.../bin` to `PATH`) | The WineHQ `noble` packages can't do new-WoW64 (see spike #59's comment on #58 for the full build recipe). Provides `wine`, `winepath` and `wineserver`, all required on `PATH` - without `wineserver` on `PATH` the post-run cleanup below can't run, and a run can hang forever (see "Wine process cleanup"). This is a *separate* Wine install from the one baked into the `tools/msvc-wine/` build-toolchain image below - the harness's Wine runs the game engine, the image's Wine runs the compiler, and their versions don't need to match. |
 | Wine prefix | `$WINEPREFIX`, default `$HOME/games/wineprefix-chextrek` | Needs the **VC++ 2015-2022 x86 redist** installed in it (`vc_redist.x86.exe /install /quiet`) - `dhewm3.exe` imports `mfc140.dll`, which Wine has no builtin for; without it the loader fails with `c0000135`. |
 | Classic Doom 3 1.3.1 | `$HOME/games/doom3` (has `base/pak000.pk4`-`pak008.pk4`) | Copied once from the Windows PC, outside every repo, same as the Windows machine's copy. This is `$DOOM3_BASEPATH`. |
 | dhewm3 1.5.5 win32 (official, unmodified) | `$HOME/games/dhewm3/1.5.5-win32/dhewm3/dhewm3.exe` | The same `dhewm3-1.5.5_win32.zip` as the Windows machine, run under Wine - never built from source. This is `$DHEWM3_HOME`. |
 | `chextrek` mount | `$DOOM3_BASEPATH/chextrek` | A plain `ln -s` to whichever checkout is being tested - no NTFS-symlink privilege quirk on Linux. The harness creates/repoints it automatically, same as Windows. |
 | Xvfb | anywhere on `PATH` (e.g. the distro package) | The harness starts its own (`chextrek_ensure_display_or_exit` in `tools/lib-harness.sh`) on the first free display number when `$DISPLAY` isn't already usable, and stops it again when the run finishes. Nobody needs to be logged in, and no `DISPLAY` needs to be pre-set - that's the whole point on a headless box reached over SSH. |
 | Save/config/screenshot path | `$WINEPREFIX/drive_c/users/<you>/Documents/My Games/dhewm3/chextrek/` | The "Documents" dhewm3 hardcodes is the one inside the Wine prefix it's actually running in, not this Linux user's own `$HOME/Documents`. |
+| Docker | already installed, owner in the `docker` group (no `sudo` needed) | Runs the pinned MSVC-under-Wine build-toolchain container below. |
+| Build-toolchain image `chextrek-msvc-wine:14.50.35717-x86` | one-time: `tools/msvc-wine/build-image.sh` | Builds the image from `tools/msvc-wine/Dockerfile`; see "Building `chextrek.dll` on Unicron" below. |
 
 Environment variables (all optional; Linux-specific defaults live in `tools/lib-harness.sh`):
 
@@ -60,6 +59,87 @@ Environment variables (all optional; Linux-specific defaults live in `tools/lib-
 - `WINEPREFIX` - the Wine prefix dhewm3 runs in. Defaults to `$HOME/games/wineprefix-chextrek`.
 - `CHEXTREK_LOCK_FILE` - the single-run lock file (#62, see "Only run one harness invocation at a
   time on a given machine" below). Defaults to `/tmp/chextrek-harness.lock`.
+
+### Building `chextrek.dll` on Unicron (spec #64)
+
+One-time setup: `tools/msvc-wine/build-image.sh` builds the `chextrek-msvc-wine:14.50.35717-x86`
+Docker image from `tools/msvc-wine/Dockerfile`. That Dockerfile pins everything a rebuild needs to
+reproduce the same MSVC toolset months later:
+
+- **msvc-wine** (https://github.com/mstorsjo/msvc-wine, ISC license, not vendored into this repo),
+  pinned at a fixed commit, fetches and wraps the real MSVC toolchain so `cl`/`link`/`lib`/etc. run
+  transparently under Wine from Linux.
+- **MSVC 14.50.35717 (VS 18), x86-only** - the same MSVC toolset `tools/build-chextrek.sh`'s
+  Windows branch gets from the "Visual Studio 18 2026" generator (spec #28's pin). Downloading it
+  requires accepting the Visual Studio Build Tools license terms
+  (https://go.microsoft.com/fwlink/?LinkId=2327714 at the time of pinning) - spec #64's AC requires
+  the owner to confirm this use is acceptable before this lands; record that confirmation on this
+  sub-issue's PR, not here.
+- `winbind`, needed for `mspdbsrv.exe` (`/FS`-forced synchronous PDB writes still invoke it even
+  though nothing on Linux compiles with `/Zi` any more, or it's pre-started directly by
+  `tools/build-chextrek.sh` - see "Building `chextrek.dll` on Unicron" below) to work at all under
+  Wine; without `winbind` it fails with `C1902`, a known msvc-wine limitation.
+
+`tools/build-chextrek.sh`'s Linux branch (a `uname` check, the same test `chextrek_is_linux` in
+`tools/lib-harness.sh` makes - this script doesn't source that library, so it repeats the check
+rather than adding the dependency) then:
+
+1. Checks `docker` is on `PATH` and the pinned image exists - a clear `error:` line pointing at
+   `tools/msvc-wine/build-image.sh` if not, never a bare Docker error.
+2. Runs `cmake -S engine/dhewm3-sdk -B engine/build -G Ninja` inside that image against this
+   checkout (bind-mounted), with the same project options as Windows (`BASE=ON`,
+   `BASE_NAME=chextrek`, `D3XP=OFF`), cross-compiling for `CMAKE_SYSTEM_NAME=Windows`/
+   `CMAKE_SYSTEM_PROCESSOR=x86`. `CMAKE_EXE_LINKER_FLAGS`/`CMAKE_SHARED_LINKER_FLAGS` are set to
+   `/MANIFEST:NO`: this MSVC-under-Wine `link.exe` doesn't produce the side-car manifest CMake's
+   default rule expects to feed to `mt.exe` afterwards (`mt` then fails, "File not found") -
+   `chextrek.dll` doesn't need a manifest embedded, so the fix is to not ask for one.
+3. Builds with `cmake --build engine/build --target base`. An `EXIT` trap `chown`s `engine/build`
+   back from `root` (the container's user - it needs `root`'s own wine prefix, baked into the
+   image at image-build time) to the invoking user before the container exits either way, so a
+   failed configure or build doesn't leave it un-owned by the invoking user.
+4. The same shared copy step as Windows then copies the resulting `chextrek.dll`/`.pdb` from
+   `engine/build` to the repo root.
+
+The result is a `PE32 executable (DLL), Intel 80386` - the same MSVC-ABI binary format the official
+win32 dhewm3 1.5.5 (spec #59) loads. `tools/test-menu-smoke.sh` on Unicron, run without
+`CHEXTREK_SKIP_BUILD` set, is the reproducible proof: it builds via this Linux branch, then checks
+that result against every always-on check. See the #64 PR for a run of it.
+
+**mspdbsrv pre-start, and why:** `mspdbsrv.exe` (spawned under `/Zi`/`/FS` for PDB writes) is a
+long-lived background daemon; the first `cl.exe` invocation that needs it and finds none running
+spawns it *itself*, and it inherits that `cl` invocation's stdout/stderr pipe - the one msvc-wine's
+`sed` output filter reads from. Because `mspdbsrv` keeps that pipe's write end open long after the
+`cl` that spawned it has exited, `sed` (and so that one build step) blocks waiting for EOF until
+`mspdbsrv`'s own idle-shutdown timer closes it - about 10 minutes, observed to hit twice during a
+from-scratch configure (once per compiler-ABI probe) and again during the first real compile.
+`tools/build-chextrek.sh`'s Linux branch now starts `mspdbsrv.exe` itself first, stdio pointed at
+`/dev/null`, before configuring, so every `cl.exe` invocation connects to that already-running
+instance instead of spawning (and stalling behind) a new one; it also configures with
+`-DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=$<$<CONFIG:Debug,RelWithDebInfo>:Embedded>` (CMake >= 3.25,
+msvc-wine's documented workaround, restricted by that generator expression to the two configs
+dhewm3-sdk's own `CMakeLists.txt` sets `/Zi` for in the first place) so CMake's own ABI-detection
+probes use `/Z7` instead of `/Zi` and need `mspdbsrv` even less. For a Debug/RelWithDebInfo build
+this also flips dhewm3-sdk's own explicit `/Zi` (in `CMAKE_C_FLAGS_DEBUG`/`_RELWITHDEBINFO`) to
+`/Z7` - `cl` prints a harmless `D9025: overriding '/Zi' with '/Z7'` warning for every file, since
+dhewm3-sdk sets that flag directly rather than through CMake's debug-format abstraction and this
+repo can't fix that warning at the source without patching the pinned SDK import; it doesn't affect
+correctness or the resulting `.pdb`. Release/MinSizeRel are unaffected (dhewm3-sdk doesn't set
+`/Zi` for them to begin with), same as Windows.
+
+**Measured build times** (Unicron, 32 logical CPUs, `ninja`'s default job count, RelWithDebInfo,
+after the `mspdbsrv` fix above; one-time `docker build`/image-pull setup not included):
+
+| Build | Wall-clock | Notes |
+|---|---|---|
+| Clean (`rm -rf engine/build`, 122 objects) | ~8s | Configure ~1s, rest is compile+link; no minutes-long stall. |
+| No-change rebuild | ~1s | Ninja partially over-rebuilds (about 22/122 objects) some runs - same-second mtimes on a fast build outrace ninja's mtime-based staleness check on this filesystem; harmless and self-corrects, not a correctness issue. |
+| One-file incremental (`touch` a `game/*.cpp`) | ~1s | Rebuilds just that file (plus its usual reverse dependents) and relinks. |
+
+Before the `mspdbsrv` fix, a from-scratch configure alone measured ~1211s (about 20 minutes, two
+~10-minute stalls) - the fix above is what makes the numbers above possible. This is no longer
+"noticeably slower than Windows/MSBuild" in any way that matters for an iteration loop; docker's own
+per-invocation overhead (container start against the already-booted image) is negligible next to
+the compile time itself.
 
 What the Linux platform layer does differently (same `chextrek_run_console_script` interface,
 `tools/lib-harness.sh`):
@@ -89,10 +169,10 @@ What the Linux platform layer does differently (same `chextrek_run_console_scrip
   can't touch a concurrent run's wine processes in a different prefix.
 
 **Not handled by #60** (left for later sub-issues, not asserted by anything here): building
-`chextrek.dll` itself on Linux; the two scenarios spike #59 found Wine-only-red
-(`test-end-level-nextmap.sh`, `test-objectives.sh`) - fixed by #61, see the next paragraph. The
-single-run lock across concurrent worktrees is #62 - see "Only run one harness invocation at a time
-on a given machine" below.
+`chextrek.dll` itself on Linux - done by #64, see "Building `chextrek.dll` on Unicron" above; the
+two scenarios spike #59 found Wine-only-red (`test-end-level-nextmap.sh`, `test-objectives.sh`) -
+fixed by #61, see the next paragraph. The single-run lock across concurrent worktrees is #62 - see
+"Only run one harness invocation at a time on a given machine" below.
 
 **Fixed by #61** (both scenarios' Wine-only reds from the spike): in both cases the scenario's own
 assertions were unchanged; only a `wait` count each script sends the game grew, gated on
@@ -115,9 +195,12 @@ tools/build-chextrek.sh [Debug|RelWithDebInfo|Release]
 ```
 
 Configures `engine/dhewm3-sdk` (the pinned dhewm3-sdk import, see `engine/dhewm3-sdk/UPSTREAM.md`)
-with CMake for `Visual Studio 18 2026` / Win32, `BASE_NAME=chextrek`, `D3XP=OFF`, builds it with
-MSBuild, and copies the resulting `chextrek.dll` (+ `.pdb`) to the repo root. Both are gitignored;
-rebuild any time with this one command.
+with CMake, `BASE_NAME=chextrek`, `D3XP=OFF`, 32-bit, and copies the resulting `chextrek.dll`
+(+ `.pdb`) to the repo root. Both are gitignored; rebuild any time with this one command, on
+either machine. On Windows this uses `Visual Studio 18 2026` / Win32 and MSBuild, unchanged since
+spec #28/#29. On Unicron (spec #64) this uses Ninja against the pinned MSVC-14.50.35717-x86-under-
+Wine container image - see "Building `chextrek.dll` on Unicron" above for the one-time setup and
+what differs.
 
 ## Running the tests
 
