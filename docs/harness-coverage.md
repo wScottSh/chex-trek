@@ -30,6 +30,7 @@ functions against the reference files.
 | Main menu loads clean (script compile passes), on both the Windows dev machine and Unicron (Linux/Wine, #60) - same script, same interface, unchanged assertions | `tools/test-menu-smoke.sh` | covered - also checks #29's known `openDoors` unknown-event failure is gone. |
 | Always-on checks on both real maps (`e1m1`, `sf_923`) | every scenario that loads a map | covered - no allowlist. The unknown-spawnclass check matches the engine's real message (`Could not spawn '<classname>'.  Class '<spawnclass>' not found`). |
 | `tools/run-all-tests.sh` skips `build-chextrek.sh` and runs against a prebuilt `chextrek.dll` when the caller pre-sets `CHEXTREK_SKIP_BUILD=1` (Unicron, #61), but still always builds first when it isn't set | `tools/test-run-all-tests-skip-build.sh` | covered - self-test against stubbed `build-chextrek.sh`/`test-*.sh` scripts in a scratch dir; never launches the game. |
+| A deliberately broken change - a failing `tools/test-*.sh` - makes `tools/run-all-tests.sh` exit 1 with that scenario listed as `FAIL` in the summary, while passing scenarios before and after it still run (spec #58/#65, so an agent on Unicron can prove a change in game with one command before opening a PR) | `tools/test-run-all-tests-scenario-failure.sh` | covered - self-test against stubbed `build-chextrek.sh`/`test-*.sh` scripts in a scratch dir, one of them deliberately exiting 1; never launches the game. |
 
 ## Per-feature (spec #28 order)
 

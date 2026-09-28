@@ -28,7 +28,11 @@ Environment variables the scripts read (all optional, default to the table above
 
 ## Unicron (Linux/Wine)
 
-Spec #58/#60/#61/#64. Unicron builds and runs the harness unattended, with nobody ever logged in to
+Spec #58/#60/#61/#64/#65. If you're an agent working on Unicron: `docs/agents/unicron-build-test.md`
+has the one command to run and when to run it (before opening a PR on any game-library change) -
+this section covers the one-time machine setup and internals that command depends on.
+
+Unicron builds and runs the harness unattended, with nobody ever logged in to
 a desktop; the platform layer this needs lives in `tools/lib-harness.sh` behind `chextrek_is_linux`.
 `tools/build-chextrek.sh` builds `chextrek.dll` on Unicron too (#64 - see "Building `chextrek.dll`
 on Unicron" below), so `tools/run-all-tests.sh` and every `tools/test-*.sh` build first by default,
