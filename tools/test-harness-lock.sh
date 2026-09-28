@@ -5,25 +5,28 @@
 # for #62 (still just the documented "one at a time" rule, unenforced - see docs/dev-setup.md), so
 # this test is a no-op there.
 #
-# Case 1 and 2 use a private CHEXTREK_LOCK_FILE so they can't be blocked by a real harness run
+# Case 1 and 2/2b use a private CHEXTREK_LOCK_FILE so they can't be blocked by a real harness run
 # already using the default lock - same idea as tools/test-harness-no-display.sh's curated PATH
 # keeping that self-test isolated from the real environment while exercising the exact same code
-# paths. Case 3 and 4 launch the *real* harness scripts and deliberately leave CHEXTREK_LOCK_FILE
+# paths. Case 3, 4 and 5 launch the *real* harness scripts and deliberately leave CHEXTREK_LOCK_FILE
 # unset, so they exercise the actual default lock (`/tmp/chextrek-harness.lock`) two real, unrelated
 # invocations would use - the scenario #62 exists for.
 #
 # Case 1 proves AC2 (the second run prints that it's waiting) deterministically, by holding the
 # lock with a plain `flock FILE sleep N` for a known duration and timing the acquirer against it,
 # rather than hoping two independent real runs happen to race within the same few hundred
-# milliseconds. Case 2 proves AC3 (a harness run killed while a child it started - Xvfb, or the wine
-# launch - is still running leaves no stale lock): it mirrors those two call sites' actual shape
-# (acquire the lock, background a child that closes its own inherited copy of the lock fd before
-# exec'ing into a long-running process, get killed itself while that child is still alive) rather
-# than a generic "kill -9 a process holding a lock" case, which a naive fix (e.g. relying on
-# close-on-exec) could pass without actually covering Xvfb/wine. Case 3 proves AC1+AC2 against a
-# real harness run. Case 4 proves AC1 (two real runs started at once both complete, correctly,
-# without touching each other's log/save dir) with two genuinely concurrent real harness
-# invocations.
+# milliseconds. Case 2 proves AC3's mechanism (a harness run killed while a child it started - Xvfb,
+# or the wine launch - is still running leaves no stale lock): it mirrors those two call sites'
+# actual shape (acquire the lock, background a child that closes its own inherited copy of the lock
+# fd before exec'ing into a long-running process, get killed itself while that child is still alive)
+# rather than a generic "kill -9 a process holding a lock" case, which a naive fix (e.g. relying on
+# close-on-exec) could pass without actually covering Xvfb/wine. Case 2b ties that mechanism to the
+# real chextrek_ensure_display_or_exit's own Xvfb, checked via its /proc fd table. Case 3 proves
+# AC1+AC2 against a real harness run. Case 4 proves AC1 (two real runs started at once both
+# complete, correctly, without touching each other's log/save dir) with two genuinely concurrent
+# real harness invocations. Case 5 proves AC3 against the *wine launch* specifically (the other call
+# site that can start something long-lived - a wineserver `winepath`/`wine` may spawn): SIGKILLs a
+# real run while its dhewm3 is actually running and checks the lock is free at once regardless.
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -165,20 +168,21 @@ if command -v Xvfb >/dev/null 2>&1; then
 		_chextrek_acquire_lock
 		chextrek_ensure_display_or_exit
 		echo "xvfb-pid=${CHEXTREK_XVFB_PID}"
-		echo "lock-fd=${CHEXTREK_LOCK_FD}"
 		sleep 1
 	' _ "$SCRIPT_DIR" 2>&1)"
 	XVFB_PID="$(echo "$OUT2B" | sed -n 's/^xvfb-pid=//p')"
-	LOCK_FD_NUM="$(echo "$OUT2B" | sed -n 's/^lock-fd=//p')"
-	if [ -n "$XVFB_PID" ] && [ -n "$LOCK_FD_NUM" ] && [ -e "/proc/${XVFB_PID}/fd" ]; then
-		if [ -e "/proc/${XVFB_PID}/fd/${LOCK_FD_NUM}" ]; then
-			echo "FAIL: the real Xvfb process still has the lock fd (${LOCK_FD_NUM}) open"
+	if [ -n "$XVFB_PID" ] && [ -e "/proc/${XVFB_PID}/fd" ]; then
+		# Match by what the fd actually points at (readlink), not by fd number: Xvfb could open its
+		# own unrelated fd at the same number, which a bare "does this fd number exist" check would
+		# misreport as a leak.
+		if find "/proc/${XVFB_PID}/fd" -lname "$CHEXTREK_LOCK_FILE" 2>/dev/null | grep -q .; then
+			echo "FAIL: the real Xvfb process still has the lock file (${CHEXTREK_LOCK_FILE}) open"
 			FAIL=1
 		else
-			echo "PASS: the real Xvfb process doesn't have the lock fd open"
+			echo "PASS: the real Xvfb process doesn't have the lock file open"
 		fi
 	else
-		echo "SKIP: couldn't find the Xvfb pid/fd table to check (got xvfb-pid='${XVFB_PID}' lock-fd='${LOCK_FD_NUM}')"
+		echo "SKIP: couldn't find the Xvfb pid's fd table to check (got xvfb-pid='${XVFB_PID}')"
 	fi
 	# chextrek_ensure_display_or_exit doesn't stop its own Xvfb (only the run wrapper does, via
 	# _chextrek_stop_xvfb) - this check called it directly, so clean up the Xvfb it started by hand.
@@ -300,6 +304,54 @@ if echo "${RUN1_OUT}${RUN2_OUT}" | grep -qF "Waiting for the harness lock"; then
 	echo "PASS: contention was observed between the two concurrent real runs"
 else
 	echo "INFO: no contention observed between these two concurrent real runs (both may have run too fast to overlap) - AC2 is proven deterministically in case 1 and case 3 above"
+fi
+
+echo
+echo "=== #62 lock test: case 5 - SIGKILLing a real run while its wine/dhewm3 is still alive leaves no stale lock (AC3) ==="
+# Case 2/2b prove the fix for Xvfb; this is the same proof for the wine launch itself (the other
+# call site the round-2 review flagged: winepath/wine can start a wineserver that survives this
+# call). A long-running console script (many "wait"s) gives a wide window to SIGKILL the run-scenario
+# process itself - simulating an operator's Ctrl-C or an OOM kill - while dhewm3 is still actually
+# running under wine, then checks the lock is free at once even though that orphaned dhewm3/wine
+# keeps running for a while after.
+LONGRUN_LABEL="chextrek_lock_test_killme"
+{
+	echo "developer 1"
+	i=0
+	while [ $i -lt 600 ]; do
+		echo "wait"
+		i=$((i + 1))
+	done
+	echo "quit"
+} > "${SCRATCH}/longrun.cfg"
+
+bash "${SCRIPT_DIR}/run-scenario.sh" "$LONGRUN_LABEL" "${SCRATCH}/longrun.cfg" 120 \
+	> "${SCRATCH}/case5.out" 2>&1 &
+RUN5_PID=$!
+
+for _ in $(seq 1 100); do
+	grep -q "Launching dhewm3" "${SCRATCH}/case5.out" 2>/dev/null && break
+	sleep 0.1
+done
+sleep 1 # give wine a moment to actually be running dhewm3, not just be mid-exec into it
+
+kill -9 "$RUN5_PID" 2>/dev/null
+wait "$RUN5_PID" 2>/dev/null
+
+DEFAULT_LOCK="$(chextrek_lock_file)"
+if flock -n "$DEFAULT_LOCK" -c true 2>/dev/null; then
+	echo "PASS: the lock is free immediately after SIGKILLing the run, even with its wine/dhewm3 possibly still alive"
+else
+	echo "FAIL: the lock is still held after SIGKILLing the run - wine/wineserver is holding it"
+	FAIL=1
+fi
+
+# Best-effort cleanup: only this test's own orphaned dhewm3, matched by its distinctive cfg name
+# (embedded in the engine's own +exec argument, so this can't match an unrelated concurrent run).
+pkill -9 -f "${LONGRUN_LABEL}_" 2>/dev/null || true
+sleep 0.3
+if command -v wineserver >/dev/null 2>&1; then
+	WINEPREFIX="${WINEPREFIX:-$HOME/games/wineprefix-chextrek}" wineserver -k >/dev/null 2>&1 || true
 fi
 
 echo

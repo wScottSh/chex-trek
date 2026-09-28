@@ -146,9 +146,17 @@ chextrek_is_linux() {
 # dhewm3 is a native Windows binary; every `+set fs_*` path it's given on the command line has to
 # be a Windows-style path. Windows dev machine (Git Bash): `cygpath -w`. Unicron (Linux/Wine):
 # `winepath -w`, resolved against $WINEPREFIX the same way the run itself is.
+#
+# `winepath` can itself start a wineserver (#62): closes this call's copy of the single-run lock fd
+# first (see _chextrek_acquire_lock) so that wineserver - which can outlive this whole call - never
+# gets a copy of it either.
 chextrek_to_engine_path() {
 	if chextrek_is_linux; then
-		winepath -w "$1"
+		if [ -n "${CHEXTREK_LOCK_FD:-}" ]; then
+			winepath -w "$1" {CHEXTREK_LOCK_FD}>&-
+		else
+			winepath -w "$1"
+		fi
 	else
 		cygpath -w "$1"
 	fi
@@ -208,10 +216,14 @@ chextrek_ensure_display_or_exit() {
 		CHEXTREK_XVFB_LOG="/tmp/chextrek-xvfb-${N}.log"
 		# Xvfb outlives this call by design (stopped explicitly later, see _chextrek_stop_xvfb) - if
 		# this process were killed first, an inherited copy of the single-run lock fd (#62) would
-		# keep that orphaned Xvfb holding the lock forever. Close this subshell's copy before
-		# exec'ing into Xvfb so only this function's own fd matters for the lock.
-		( [ -n "${CHEXTREK_LOCK_FD:-}" ] && eval "exec ${CHEXTREK_LOCK_FD}>&-"
-		  exec Xvfb ":${N}" -screen 0 1280x1024x24 -nolisten tcp ) >"$CHEXTREK_XVFB_LOG" 2>&1 &
+		# keep that orphaned Xvfb holding the lock forever. `{CHEXTREK_LOCK_FD}>&-` closes this
+		# fork's copy of it before Xvfb itself execs, so only this function's own fd matters for the
+		# lock (see _chextrek_acquire_lock; same reasoning as the wine launch below).
+		if [ -n "${CHEXTREK_LOCK_FD:-}" ]; then
+			Xvfb ":${N}" -screen 0 1280x1024x24 -nolisten tcp >"$CHEXTREK_XVFB_LOG" 2>&1 {CHEXTREK_LOCK_FD}>&- &
+		else
+			Xvfb ":${N}" -screen 0 1280x1024x24 -nolisten tcp >"$CHEXTREK_XVFB_LOG" 2>&1 &
+		fi
 		CHEXTREK_XVFB_PID=$!
 		local WAITED=0
 		while [ $WAITED -lt 10 ] && [ ! -e "/tmp/.X${N}-lock" ]; do
@@ -270,11 +282,10 @@ chextrek_lock_file() {
 
 # _chextrek_acquire_lock
 #
-# Opens chextrek_lock_file on fd CHEXTREK_LOCK_FD (exported, so a background/exec'd child that must
-# close it - see below - can find which fd to close by name even once it's a separate process) and
-# takes an exclusive flock on it, printing a "waiting" line (#62 AC2) once if another run already
-# holds it, then blocking until it's free. Exits the calling script with 1 if the lock file itself
-# can't even be opened (e.g. permissions) - proceeding unlocked would defeat the whole point.
+# Opens chextrek_lock_file on fd CHEXTREK_LOCK_FD and takes an exclusive flock on it, printing a
+# "waiting" line (#62 AC2) once if another run already holds it, then blocking until it's free.
+# Exits the calling script with 1 if the lock file itself can't even be opened (e.g. permissions) -
+# proceeding unlocked would defeat the whole point.
 #
 # flock's lock lives on the open file descriptor, not on the file's contents or a pid recorded in
 # it, so a run that dies while holding it - crash, SIGKILL, whatever - has the kernel close that fd
@@ -282,10 +293,13 @@ chextrek_lock_file() {
 # copy of that fd open. A plain fork (every external command this script runs, including Xvfb and
 # the wine launch) inherits it regardless of what the child later execs into, so a harness process
 # killed while such a child is still running would otherwise leave the lock held by that orphan
-# indefinitely. chextrek_ensure_display_or_exit's Xvfb and the wine launch below - the two children
-# that can outlive this call - both close their inherited copy (`exec ${CHEXTREK_LOCK_FD}>&-`) as
-# the very first thing they do, before exec'ing into Xvfb/wine, so only *this* process's own copy
-# of the fd ever matters for the lock.
+# indefinitely. chextrek_ensure_display_or_exit's Xvfb spawn, the winepath call in
+# chextrek_to_engine_path, and the wine launch in _chextrek_run_console_script_impl - the places
+# that can start something able to outlive this call (Xvfb itself; a wineserver `winepath` or
+# `wine` may spawn, which does not exit with the command that started it) - each attach
+# `{CHEXTREK_LOCK_FD}>&-` directly to that command, so the fd is closed in *that fork*, before it
+# execs into anything, and nothing it or its own children (wineserver, winedevice.exe) start ever
+# gets a copy. Only this process's own fd, closed by _chextrek_release_lock, matters for the lock.
 _chextrek_acquire_lock() {
 	local LOCK_FILE
 	LOCK_FILE="$(chextrek_lock_file)"
@@ -293,7 +307,6 @@ _chextrek_acquire_lock() {
 		echo "error: couldn't open the harness lock file ${LOCK_FILE}. See docs/dev-setup.md." >&2
 		exit 1
 	fi
-	export CHEXTREK_LOCK_FD
 	if ! flock -n "$CHEXTREK_LOCK_FD"; then
 		echo "==> Waiting for the harness lock (another run holds ${LOCK_FILE}) ..."
 		flock "$CHEXTREK_LOCK_FD"
@@ -307,7 +320,7 @@ _chextrek_acquire_lock() {
 _chextrek_release_lock() {
 	[ -n "${CHEXTREK_LOCK_FD:-}" ] || return 0
 	flock -u "$CHEXTREK_LOCK_FD" 2>/dev/null || true
-	eval "exec ${CHEXTREK_LOCK_FD}>&-" 2>/dev/null || true
+	exec {CHEXTREK_LOCK_FD}>&- 2>/dev/null || true
 	CHEXTREK_LOCK_FD=""
 }
 
@@ -498,14 +511,19 @@ _chextrek_run_console_script_impl() {
 		# asked to (#60 AC: "a timeout kills only the dhewm3 process the harness started" - not
 		# Windows' machine-wide taskkill-by-image-name below). This runs in the foreground and
 		# normally exits with `timeout`/wine well before this call returns - but if *this* harness
-		# process itself were killed first, wine/dhewm3 (and whatever it forks, e.g. wineserver)
-		# would keep running and, having inherited the single-run lock fd (#62) across the fork
-		# chain above, would keep holding the lock indefinitely. Closing this bash -c's copy of it
-		# before it execs into wine means only this function's own fd matters for the lock.
-		timeout --kill-after=10 "$TIMEOUT_SECS" bash -c '
-			[ -n "${CHEXTREK_LOCK_FD:-}" ] && eval "exec ${CHEXTREK_LOCK_FD}>&-"
-			cd "$1" && shift && exec wine "$@"
-		' _ "$DHEWM3_HOME" "$DHEWM3_EXE" "${ENGINE_ARGS[@]}"
+		# process itself were killed first, wine/dhewm3 and everything it in turn forks (wineserver,
+		# winedevice.exe) would keep running and, having inherited the single-run lock fd (#62)
+		# across the fork chain, would keep holding the lock indefinitely. `{CHEXTREK_LOCK_FD}>&-`
+		# closes this call's own copy of it in *timeout's* fork, before timeout execs into anything -
+		# so bash -c, wine, and every process wine goes on to start never have a copy in the first
+		# place, and only this function's own fd matters for the lock.
+		if [ -n "${CHEXTREK_LOCK_FD:-}" ]; then
+			timeout --kill-after=10 "$TIMEOUT_SECS" bash -c 'cd "$1" && shift && exec wine "$@"' _ \
+				"$DHEWM3_HOME" "$DHEWM3_EXE" "${ENGINE_ARGS[@]}" {CHEXTREK_LOCK_FD}>&-
+		else
+			timeout --kill-after=10 "$TIMEOUT_SECS" bash -c 'cd "$1" && shift && exec wine "$@"' _ \
+				"$DHEWM3_HOME" "$DHEWM3_EXE" "${ENGINE_ARGS[@]}"
+		fi
 	else
 		timeout "$TIMEOUT_SECS" "$DHEWM3_EXE" "${ENGINE_ARGS[@]}"
 	fi

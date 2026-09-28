@@ -17,12 +17,16 @@ trap 'rm -rf "$SCRATCH"' EXIT
 FAIL=0
 
 if chextrek_is_linux; then
-	# A curated PATH with only the ordinary tools the test itself, chextrek_is_linux and the
-	# harness's early checks need (symlinked from wherever they really live) - and deliberately no
-	# `Xvfb` - so "Xvfb isn't installed" (case 1a) is the real `command -v Xvfb` miss, not a stand-in.
+	# A curated PATH with only the ordinary tools the test itself, chextrek_is_linux, the harness's
+	# early checks, and the single-run lock (#62, chextrek_run_console_script takes it before any of
+	# this) need (symlinked from wherever they really live) - and deliberately no `Xvfb` - so "Xvfb
+	# isn't installed" (case 1a) is the real `command -v Xvfb` miss, not a stand-in. `flock` has to
+	# be here: without it, _chextrek_acquire_lock's own `flock -n`/`flock` calls would silently fail
+	# ("command not found", not caught since this isn't `set -e`) and this test would exercise a
+	# harness that never actually took the lock, not the real code path.
 	mkdir -p "${SCRATCH}/no-xvfb-bin"
 	for TOOL in bash uname date cat mkdir rm printf sed grep id readlink basename dirname cp \
-		mktemp kill sleep seq ln tr chmod true env; do
+		mktemp kill sleep seq ln tr chmod true env flock; do
 		T="$(command -v "$TOOL" 2>/dev/null)" && ln -sf "$T" "${SCRATCH}/no-xvfb-bin/${TOOL}"
 	done
 
