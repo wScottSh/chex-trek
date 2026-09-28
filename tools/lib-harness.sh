@@ -8,7 +8,8 @@
 #     always-on checks (chextrek.dll loaded, state-dump header present, no ERROR/unknown-event/
 #     unknown-spawnclass/script-compile lines, no timeout kill).
 #   chextrek_log_has_no_display / chextrek_exit_no_display - the no-display environment stop
-#     (exit 3) the run makes when this Windows session has no display.
+#     (exit 3) the run makes when there's no way to open a window (Windows: this session has no
+#     active desktop; Linux/Wine: the display this run had died mid-run).
 #
 # Scenario-script helpers (tools/test-*.sh):
 #   chextrek_build_or_exit      - builds chextrek.dll once (skipped under CHEXTREK_SKIP_BUILD=1).
@@ -18,8 +19,17 @@
 #   chextrek_line_field_values  - values of a `<field>: <rest of line>` chextrek_dump line.
 #   chextrek_hud_map_*_values   - fields of the dump's `hud_map:` line.
 #
-# See docs/dev-setup.md for the environment variables this reads (DHEWM3_HOME, DOOM3_BASEPATH,
-# DHEWM3_DOCUMENTS_DIR) and for why the mount/save-path/timeout handling works the way it does.
+# Linux/Wine platform layer (spec #58/#60): chextrek_run_console_script's interface, and every
+# scenario helper above it, is identical on both platforms - only the plumbing behind it branches
+# on `chextrek_is_linux`:
+#   chextrek_is_linux           - true on Unicron (Linux/Wine), false on the Windows dev machine.
+#   chextrek_to_engine_path     - `winepath -w` (Linux) vs `cygpath -w` (Windows) path conversion.
+#   chextrek_ensure_display_or_exit - starts this run's own Xvfb display when none is usable
+#                                 (Linux), instead of the Windows qwinsta active-session check.
+# See docs/dev-setup.md's "Unicron (Linux/Wine)" section for the one-time setup this assumes
+# (Wine, the VC++ x86 redist in the prefix, Xvfb) and for the environment variables this reads
+# (DHEWM3_HOME, DOOM3_BASEPATH, DHEWM3_DOCUMENTS_DIR, WINEPREFIX) and why the mount/save-path/
+# timeout handling works the way it does.
 
 # chextrek_build_or_exit
 #
@@ -117,16 +127,107 @@ chextrek_log_has_no_display() {
 	grep -qF "No displays available" "$1"
 }
 
+# chextrek_is_linux
+#
+# True on Unicron (Linux/Wine, spec #58/#60), false on the Windows dev machine (MSYS/Git Bash).
+# Every OS-specific branch in this file tests this instead of guessing from which tools happen to
+# be on PATH, so the two platforms' code paths stay easy to find and can't accidentally blend.
+chextrek_is_linux() {
+	case "$(uname -s)" in
+	Linux*) return 0 ;;
+	*) return 1 ;;
+	esac
+}
+
+# chextrek_to_engine_path UNIX_PATH
+#
+# dhewm3 is a native Windows binary; every `+set fs_*` path it's given on the command line has to
+# be a Windows-style path. Windows dev machine (Git Bash): `cygpath -w`. Unicron (Linux/Wine):
+# `winepath -w`, resolved against $WINEPREFIX the same way the run itself is.
+chextrek_to_engine_path() {
+	if chextrek_is_linux; then
+		winepath -w "$1" 2>/dev/null
+	else
+		cygpath -w "$1"
+	fi
+}
+
+# chextrek_ensure_display_or_exit
+#
+# Windows: dhewm3 needs an active interactive desktop; that check stays in
+# chextrek_run_console_script (qwinsta), unchanged.
+#
+# Unicron (Linux/Wine, #60): dhewm3 still needs *some* X display to open a window on, but nobody
+# is ever logged in to Unicron, so "no display" here is the normal case, not a rare disconnect -
+# the harness brings its own. If $DISPLAY already names a live X server (a previous call's Xvfb,
+# or a real X session), reuse it. Otherwise start a fresh Xvfb on the first free display number
+# and export DISPLAY for this run; CHEXTREK_XVFB_PID is set so the caller can stop it again once
+# the run finishes (see chextrek_run_console_script). Xvfb itself being unavailable or refusing to
+# start on every candidate display is the actual environment stop (exit 3) - the same class of
+# blocker the Windows branch reports for a disconnected session, just with a different cause.
+chextrek_ensure_display_or_exit() {
+	CHEXTREK_XVFB_PID=""
+	if [ -n "${DISPLAY:-}" ] && command -v xdpyinfo >/dev/null 2>&1 && xdpyinfo >/dev/null 2>&1; then
+		return 0
+	fi
+	if ! command -v Xvfb >/dev/null 2>&1; then
+		echo "ENVIRONMENT: no display - DISPLAY is unset (or unusable) and Xvfb isn't installed to start one."
+		echo "ENVIRONMENT: this is not a test failure. Install Xvfb on this host; do not wait or retry."
+		exit 3
+	fi
+	# Only the free-display-number search (below) needs to scan a wide range - contention on one
+	# particular number (another run's Xvfb already holding it) is the expected reason a candidate
+	# is skipped. An actual failure to spawn Xvfb at all (missing library, no permission, ...)
+	# fails identically whichever number is tried, so cap real spawn *attempts* separately and
+	# small: retrying that 100+ times would just make a real failure minutes slower to report,
+	# never more likely to succeed. `kill -0` can't tell a zombie (already-exited, not yet reaped)
+	# from a live process, so bound each attempt purely by wall time and always reap with `wait`
+	# before moving on, rather than polling liveness.
+	local N ATTEMPTS=0
+	for N in $(seq 90 199); do
+		[ -e "/tmp/.X${N}-lock" ] && continue
+		ATTEMPTS=$((ATTEMPTS + 1))
+		Xvfb ":${N}" -screen 0 1280x1024x24 -nolisten tcp >"/tmp/chextrek-xvfb-${N}.log" 2>&1 &
+		CHEXTREK_XVFB_PID=$!
+		local WAITED=0
+		while [ $WAITED -lt 10 ] && [ ! -e "/tmp/.X${N}-lock" ]; do
+			sleep 0.1
+			WAITED=$((WAITED + 1))
+		done
+		if [ -e "/tmp/.X${N}-lock" ]; then
+			export DISPLAY=":${N}"
+			return 0
+		fi
+		kill "$CHEXTREK_XVFB_PID" 2>/dev/null
+		wait "$CHEXTREK_XVFB_PID" 2>/dev/null
+		CHEXTREK_XVFB_PID=""
+		[ $ATTEMPTS -ge 3 ] && break
+	done
+	echo "ENVIRONMENT: no display - couldn't start Xvfb (tried ${ATTEMPTS} free display number(s))."
+	echo "ENVIRONMENT: this is not a test failure. Fix Xvfb on this host; do not wait or retry."
+	exit 3
+}
+
 # chextrek_exit_no_display
 #
 # dhewm3 needs an active interactive desktop. When this Windows user session is disconnected
 # (another user switched in on the console, or an RDP session dropped), SDL can't open a window
 # and every run fails. That is an environment problem, not a test result, and it won't clear
 # until a human reconnects - so exit the whole calling script with code 3 instead of returning
-# a normal FAIL that reads like a code bug.
+# a normal FAIL that reads like a code bug. Also stops this call's own Xvfb (#60), if it started
+# one, so a display dying mid-run never leaks it.
 chextrek_exit_no_display() {
-	echo "ENVIRONMENT: no display - this Windows session is not the active console session, so dhewm3 can't open a window."
-	echo "ENVIRONMENT: this is not a test failure. Stop and tell the human to reconnect to this session; do not wait or retry."
+	if [ -n "${CHEXTREK_XVFB_PID:-}" ]; then
+		kill "$CHEXTREK_XVFB_PID" 2>/dev/null
+		wait "$CHEXTREK_XVFB_PID" 2>/dev/null
+	fi
+	if chextrek_is_linux; then
+		echo "ENVIRONMENT: no display - the X display this run started or was given died before dhewm3 could open a window."
+		echo "ENVIRONMENT: this is not a test failure. Fix Xvfb/Wine on this host; do not wait or retry."
+	else
+		echo "ENVIRONMENT: no display - this Windows session is not the active console session, so dhewm3 can't open a window."
+		echo "ENVIRONMENT: this is not a test failure. Stop and tell the human to reconnect to this session; do not wait or retry."
+	fi
 	exit 3
 }
 
@@ -149,18 +250,45 @@ chextrek_exit_no_display() {
 # call returns. Does not exit the shell - callers decide what to do with a non-zero
 # CHEXTREK_RUN_STATUS - except when there is no display (see chextrek_exit_no_display), which
 # exits the calling script with code 3.
+#
+# This is a thin wrapper around _chextrek_run_console_script_impl so that an Xvfb this call
+# started on Linux/Wine (#60, see chextrek_ensure_display_or_exit) always gets stopped again on
+# every return path out of the impl - without having to remember a cleanup call at each of the
+# impl's several early returns. A no-display exit (chextrek_exit_no_display) bypasses this wrapper
+# entirely (exit, not return), so it does its own Xvfb cleanup inline.
 chextrek_run_console_script() {
+	CHEXTREK_XVFB_PID=""
+	_chextrek_run_console_script_impl "$@"
+	local RC=$?
+	if [ -n "$CHEXTREK_XVFB_PID" ]; then
+		kill "$CHEXTREK_XVFB_PID" 2>/dev/null
+		wait "$CHEXTREK_XVFB_PID" 2>/dev/null
+	fi
+	return $RC
+}
+
+_chextrek_run_console_script_impl() {
 	local REPO_ROOT="$1"
 	local CONSOLE_SCRIPT_BODY="$2"
 	local TIMEOUT_SECS="$3"
 	local RUN_LABEL="${4:-chextrek_harness}"
 
-	DHEWM3_HOME="${DHEWM3_HOME:-/c/Users/Scott/dhewm3/1.5.5-win32/dhewm3}"
-	DOOM3_BASEPATH="${DOOM3_BASEPATH:-/c/Program Files (x86)/Steam/steamapps/common/Doom 3}"
+	if chextrek_is_linux; then
+		DHEWM3_HOME="${DHEWM3_HOME:-$HOME/games/dhewm3/1.5.5-win32/dhewm3}"
+		DOOM3_BASEPATH="${DOOM3_BASEPATH:-$HOME/games/doom3}"
+		export WINEPREFIX="${WINEPREFIX:-$HOME/games/wineprefix-chextrek}"
+		# Unicron has nobody logged in, ever (#60 AC: "works over SSH with no DISPLAY set") - bring
+		# our own display instead of treating "no display" as the environment stop qwinsta is for on
+		# Windows below.
+		chextrek_ensure_display_or_exit
+	else
+		DHEWM3_HOME="${DHEWM3_HOME:-/c/Users/Scott/dhewm3/1.5.5-win32/dhewm3}"
+		DOOM3_BASEPATH="${DOOM3_BASEPATH:-/c/Program Files (x86)/Steam/steamapps/common/Doom 3}"
 
-	# qwinsta marks this process's own session with ">"; anything but Active means no display.
-	if command -v qwinsta >/dev/null 2>&1 && ! qwinsta 2>/dev/null | grep -E '^>' | grep -qw Active; then
-		chextrek_exit_no_display
+		# qwinsta marks this process's own session with ">"; anything but Active means no display.
+		if command -v qwinsta >/dev/null 2>&1 && ! qwinsta 2>/dev/null | grep -E '^>' | grep -qw Active; then
+			chextrek_exit_no_display
+		fi
 	fi
 
 	local DHEWM3_EXE="${DHEWM3_HOME}/dhewm3.exe"
@@ -177,14 +305,17 @@ chextrek_run_console_script() {
 	fi
 
 	# --- keep the basepath's "chextrek" mount pointed at *this* checkout (worktrees change this) ---
-	# IMPORTANT: this must be a real NTFS symlink (readlink resolves it, `fsutil reparsepoint
+	# On Windows this must be a real NTFS symlink (readlink resolves it, `fsutil reparsepoint
 	# query` shows a "Symbolic Link" tag). Plain `ln -s` on a directory falls back to a full
 	# recursive copy on this toolchain when it can't get symlink privilege - that would silently
 	# test a stale copy instead of this checkout, and `rm -rf` on a *copy* is safe but on a real
 	# reparse point it must never be used (it would recurse through the link and could delete the
 	# checkout it points at). `MSYS=winsymlinks:nativestrict` forces the real symlink; if that
 	# ever stops being permitted on a dev machine, fix the privilege (Developer Mode) rather than
-	# loosening this.
+	# loosening this. Unicron (Linux/Wine, #60) has no such privilege quirk - a plain `ln -s`
+	# creates a real symlink outright (spike #59 confirmed this "just works" unmodified) - but the
+	# readlink verification below still applies on both, so a silent fallback would be caught the
+	# same way.
 	local MOD_LINK="${DOOM3_BASEPATH}/chextrek"
 	local CURRENT_TARGET=""
 	if [ -L "$MOD_LINK" ]; then
@@ -200,7 +331,11 @@ chextrek_run_console_script() {
 		fi
 		echo "==> Pointing ${MOD_LINK} at ${WANT_TARGET}"
 		rm -f "$MOD_LINK"
-		MSYS=winsymlinks:nativestrict ln -s "$WANT_TARGET" "$MOD_LINK"
+		if chextrek_is_linux; then
+			ln -s "$WANT_TARGET" "$MOD_LINK"
+		else
+			MSYS=winsymlinks:nativestrict ln -s "$WANT_TARGET" "$MOD_LINK"
+		fi
 		if [ "$(readlink "$MOD_LINK" 2>/dev/null)" != "$WANT_TARGET" ]; then
 			echo "error: couldn't create a real symlink at ${MOD_LINK} (no symlink privilege?). See docs/dev-setup.md." >&2
 			CHEXTREK_RUN_STATUS=1
@@ -208,11 +343,19 @@ chextrek_run_console_script() {
 		fi
 	fi
 
-	# --- dhewm3 hardcodes its per-user save folder on Windows (Documents/My Games/dhewm3);
-	# that's our scratch save path - it can't be redirected via fs_savepath (see
-	# docs/dev-setup.md), but it already lives outside this repo, which is what the "never write
-	# into the repo" AC is about.
-	local DOCUMENTS_DIR="${DHEWM3_DOCUMENTS_DIR:-${HOME}/Documents}"
+	# --- dhewm3 hardcodes its per-user save folder (Documents/My Games/dhewm3); that's our
+	# scratch save path - it can't be redirected via fs_savepath (see docs/dev-setup.md), but it
+	# already lives outside this repo, which is what the "never write into the repo" AC is about.
+	# On Unicron (#60) "Documents" is the one inside the Wine prefix dhewm3 actually runs in, not
+	# this Linux user's own $HOME/Documents.
+	local DOCUMENTS_DIR
+	if [ -n "${DHEWM3_DOCUMENTS_DIR:-}" ]; then
+		DOCUMENTS_DIR="$DHEWM3_DOCUMENTS_DIR"
+	elif chextrek_is_linux; then
+		DOCUMENTS_DIR="${WINEPREFIX}/drive_c/users/$(id -un)/Documents"
+	else
+		DOCUMENTS_DIR="${HOME}/Documents"
+	fi
 	local SAVE_ROOT="${DOCUMENTS_DIR}/My Games/dhewm3"
 	local MOD_SAVE_DIR="${SAVE_ROOT}/chextrek"
 
@@ -245,29 +388,55 @@ chextrek_run_console_script() {
 	local LOG_FILE="${SAVE_ROOT}/dhewm3log.txt"
 	rm -f "$LOG_FILE"
 
+	local -a ENGINE_ARGS=(
+		+set fs_basepath "$(chextrek_to_engine_path "$DOOM3_BASEPATH")"
+		+set fs_game chextrek
+		+set fs_gameDllPath "$(chextrek_to_engine_path "$REPO_ROOT")"
+		+set developer 1
+		+set in_nograb 1
+		+set r_fullscreen 0
+		+exec "$CFG_NAME"
+	)
+
 	# NOTE: this must run *in the foreground*, not backgrounded with `&`. Backgrounding it under
 	# this shell was observed to change how/when dhewm3 flushes its log to disk, even though the
 	# process is a native, independent Windows GUI app either way. `timeout` wraps it in the
 	# foreground and still delivers a clean kill when the ceiling is hit.
 	echo "==> Launching dhewm3 (mod=chextrek, timeout=${TIMEOUT_SECS}s, scenario=${RUN_LABEL})"
-	timeout "$TIMEOUT_SECS" "$DHEWM3_EXE" \
-		+set fs_basepath "$(cygpath -w "$DOOM3_BASEPATH")" \
-		+set fs_game chextrek \
-		+set fs_gameDllPath "$(cygpath -w "$REPO_ROOT")" \
-		+set developer 1 \
-		+set in_nograb 1 \
-		+set r_fullscreen 0 \
-		+exec "$CFG_NAME"
-	local RUN_EXIT=$?
+	local RUN_EXIT
+	if chextrek_is_linux; then
+		# `bash -c '... && exec wine ...'` cds into the engine's own dir first (it looks for
+		# SDL2.dll/OpenAL32.dll next to itself, spike #59) and then `exec`s into wine, so `timeout`
+		# is still tracking exactly one PID - the wine process itself, not a wrapper shell around
+		# it. `--kill-after` guarantees that PID actually dies on timeout instead of just being
+		# asked to (#60 AC: "a timeout kills only the dhewm3 process the harness started" - not
+		# Windows' machine-wide taskkill-by-image-name below).
+		timeout --kill-after=10 "$TIMEOUT_SECS" bash -c 'cd "$1" && shift && exec wine "$@"' _ \
+			"$DHEWM3_HOME" "$DHEWM3_EXE" "${ENGINE_ARGS[@]}"
+	else
+		timeout "$TIMEOUT_SECS" "$DHEWM3_EXE" "${ENGINE_ARGS[@]}"
+	fi
+	RUN_EXIT=$?
 
 	local TIMED_OUT=0
 	if [ $RUN_EXIT -eq 124 ] || [ $RUN_EXIT -eq 137 ]; then
 		TIMED_OUT=1
 		echo "==> Timed out after ${TIMEOUT_SECS}s - an error dialog likely hung the game. Killed it."
-		# Belt-and-braces: `timeout` already sent the kill, but make sure nothing lingers. This
-		# kills *every* dhewm3.exe on the machine (image-name match, not PID) - see the "one run
-		# at a time" note in docs/dev-setup.md.
-		taskkill //F //IM dhewm3.exe >/dev/null 2>&1
+		if ! chextrek_is_linux; then
+			# Belt-and-braces: `timeout` already sent the kill, but make sure nothing lingers. This
+			# kills *every* dhewm3.exe on the machine (image-name match, not PID) - see the "one
+			# run at a time" note in docs/dev-setup.md. On Linux, `timeout --kill-after` above
+			# already killed exactly the PID this call started - no machine-wide fallback needed.
+			taskkill //F //IM dhewm3.exe >/dev/null 2>&1
+		fi
+	fi
+
+	# The win32 engine writes its log with CRLF line endings. Git Bash's grep on Windows ignores
+	# the trailing CR; Linux grep doesn't, so every `...$`-anchored always-on check below would
+	# silently fail even though the value is right there (spike #59 finding 1). Normalize before
+	# archiving/asserting, on the log this run wrote to, before it's ever grepped.
+	if chextrek_is_linux && [ -f "$LOG_FILE" ]; then
+		sed -i 's/\r$//' "$LOG_FILE"
 	fi
 
 	# --- archive this run's artifacts (log + any screenshot), still outside the repo ---

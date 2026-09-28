@@ -21,9 +21,9 @@ functions against the reference files.
 |---|---|---|
 | `chextrek.dll` builds (32-bit x86) from stock dhewm3-sdk pinned at `ad837f9b1b` | `tools/build-chextrek.sh` | covered |
 | Harness launches dhewm3 1.5.5 win32 with the mod mounted, drives it with a console script ending in `quit`, kills a hung run after a timeout | `tools/run-harness.sh` (`tools/run-scenario.sh` for any console script) | covered |
-| Harness stops at once with exit 3 and one `ENVIRONMENT` line when there's no display (disconnected Windows session) | `tools/test-harness-no-display.sh` | covered - self-test; stubs `qwinsta`, never launches the game. |
+| Harness stops at once with exit 3 and one `ENVIRONMENT` line when there's no display (disconnected Windows session), or brings up its own display when none is usable (Unicron/Wine, #60) | `tools/test-harness-no-display.sh` | covered - self-test; on Windows stubs `qwinsta`, on Linux hides Xvfb, never launches the game either way. |
 | `chextrek.dll` (not `base.dll`) is the game library that loaded; state-dump command `chextrek_dump` prints a stable header (`CHEXTREK-STATE-DUMP v1`) | always-on checks, every run | covered - each feature below adds its own dump lines. |
-| Main menu loads clean (script compile passes) | `tools/test-menu-smoke.sh` | covered - also checks #29's known `openDoors` unknown-event failure is gone. |
+| Main menu loads clean (script compile passes), on both the Windows dev machine and Unicron (Linux/Wine, #60) - same script, same interface, unchanged assertions | `tools/test-menu-smoke.sh` | covered - also checks #29's known `openDoors` unknown-event failure is gone. |
 | Always-on checks on both real maps (`e1m1`, `sf_923`) | every scenario that loads a map | covered - no allowlist. The unknown-spawnclass check matches the engine's real message (`Could not spawn '<classname>'.  Class '<spawnclass>' not found`). |
 
 ## Per-feature (spec #28 order)
