@@ -386,11 +386,12 @@ prints this same reminder once it launches the engine.
 ### AFK trigger: a systemd user timer polls origin/master (spec #58/#68)
 
 Nobody has to start anything. A systemd **user** timer on Unicron, combined with lingering
-(already enabled for this user - `loginctl show-user <user> -p Linger`; this ticket doesn't touch
-it), polls `origin/master` on a schedule and hands every new commit to
-`tools/pipeline-process-commit.sh`, oldest first, one at a time - the trigger #66/#67 were built
-without, and the piece that makes spec #58 actually AFK: a commit pushed while nobody is logged in
-to Unicron still gets built, tested and published (or reported red).
+(already enabled for this user - `loginctl show-user <user> -p Linger`; spec #58/#68 doesn't touch
+it - if it were ever off, `loginctl enable-linger <user>` turns it on), polls `origin/master` on a
+schedule and hands every new commit to `tools/pipeline-process-commit.sh`, oldest first, one at a
+time - the trigger #66/#67 were built without, and the piece that makes spec #58 actually AFK: a
+commit pushed while nobody is logged in to Unicron still gets built, tested and published (or
+reported red).
 
 **The poll logic itself** lives in `tools/pipeline-poll.sh` - a plain script with no systemd
 dependency (systemd just calls it on a timer), so it's fully covered by
@@ -406,7 +407,13 @@ poller has already handed off (`CHEXTREK_PIPELINE_STATE_DIR/poller-last-processe
 state root `tools/pipeline-process-commit.sh` uses), and processes every commit newer than that,
 **oldest first, one full `tools/pipeline-process-commit.sh` run at a time, in this one call**. The
 state file is updated after each commit's own run returns, not once at the end, so an interrupted
-backlog resumes exactly where it left off.
+backlog resumes exactly where it left off. The backlog is walked via `git rev-list --first-parent`
+- master's own linear merge-commit history, the same shape every PR into this repo actually takes
+(a merge commit per PR, same as this repo's own `Merge #67:`/`Merge #69:` commits) - deliberately
+**not** a plain `rev-list`, which would also enumerate every individual commit on each merged-in
+feature branch, interleaved by date across branches rather than in master's own merge order -
+exactly the out-of-order processing the in-order design below exists to avoid, and a needless
+suite run/release per WIP commit on a branch that never itself sat at the tip of master.
 
 **Why oldest-first, one at a time, rather than skipping straight to the newest commit when several
 land between polls:** #67's red/green issue tracking is explicitly documented as only safe for
@@ -435,16 +442,22 @@ tip without processing anything, a WARNING is logged, and the poll tick exits 2 
 
 **No overlap** has two independent layers:
 
-1. **systemd's own singleton semantics for the oneshot service** - the primary guarantee. Starting
-   a service that's already active doesn't spawn a second instance; a timer firing while the
-   previous run is still going is effectively absorbed. `tools/systemd/*.timer.tmpl` schedules the
-   next tick `OnUnitActiveSec` after the *previous run finished*, not on a fixed wall-clock grid,
-   so a slow run (a backlog) never causes two to pile up in the first place.
+1. **systemd's own singleton semantics for the oneshot service** - the primary guarantee, and a
+   general systemd unit-activation invariant, not something specific to timers: starting a unit
+   that's already active is a no-op job (it returns at once; it does not queue up a second
+   execution once the first finishes), whether the `start` comes from the timer's own elapse or
+   from a human running `systemctl --user start` by hand while a run is in progress. Live-verified
+   directly (`tools/test-pipeline-poll-systemd.sh`, phase D) via an explicit concurrent
+   `systemctl --user start` against a deliberately slow run - not by waiting for the real timer to
+   happen to re-elapse during the busy window, which turned out (probed live against this same
+   systemd) to be too timing-dependent to assert reliably in a bounded self-test; the underlying
+   job-control guarantee is identical either way.
 2. **`tools/pipeline-poll.sh`'s own non-blocking flock** (`STATE_DIR/locks/poll.lock`, separate
    from `pipeline-process-commit.sh`'s own per-tag lock) - defense in depth against anything
-   invoking the poll script outside systemd (a human running it by hand while the timer also
-   fires). A tick that finds the lock already held logs that and exits 0 at once, rather than
-   queuing - the next tick picks up any backlog.
+   invoking the poll script outside systemd entirely (e.g. a human running it directly by hand,
+   bypassing `systemctl` altogether, while the timer also fires). A tick that finds the lock
+   already held logs that and exits 0 at once, rather than queuing - the next tick picks up any
+   backlog.
 
 **Installing the timer** - `tools/setup-pipeline-poll-timer.sh` renders
 `tools/systemd/chextrek-pipeline-poll.{service,timer}.tmpl` into
@@ -468,11 +481,25 @@ future poll tick, indefinitely. `--interval` defaults to `10min`; `--branch` def
 does **not** enable or start anything, so installing is safe to do well ahead of actually turning
 the poller on.
 
-**Reboot survival** (AC): `Persistent=true` in the timer unit means a tick missed entirely while
-Unicron was off still fires once shortly after the next boot, instead of waiting a full interval
-more; `WantedBy=timers.target` plus `enable` is what makes it come back after a reboot at all;
-lingering (already on for this user) is what lets a `systemd --user` unit run with nobody logged
-in in the first place. Can't reboot Unicron from here to prove this live - verified instead via
+**That dedicated checkout's own `tools/` scripts are not self-updating.** The poller only ever
+`git fetch`es `origin/<branch>` to read new commits - it never `git pull`s its own checkout, so
+`tools/pipeline-poll.sh`/`tools/pipeline-process-commit.sh` as they run unattended stay pinned to
+whatever commit that checkout happened to be at when installed, even as `origin/master` moves
+ahead under them (this is the same pattern `tools/pipeline-process-commit.sh` already used by hand
+before spec #58/#68 - not new here, just now unattended, where nobody will notice a stale checkout
+by eye). If a change to either script needs to take effect, update that checkout by hand (e.g.
+`git -C /path/to/checkout pull`) - a future improvement could have the poller pull its own
+checkout each tick, but that's out of scope here.
+
+**Reboot survival** (AC): `WantedBy=timers.target` plus `enable` is what makes the timer come back
+after a reboot at all; lingering (already on for this user) is what lets a `systemd --user` unit
+run with nobody logged in in the first place; `OnBootSec=5min` (boot-relative, not wall-clock) is
+what makes a tick fire again shortly after *any* boot, catching up on whatever time Unicron was
+off regardless of how long that was. `Persistent=true` is included in the timer unit per the usual
+systemd convention, but - `systemd.timer(5)` is explicit about this - it only has an effect for
+`OnCalendar=` timers; this timer uses `OnBootSec=`/`OnUnitActiveSec=` instead, for which it's a
+documented no-op, so it isn't what's actually doing the reboot-catch-up work here - `OnBootSec=`
+alone already provides it, as above. Can't reboot Unicron from here to prove this live - verified instead via
 `systemd-analyze --user verify` against the rendered units (clean, no warnings) and by inspection
 of the unit files themselves; **owner-pending**: reboot Unicron once the real timer is enabled and
 confirm `systemctl --user list-timers` still shows it afterwards.
@@ -491,27 +518,38 @@ session or interactively-sourced shell profile is needed for any of the followin
   `PATH`, for exactly this "nobody set up a shell first" case.
 - Display: nothing sets `DISPLAY` here on purpose - the harness (`tools/lib-harness.sh`) brings up
   its own Xvfb per run, same as every other unattended invocation on Unicron.
+- Network: the unit deliberately has no `After=`/`Wants=network-online.target` - that target has
+  no meaning for a `systemd --user` manager (confirmed live: `systemctl --user status
+  network-online.target` reports `LoadState=not-found`), so adding it would be a silent no-op, not
+  a real ordering guarantee. A poll tick that runs before the network is actually up simply fails
+  fast (`tools/pipeline-poll.sh`'s own `git fetch` exit 2) and is retried at the next interval.
 
 **What's proven where:**
 - **Self-test, no systemd** (`tools/test-pipeline-poll.sh`): the poll/state/ordering logic end to
   end against a local bare repo standing in for `origin` and a stubbed process-commit command (not
   the real `tools/pipeline-process-commit.sh` - that script's own behavior is
   `tools/test-pipeline-process-commit.sh`'s job) - bootstrap, up-to-date no-op, a single new
-  commit, a multi-commit backlog processed in order, red/environment-blocked results still
-  advancing the baseline, a poll-level error stopping and being retried first (not skipped) next
-  time, the poll lock's no-overlap skip, and history-divergence handling.
+  commit, a multi-commit backlog processed in order (including a merge commit, processed once via
+  `--first-parent`, with the individual commits it merged in never processed separately),
+  red/environment-blocked results still advancing the baseline, a poll-level error stopping and
+  being retried first (not skipped) next time, a merge-base lookup error being treated as a
+  poll-level error rather than a false force-push reset, the poll lock's no-overlap skip, and
+  history-divergence handling.
 - **Live systemd mechanics** (`tools/test-pipeline-poll-systemd.sh`): a real, uniquely-named
-  throwaway unit (`chextrek-pipeline-test-<pid>-<random>`), a 3-second interval, a stubbed `gh` and
-  stubbed suite command, an isolated state dir, and a local bare repo as `origin` - proves a real
-  timer-fired oneshot service bootstraps, processes a newly-pushed commit exactly once and
-  publishes its (stub) release, skips a commit already processed, and never lets a second
-  invocation run concurrently with a slow one even when the timer interval is shorter than the run
-  itself. Skips cleanly (prints `SKIP`, exits 0) if `systemctl --user` isn't usable in the
-  environment it's run in; unconditionally disables, removes and `daemon-reload`s its throwaway
-  unit (and `reset-failed`s it) on every exit path, live-verified by hand afterwards
-  (`systemctl --user list-timers --all` / `list-units --all | grep chextrek`) to leave nothing
-  behind.
-- **Never done in this ticket, on purpose (HARD RULE):** the real "chextrek-pipeline-poll" unit was
+  throwaway unit (`chextrek-pipeline-test-<pid>-<random>`), a stubbed `gh` and stubbed suite
+  command, an isolated state dir, and a local bare repo as `origin` - proves a real oneshot service
+  bootstraps, processes a newly-pushed commit exactly once and publishes its (stub) release, skips
+  a commit already processed, and is never joined by a second concurrent invocation while a run is
+  slow (proven via an explicit second `systemctl --user start` while a run is confirmed mid-flight
+  - not by waiting for the real timer to happen to re-elapse during that busy window, which turned
+  out to be too timing-dependent to assert reliably in a bounded test; both go through the same
+  systemd job-control machinery, so this is equally strong evidence for the timer's own no-overlap
+  safety - see the test's own phase-D comment). Skips cleanly (prints `SKIP`, exits 0) if
+  `systemctl --user` isn't usable in the environment it's run in; unconditionally disables, removes
+  and `daemon-reload`s its throwaway unit (and `reset-failed`s it) on every exit path,
+  live-verified by hand afterwards (`systemctl --user list-timers --all` /
+  `list-units --all | grep chextrek`) to leave nothing behind.
+- **Never done in spec #58/#68, on purpose (HARD RULE):** the real "chextrek-pipeline-poll" unit was
   never installed or enabled against the real `origin/master` with a real `gh` - that would let an
   unattended poll tick publish a real release the moment any new commit landed, which is forbidden
   until spec #58 is merged and the VS Build Tools license use is confirmed (#64). `gh release list`

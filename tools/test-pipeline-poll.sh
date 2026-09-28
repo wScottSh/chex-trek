@@ -280,6 +280,50 @@ else
 	fail "post-divergence follow-up: exit=$CODE calls=$(wc -l <"$STUB_PROCESS_CALLS")"
 fi
 
+# === 10. a merge commit lands on master (a PR-style merge, same shape as this repo's own
+# history): only the merge commit itself is processed - --first-parent must skip the individual
+# feature-branch commits it merged in, never process them out of master's own order ===
+reset_calls
+# PUSHER's own local master can be stale after test 9's force-push (done via a separate throwaway
+# clone, never through PUSHER) - resync it to origin/master first, same as any real contributor
+# would after a force-push, so this push isn't rejected as non-fast-forward.
+git -C "$PUSHER" fetch -q origin master
+git -C "$PUSHER" checkout -q -B master origin/master
+git -C "$PUSHER" checkout -q -b feature-x
+git -C "$PUSHER" commit -q --allow-empty -m "feature commit 1"
+FEATURE_SHA1="$(git -C "$PUSHER" rev-parse HEAD)"
+git -C "$PUSHER" commit -q --allow-empty -m "feature commit 2"
+FEATURE_SHA2="$(git -C "$PUSHER" rev-parse HEAD)"
+git -C "$PUSHER" checkout -q master
+git -C "$PUSHER" merge -q --no-ff -m "Merge feature-x" feature-x
+MERGE_SHA="$(git -C "$PUSHER" rev-parse HEAD)"
+git -C "$PUSHER" push -q origin master
+git -C "$PUSHER" branch -q -D feature-x
+OUT="$(poll)"
+CODE=$?
+GOT_CALLS="$(calls_since | tr '\n' ' ')"
+if [ "$CODE" = "0" ] && [ "$GOT_CALLS" = "${MERGE_SHA} " ] && [ "$(cat "$STATE_FILE")" = "$MERGE_SHA" ]; then
+	pass "a merge commit is processed exactly once, as itself - the merged-in feature commits are never individually processed"
+else
+	fail "merge commit handling: exit=$CODE calls='${GOT_CALLS}' expected only '${MERGE_SHA}' (never ${FEATURE_SHA1} or ${FEATURE_SHA2}) state='$(cat "$STATE_FILE")'"
+fi
+
+# === 11. a merge-base error that isn't a real divergence (e.g. the state file naming an object
+# this repo doesn't have) is a poll-level error, not a false "force-push" reset - the baseline is
+# left exactly as it was, not clobbered with the current tip ===
+reset_calls
+cp "$STATE_FILE" "${STATE_FILE}.bak"
+BOGUS_SHA="0000000000000000000000000000000000000000"
+printf '%s\n' "$BOGUS_SHA" >"$STATE_FILE"
+OUT="$(poll)"
+CODE=$?
+if [ "$CODE" = "2" ] && [ "$(wc -l <"$STUB_PROCESS_CALLS")" = "0" ] && [ "$(cat "$STATE_FILE")" = "$BOGUS_SHA" ] && ! printf '%s' "$OUT" | grep -q "diverged"; then
+	pass "a merge-base error (bad object, not a real divergence) is a poll-level error - baseline left untouched, never falsely reset"
+else
+	fail "merge-base-error handling: exit=$CODE calls=$(wc -l <"$STUB_PROCESS_CALLS") state='$(cat "$STATE_FILE")' expected_unchanged='${BOGUS_SHA}'"
+fi
+mv "${STATE_FILE}.bak" "$STATE_FILE"
+
 echo
 if [ "$FAIL" = "0" ]; then
 	echo "PASS: whole suite"

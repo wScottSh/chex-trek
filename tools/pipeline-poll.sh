@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
 # AFK trigger (spec #58/#68): one poll tick. Fetches origin/<branch> (default "master"), finds
 # every commit newer than the last one this poller has already handed to
-# tools/pipeline-process-commit.sh, and processes each of them, oldest first, one at a time, in a
-# single call to this script. Meant to be invoked by a systemd user timer (tools/systemd/) - see
-# docs/dev-setup.md's "AFK trigger" section for install/enable/disable/status/logs - but has no
-# systemd dependency itself: it's a plain script a human (or cron, or anything else) can run by
-# hand, which is also what makes it self-testable without systemd (tools/test-pipeline-poll.sh).
+# tools/pipeline-process-commit.sh via `git rev-list --first-parent` (master's own linear
+# merge-commit history - see "the actual backlog" below for why not a plain `rev-list`, which
+# would also walk every individual commit on each merged-in feature branch), and processes each of
+# them, oldest first, one at a time, in a single call to this script. Meant to be invoked by a
+# systemd user timer (tools/systemd/) - see docs/dev-setup.md's "AFK trigger" section for
+# install/enable/disable/status/logs - but has no systemd dependency itself: it's a plain script a
+# human (or cron, or anything else) can run by hand, which is also what makes it self-testable
+# without systemd (tools/test-pipeline-poll.sh).
 #
 # Usage: tools/pipeline-poll.sh
 #
@@ -36,7 +39,7 @@
 # processing anything - it would otherwise try to process this repo's entire history the first
 # time the timer ever fires, publishing a release for every past commit. Establishing "now" as the
 # baseline and only reacting to commits pushed *after* that matches the AFK trigger's own framing
-# ("each new origin/master commit") and this ticket's hard rule against any real, unintended
+# ("each new origin/master commit") and spec #58/#68's hard rule against any real, unintended
 # release.
 #
 # History divergence (a force-push to the polled branch, rewriting history past the last-processed
@@ -129,11 +132,23 @@ if [ -z "$TIP" ]; then
 	exit 2
 fi
 
+# write_state SHA - atomically writes SHA as the new "last processed" marker. Exits 2 at once on
+# any failure (the header's own promised exit 2 for "the state file couldn't be ... written") -
+# never silently continues past a marker that didn't actually get written, which would let a
+# commit be reprocessed (harmless but wasteful) or, worse, be silently skipped depending on where
+# in the loop the failure happened.
+write_state() {
+	if ! printf '%s\n' "$1" >"${STATE_FILE}.tmp" || ! mv "${STATE_FILE}.tmp" "$STATE_FILE"; then
+		log "==> error: couldn't write the state file ${STATE_FILE}"
+		exit 2
+	fi
+}
+
 # --- bootstrap: first poll tick ever (no state file) sets the baseline to the current tip without
 # processing anything - see header for why ---
 if [ ! -f "$STATE_FILE" ]; then
 	log "==> no state file at ${STATE_FILE} yet - bootstrapping baseline to ${TIP} (origin/${BRANCH}) without processing any history"
-	printf '%s\n' "$TIP" >"${STATE_FILE}.tmp" && mv "${STATE_FILE}.tmp" "$STATE_FILE"
+	write_state "$TIP"
 	log "==> bootstrap complete"
 	exit 0
 fi
@@ -150,21 +165,48 @@ if [ "$LAST" = "$TIP" ]; then
 fi
 
 # --- divergence check: LAST must still be an ancestor of TIP, or origin/<branch> was rewritten
-# (force-push) past a commit this poller already handed off - see header ---
-if ! git -C "$REPO_ROOT" merge-base --is-ancestor "$LAST" "$TIP" 2>/dev/null; then
+# (force-push) past a commit this poller already handed off - see header. `--is-ancestor`'s exit
+# status is 3-way, not boolean: 0 = is an ancestor, 1 = confirmed *not* an ancestor (the real
+# divergence case), anything else (2, or a signal) = git itself couldn't answer the question at
+# all (a corrupt/incomplete object, transient repo error) - that's a poll-level error, not a
+# divergence finding, and must never be treated as one: doing so would permanently reset the
+# baseline past commits that were never actually processed, silently skipping them for good. ---
+git -C "$REPO_ROOT" merge-base --is-ancestor "$LAST" "$TIP" 2>/dev/null
+ANCESTOR_STATUS=$?
+if [ "$ANCESTOR_STATUS" = "1" ]; then
 	log "==> WARNING: origin/${BRANCH} has diverged from the last-processed commit ${LAST} (force-push?) - resetting baseline to ${TIP} without processing anything; investigate manually"
-	printf '%s\n' "$TIP" >"${STATE_FILE}.tmp" && mv "${STATE_FILE}.tmp" "$STATE_FILE"
+	write_state "$TIP"
+	exit 2
+elif [ "$ANCESTOR_STATUS" != "0" ]; then
+	log "==> error: 'git merge-base --is-ancestor' couldn't determine whether ${LAST} is an ancestor of ${TIP} (exit ${ANCESTOR_STATUS}) - not treating this as a force-push; leaving the baseline untouched"
 	exit 2
 fi
 
-# --- the actual backlog, oldest first (see header for why not "just the newest") ---
-mapfile -t NEW_COMMITS < <(git -C "$REPO_ROOT" rev-list --reverse "${LAST}..${TIP}")
+# --- the actual backlog, oldest first (see header for why not "just the newest"), --first-parent
+# only: LAST is confirmed an ancestor of TIP and LAST != TIP above, so a *linear* first-parent walk
+# from TIP back to LAST can never be empty - master takes merge commits (every PR here lands via
+# one), and without --first-parent, rev-list would also yield every individual commit *on* each
+# merged-in feature branch, interleaved by date across branches rather than in master's own merge
+# order - exactly the out-of-order processing the in-order design above exists to avoid (a stale
+# green re-publish of an old feature-branch commit could close a red issue a genuinely later
+# master commit opened; WIP commits from a branch would each get their own suite run/release).
+# --first-parent walks only the commits actually reachable via master's own first-parent chain -
+# each merge commit itself (which already carries the merged branch's full diff) plus any commit
+# pushed to master directly, in true master order. ---
+if ! NEW_COMMITS_RAW="$(git -C "$REPO_ROOT" rev-list --first-parent --reverse "${LAST}..${TIP}")"; then
+	log "==> error: 'git rev-list --first-parent ${LAST}..${TIP}' failed"
+	exit 2
+fi
+mapfile -t NEW_COMMITS <<<"$NEW_COMMITS_RAW"
+# mapfile on empty input yields one empty-string element, not zero elements - filter it out. An
+# empty backlog here is otherwise unreachable (LAST is a confirmed ancestor of TIP, and LAST !=
+# TIP, so TIP itself is always in range) - if it ever happens anyway, treat it as "nothing to do"
+# rather than guess.
+if [ "${#NEW_COMMITS[@]}" -eq 1 ] && [ -z "${NEW_COMMITS[0]}" ]; then
+	NEW_COMMITS=()
+fi
 if [ "${#NEW_COMMITS[@]}" -eq 0 ]; then
-	# LAST != TIP but no commits in between: can happen right after the divergence-reset path
-	# above wrote TIP as the new LAST on a previous, still-in-progress run that then got killed
-	# before this run re-read it - or any other case where the ref moved without new history
-	# reachable from it. Treat it the same as "up to date": nothing to do, not an error.
-	log "==> ${LAST}..${TIP} contains no new commits - nothing to do"
+	log "==> ${LAST}..${TIP} contains no new first-parent commits - nothing to do"
 	exit 0
 fi
 
@@ -175,9 +217,12 @@ PROCESS_CMD="${CHEXTREK_PIPELINE_PROCESS_CMD:-bash \"${SCRIPT_DIR}/pipeline-proc
 POLL_EXIT=0
 for SHA in "${NEW_COMMITS[@]}"; do
 	log "==> processing ${SHA}"
-	# `8>&-` closes this subshell's own copy of the poll lock fd before the (potentially very
-	# long-running - a full suite run) process command runs: same reasoning as
-	# pipeline-process-commit.sh's own `9>&-` around its suite invocation - a process this command
+	# `eval` runs the reconstructed command line ("$PROCESS_CMD" + a literal `"$SHA"` that only
+	# expands once eval re-parses it + `8>&-`) directly in *this* shell, with `8>&-` as a
+	# redirection scoped to that one command - it closes fd 8 for the process command (and
+	# anything it execs) without touching this shell's own copy, which stays open and locked for
+	# the rest of this loop and every later iteration. Same reasoning as
+	# pipeline-process-commit.sh's own `9>&-` around its suite invocation: a process the command
 	# starts that outlives the command itself (wine/Xvfb daemonizing past a killed run, etc.) must
 	# never be able to hold this poll lock open forever.
 	eval "$PROCESS_CMD" '"$SHA"' 8>&-
@@ -187,8 +232,14 @@ for SHA in "${NEW_COMMITS[@]}"; do
 	0 | 1 | 3)
 		# A real, reported result either way (published / red / environment-blocked - #67's issue
 		# tracker already handled it inside process-commit.sh itself) - advance the baseline past
-		# this commit and move on to the next one in the backlog.
-		printf '%s\n' "$SHA" >"${STATE_FILE}.tmp" && mv "${STATE_FILE}.tmp" "$STATE_FILE"
+		# this commit and move on to the next one in the backlog. This deliberately includes exit
+		# 3 (environment blocker): the thing that's broken is the *environment*, not this specific
+		# commit, so there's nothing to gain by re-testing this exact commit again later - once the
+		# environment is fixed, whatever is the current master tip at that point gets built and
+		# tested, which is what actually matters. Leaving an environment-blocked commit unadvanced
+		# would instead retry that same stale commit forever until someone fixes the environment,
+		# even if master has long since moved on.
+		write_state "$SHA"
 		;;
 	*)
 		# 2 (pipeline-level error) or anything else unexpected: not a reliable result for this

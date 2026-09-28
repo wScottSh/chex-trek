@@ -1,18 +1,27 @@
 [Unit]
-Description=chex-trek pipeline: timer for chextrek-pipeline-poll.service (spec #58/#68)
+Description=chex-trek pipeline: timer for the AFK-trigger poll service (spec #58/#68)
 
 [Timer]
-# Runs once shortly after boot/login-manager-start (covers the lingering-enabled, nobody-logged-in
-# case - spec #58's whole point), then again every @@INTERVAL@@ after the *previous run finished*
-# (OnUnitActiveSec, not a wall-clock OnCalendar grid) - a poll tick that overruns one interval
-# (e.g. a backlog of several commits, each a full suite run) never causes two to pile up: the next
-# one is scheduled relative to completion, and systemd additionally refuses to start a second
-# instance of the same (already fully-processed-or-not, singleton) service unit while one is still
-# active - see docs/dev-setup.md's "AFK trigger" section for the full no-overlap argument.
+# Runs once shortly after boot/lingering-start (covers the nobody-logged-in case - spec #58's
+# whole point: this alone is what makes a boot with Unicron never logged into still eventually
+# catch up), then again every @@INTERVAL@@ after the *previous run started* (OnUnitActiveSec
+# counts from the last activation, not from completion - systemd.timer(5)). A run that overruns
+# one interval (e.g. a backlog of several commits, each a full suite run) doesn't cause two
+# concurrent runs to pile up: systemd refuses to start a second instance of the same
+# already-active service unit, and tools/pipeline-poll.sh's own non-blocking lock is a second,
+# independent guard - see docs/dev-setup.md's "AFK trigger" section for the full argument. It does
+# mean the *next* tick after a long run can fire again almost immediately once that run finishes,
+# rather than waiting out the rest of the interval - harmless (that tick just finds "up to date"
+# and exits at once if there's nothing new), and preferred over the alternative here.
 OnBootSec=5min
 OnUnitActiveSec=@@INTERVAL@@
-# Reboot survival (spec #58 AC): a tick missed entirely while Unicron was off (not just delayed)
-# still fires once, shortly after the next boot, instead of silently waiting a full interval more.
+# Persistent=true only has an effect for OnCalendar= timers (systemd.timer(5)) - this timer uses
+# OnBootSec/OnUnitActiveSec instead, for which it's a documented no-op, so it's included here for
+# convention/clarity rather than because it changes behavior. Reboot survival for *this* timer
+# instead comes from OnBootSec itself: a boot-relative trigger inherently "catches up" on the next
+# boot regardless of how long Unicron was off, as long as the timer is enabled (WantedBy=
+# timers.target, below) and lingering is on for this user (already enabled - see
+# docs/dev-setup.md, untouched by spec #58/#68).
 Persistent=true
 
 [Install]
