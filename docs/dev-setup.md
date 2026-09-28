@@ -224,8 +224,14 @@ nothing new and doesn't rebuild.
 |---|---|
 | `0` | Published (just now, or already was - idempotent no-op). |
 | `1` | The suite ran and found a real test FAIL - nothing published. |
-| `2` | A pipeline-level error (bad commit-ish, a worktree/`gh` failure, or the suite reported green but didn't actually produce `chextrek.dll`/`chextrek.pdb`) - not a game result. |
+| `2` | A pipeline-level error: bad commit-ish, a worktree/`gh` failure, the suite reported green but didn't actually produce `chextrek.dll`/`chextrek.pdb`, or the suite exited with anything other than 0/1/3 - not a game result either way. |
 | `3` | An environment blocker, propagated verbatim from `tools/run-all-tests.sh`'s own exit 3 (e.g. Wine not on `PATH`) - not a test result. |
+
+Two runs of the *same* commit (a by-hand run overlapping #68's poller, say) never corrupt each
+other: a per-tag `flock` (under `$CHEXTREK_PIPELINE_STATE_DIR/locks/`, separate from the harness's
+own single-run lock, #62) serializes them, so a second run never force-removes the first run's live
+scratch worktree out from under it. A second run finding the tag already published after waiting
+for the lock is the normal idempotent case above, not an error.
 
 **Where things live, outside every repo/worktree on purpose** (so a scratch worktree's removal in
 step 4 above never touches them, and logs outlive the checkout they describe):
@@ -234,6 +240,7 @@ step 4 above never touches them, and logs outlive the checkout they describe):
 |---|---|---|
 | Scratch worktrees | `$CHEXTREK_PIPELINE_STATE_DIR/worktrees/win-<short-sha>` | one per commit currently being processed; removed again once that run finishes |
 | Pipeline run logs | `$CHEXTREK_PIPELINE_STATE_DIR/logs/<timestamp>-win-<short-sha>-<pid>.log` | one file per run, `tail`-able while a run is in progress |
+| Per-commit locks | `$CHEXTREK_PIPELINE_STATE_DIR/locks/win-<short-sha>.lock` | one per commit tag; held for a run's whole duration, released automatically on exit |
 
 `$CHEXTREK_PIPELINE_STATE_DIR` defaults to `$XDG_STATE_HOME/chextrek-pipeline` if `$XDG_STATE_HOME`
 is set, else `$HOME/.local/state/chextrek-pipeline`.
