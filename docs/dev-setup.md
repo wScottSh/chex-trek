@@ -67,7 +67,9 @@ reproduce the same compiler months later:
 - `winbind`, needed for CMake's MSVC probe (`/Zi`+`/FS` spawn a background `mspdbsrv.exe` under
   Wine; without `winbind` that probe fails with `C1902`, a known msvc-wine limitation).
 
-`tools/build-chextrek.sh`'s Linux branch (`chextrek_is_linux`-style `uname` check) then:
+`tools/build-chextrek.sh`'s Linux branch (a `uname` check, the same test `chextrek_is_linux` in
+`tools/lib-harness.sh` makes - this script doesn't source that library, so it repeats the check
+rather than adding the dependency) then:
 
 1. Checks `docker` is on `PATH` and the pinned image exists - a clear `error:` line pointing at
    `tools/msvc-wine/build-image.sh` if not, never a bare Docker error.
@@ -84,9 +86,11 @@ reproduce the same compiler months later:
 4. The same shared copy step as Windows then copies the resulting `chextrek.dll`/`.pdb` from
    `engine/build` to the repo root.
 
-The result is a genuine `PE32 executable (DLL), Intel 80386` - the same MSVC-ABI binary format the
-official win32 dhewm3 1.5.5 (spec #59) loads, verified by the main-menu smoke run
-(`tools/test-menu-smoke.sh`) passing against it unchanged.
+The result is a `PE32 executable (DLL), Intel 80386` - the same MSVC-ABI binary format the official
+win32 dhewm3 1.5.5 (spec #59) loads. Prove it by running `tools/test-menu-smoke.sh` on Unicron
+without `CHEXTREK_SKIP_BUILD` set: it builds via this Linux branch, then passes every always-on
+check against the result - this was confirmed while developing #64, and the same run reproduces it
+on demand.
 
 **This is noticeably slower than the Windows/MSBuild build** - every `cl`/`link` invocation pays
 Wine per-process startup overhead - expect it to take much longer wall-clock than a native Windows

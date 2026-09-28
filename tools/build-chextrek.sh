@@ -53,13 +53,15 @@ Linux*)
 		"$CHEXTREK_MSVC_IMAGE" \
 		bash -s <<'DOCKER_BUILD_EOF'
 set -euo pipefail
+# Run even if a step below fails, so a failed configure/build never leaves engine/build owned by
+# root (unwritable/undeletable by the invoking user, and in the way of the next attempt).
+trap 'chown -R "${HOST_UID}:${HOST_GID}" engine/build 2>/dev/null || true' EXIT
 CC=cl CXX=cl cmake -S engine/dhewm3-sdk -B engine/build -G Ninja \
 	-DCMAKE_SYSTEM_NAME=Windows -DCMAKE_SYSTEM_PROCESSOR=x86 \
 	-DCMAKE_EXE_LINKER_FLAGS=/MANIFEST:NO -DCMAKE_SHARED_LINKER_FLAGS=/MANIFEST:NO \
 	-DBASE=ON -DBASE_NAME=chextrek -DD3XP=OFF -DCMAKE_BUILD_TYPE="${CONFIG}"
 echo "==> Building (${CONFIG})"
 cmake --build engine/build --target base
-chown -R "${HOST_UID}:${HOST_GID}" engine/build
 DOCKER_BUILD_EOF
 	;;
 *)
