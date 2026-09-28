@@ -40,9 +40,8 @@ to, and set `CHEXTREK_SKIP_BUILD=1` before running an individual `tools/test-*.s
 as-is. `tools/run-all-tests.sh` (#61) honors a `CHEXTREK_SKIP_BUILD=1` set *before* it's called the
 same way: it skips `build-chextrek.sh` and runs the whole suite against whatever `chextrek.dll`
 already sits at the repo root, failing fast with a clear error if there isn't one. Left unset (the
-default), it always builds first, same as before - a stale `CHEXTREK_SKIP_BUILD=1` left over from
-an earlier `test-*.sh` run can't accidentally skip a build on the Windows dev machine, since nobody
-sets it before calling `run-all-tests.sh` there.
+default - nobody sets this before calling `run-all-tests.sh` on the Windows dev machine), it always
+builds first, exactly as before.
 
 | Thing | Location | Notes |
 |---|---|---|

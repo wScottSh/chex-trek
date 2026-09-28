@@ -10,9 +10,8 @@
 # build step yet. On Unicron, set CHEXTREK_SKIP_BUILD=1 *before* calling this script (in addition
 # to copying a prebuilt chextrek.dll to the repo root yourself, same as any tools/test-*.sh run -
 # see docs/dev-setup.md's "Unicron (Linux/Wine)" section) to skip the build step and run the whole
-# suite against that prebuilt DLL as-is. Otherwise (the default) this always builds first,
-# regardless of any CHEXTREK_SKIP_BUILD the caller's environment happens to have set - a stale
-# value there must never silently skip a build on the Windows dev machine.
+# suite against that prebuilt DLL as-is. Left unset (the default - nobody sets this before calling
+# run-all-tests.sh on the Windows dev machine), this always builds first, exactly as before.
 #
 # Exit status: 0 if every script passed, 1 if any failed, 3 if a run stopped because there is no
 # display (an environment blocker, not a test result - the suite stops at once; see
