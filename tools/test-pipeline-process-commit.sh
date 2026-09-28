@@ -147,8 +147,9 @@ export PATH="${SCRATCH}/bin:${PATH}"
 export STUB_GH_ARGV_LOG="${SCRATCH}/gh-argv.log"
 export STUB_GH_ARGV_DIR="${SCRATCH}/gh-argv.d"
 export STUB_GH_RELEASES="${SCRATCH}/gh-releases.txt"
-# Issues: one line per issue, tab-separated "<number>\t<label>\t<state>\t<title>". Comments/closes
-# are each appended, one issue number per line, to their own flat log for easy counting/grepping.
+# Issues: one line per issue, tab-separated "<number>\t<repo>\t<label>\t<state>\t<title>".
+# Comments/closes are each appended, one issue number per line, to their own flat log for easy
+# counting/grepping.
 export STUB_GH_LABELS="${SCRATCH}/gh-labels.txt"
 export STUB_GH_ISSUES="${SCRATCH}/gh-issues.txt"
 export STUB_GH_ISSUE_COMMENTS="${SCRATCH}/gh-issue-comments.txt"
@@ -281,6 +282,7 @@ SHA_SIGNAL="$(commit_sha "signal-killed-suite commit")"
 SHA_SKIP_BUILD="$(commit_sha "ambient-skip-build commit")"
 SHA_CREATE_FAIL="$(commit_sha "create-call-fails-cleanly commit")"
 SHA_CREATE_RACE="$(commit_sha "create-call-fails-after-succeeding commit")"
+SHA_RED_BEFORE_6E="$(commit_sha "red-setup-for-lost-race-close-test commit")"
 SHA_ISSUE_CLOSE_GREEN="$(commit_sha "green-after-red-and-env commit")"
 SHA_ISSUE_RED_AGAIN="$(commit_sha "red-again-after-close commit")"
 SHA_ISSUE_LIST_FAIL_RED="$(commit_sha "red-with-issue-list-failure commit")"
@@ -606,12 +608,36 @@ if grep -qxF "$TAG_CREATE_FAIL" "$STUB_GH_RELEASES"; then fail "a release was re
 
 echo
 echo "=== case 6e: gh release create fails but the release was actually made (its response was lost) -> the recheck finds it, exits 0 ==="
+# A dedicated red run right before this case guarantees an issue is open going in, rather than
+# relying on the case-4e issue surviving every intervening case untouched (a later green case, 6c,
+# legitimately closes it first via the ordinary fresh-publish path - a good sign on its own, but not
+# a stable precondition for this specific case). This "lost the race" path is the other of the two
+# places (besides a fresh publish) that's allowed to close the red issue - since this run's own
+# suite genuinely did just pass for this exact commit, `gh release create` merely lost the race to
+# report it first.
+run_pipeline "$SHA_RED_BEFORE_6E" "${SCRATCH}/suite-red.sh" >/dev/null 2>&1
+OPEN_ISSUE_BEFORE_6E="$(open_issue_number)"
+CLOSE_CALLS_BEFORE_6E="$(count_gh_calls issue close)"
 SHORT_CREATE_RACE="$(git -C "$REPO" rev-parse --short=10 "$SHA_CREATE_RACE")"
 TAG_CREATE_RACE="win-${SHORT_CREATE_RACE}"
 OUT6E="$(STUB_GH_CREATE_FAIL=2 run_pipeline "$SHA_CREATE_RACE" "${SCRATCH}/suite-green.sh")"
 CODE6E=$?
 if [ $CODE6E -eq 0 ]; then pass "exits 0 - the recheck after the failed create found the release"; else fail "exit code $CODE6E, want 0"; echo "$OUT6E"; fi
 if [ "$(count_create_calls "$TAG_CREATE_RACE")" = "1" ]; then pass "the recheck itself never re-attempted a create - one release, not a duplicate"; else fail "expected exactly one create attempt, found $(count_create_calls "$TAG_CREATE_RACE")"; fi
+if [ -z "$OPEN_ISSUE_BEFORE_6E" ]; then
+	fail "expected an open pipeline:red issue going into case 6e (case 4e should have left one open)"
+elif [ "$(count_gh_calls issue close)" = "$((CLOSE_CALLS_BEFORE_6E + 1))" ] && [ "$(issue_state "$OPEN_ISSUE_BEFORE_6E")" = "closed" ]; then
+	pass "the 'lost the race but the release exists' recheck also closed the still-open red issue"
+else
+	fail "expected the lost-race recheck to close issue #${OPEN_ISSUE_BEFORE_6E} (before=${CLOSE_CALLS_BEFORE_6E} after=$(count_gh_calls issue close), state=$(issue_state "$OPEN_ISSUE_BEFORE_6E"))"
+fi
+CLOSE_ARGF_6E="$(find_last_gh_call issue close)"
+if [ -n "$CLOSE_ARGF_6E" ] && grep -qF "https://github.com/stub/stub/releases/tag/${TAG_CREATE_RACE}" "$CLOSE_ARGF_6E"; then
+	pass "that closing comment links the release found by release_url_or_empty (the stub's --json branch)"
+else
+	fail "expected the closing comment to link https://github.com/stub/stub/releases/tag/${TAG_CREATE_RACE}"
+	[ -n "$CLOSE_ARGF_6E" ] && cat "$CLOSE_ARGF_6E"
+fi
 
 echo
 echo "=== case 6f: two overlapping runs of the *same* commit never corrupt each other's scratch worktree (per-tag lock) ==="

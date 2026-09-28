@@ -3,9 +3,10 @@
 # worktree - never the owner's or an agent's working copy - builds chextrek.dll and runs the full
 # suite (tools/run-all-tests.sh) against that worktree. On green, publishes X as a GitHub Release
 # tagged win-<sha>, targeting X, with chextrek.dll and chextrek.pdb as assets, marked Latest (not
-# prerelease), notes containing the suite summary, and closes the single open pipeline:red issue
-# (if any) with a comment linking that release. Idempotent: re-processing an already-published
-# commit publishes nothing new, but still closes a still-open red issue.
+# prerelease), notes containing the suite summary, and (only when this run's own suite genuinely
+# just passed for X - never on the idempotent fast path below, see its own comment) closes the
+# single open pipeline:red issue with a comment linking that release. Idempotent: re-processing an
+# already-published commit publishes nothing new.
 #
 # On red (an ordinary FAIL) or an environment blocker (exit 3), opens the single pipeline:red
 # issue (fixed title, label pipeline:red - creating the label first if it doesn't exist yet) if
@@ -27,7 +28,9 @@
 # Exit status:
 #   0 - the commit is published: either a new release was created just now, or one already existed
 #       for this commit (idempotent no-op - AC "re-processing doesn't create a duplicate release").
-#       Either way, a still-open pipeline:red issue is closed with a comment linking the release.
+#       A still-open pipeline:red issue is closed with a comment linking the release only in the
+#       first case (this run's own suite just passed) - never on the idempotent no-op, which never
+#       touches the issue (see that path's own comment for why).
 #   1 - the suite ran and reported an ordinary FAIL (exit 1) - nothing published; the pipeline:red
 #       issue is opened or commented on with the failing scenarios.
 #   2 - a pipeline-level error: bad commit-ish, missing built assets, a worktree/gh failure, or the
@@ -224,9 +227,11 @@ close_red_issue() {
 }
 
 # release_url_or_empty TAG - TAG's release URL (`gh release view --json url --jq .url`), or empty
-# if that lookup itself fails. Shared by both places that close the red issue against a release
-# this run didn't just create with `gh release create` (the idempotent fast path below, and the
-# "lost the race but the release exists" recheck near the bottom).
+# if that lookup itself fails. Used by the one place that closes the red issue against a release
+# this run didn't just create with `gh release create` itself: the "lost the race but the release
+# exists" recheck near the bottom (this run's own suite still genuinely passed for this exact
+# commit there - `gh release create` merely lost a race to publish it first). The idempotent fast
+# path near the top never calls this - see that path's own comment for why.
 release_url_or_empty() {
 	gh release view "$1" --repo "$REPO" --json url --jq .url 2>>"$LOG_FILE"
 }
@@ -278,11 +283,15 @@ fi
 # safe to do unconditionally here since the lock above rules out a live concurrent run owning it. ---
 WT_DIR="${WORKTREE_ROOT}/${TAG}"
 WT_CREATED=0
+# Set right before the `gh release create` call below (mktemp for its stderr, see there); declared
+# here, empty, so cleanup() can safely remove it even if this run exits before reaching that point.
+CREATE_STDERR_FILE=""
 cleanup() {
 	if [ "$WT_CREATED" = "1" ] && [ -d "$WT_DIR" ]; then
 		git -C "$REPO_ROOT" worktree remove --force "$WT_DIR" >>"$LOG_FILE" 2>&1
 		git -C "$REPO_ROOT" worktree prune >>"$LOG_FILE" 2>&1 || true
 	fi
+	[ -n "$CREATE_STDERR_FILE" ] && rm -f "$CREATE_STDERR_FILE"
 }
 trap cleanup EXIT
 
@@ -336,7 +345,11 @@ log "==> suite exited ${SUITE_EXIT}"
 
 if [ "$SUITE_EXIT" = "3" ]; then
 	log "OUTCOME: environment blocker - see the ENVIRONMENT line above; nothing published"
-	ENV_LINES="$(printf '%s\n' "$SUITE_TAIL" | grep '^ENVIRONMENT:' || true)"
+	# tools/run-all-tests.sh stops at once on exit 3, before ever printing its own final
+	# "=== summary:" block, so suite_summary_block's fallback (no match -> the whole SUITE_TAIL)
+	# is exactly what's wanted here too - kept as suite_summary_block anyway (not a plain grep over
+	# SUITE_TAIL) so both this and the red-path FAIL: search go through the same helper.
+	ENV_LINES="$(suite_summary_block | grep '^ENVIRONMENT:' || true)"
 	RED_BODY="$(printf 'Commit %s (%s) hit an **environment blocker** while processing - not a test failure.\n\n%s\n\nRun archive: %s\n' \
 		"$FULL_SHA" "$TAG" "${ENV_LINES:-(no ENVIRONMENT line captured - see the full run archive)}" "$LOG_FILE")"
 	open_or_update_red_issue "$RED_BODY"
