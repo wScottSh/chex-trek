@@ -206,7 +206,12 @@ chextrek_ensure_display_or_exit() {
 		[ -e "/tmp/.X${N}-lock" ] && continue
 		ATTEMPTS=$((ATTEMPTS + 1))
 		CHEXTREK_XVFB_LOG="/tmp/chextrek-xvfb-${N}.log"
-		Xvfb ":${N}" -screen 0 1280x1024x24 -nolisten tcp >"$CHEXTREK_XVFB_LOG" 2>&1 &
+		# Xvfb outlives this call by design (stopped explicitly later, see _chextrek_stop_xvfb) - if
+		# this process were killed first, an inherited copy of the single-run lock fd (#62) would
+		# keep that orphaned Xvfb holding the lock forever. Close this subshell's copy before
+		# exec'ing into Xvfb so only this function's own fd matters for the lock.
+		( [ -n "${CHEXTREK_LOCK_FD:-}" ] && eval "exec ${CHEXTREK_LOCK_FD}>&-"
+		  exec Xvfb ":${N}" -screen 0 1280x1024x24 -nolisten tcp ) >"$CHEXTREK_XVFB_LOG" 2>&1 &
 		CHEXTREK_XVFB_PID=$!
 		local WAITED=0
 		while [ $WAITED -lt 10 ] && [ ! -e "/tmp/.X${N}-lock" ]; do
@@ -252,28 +257,43 @@ chextrek_exit_no_display() {
 # launch, cleanup - so two concurrent runs on this machine (two worktrees, an agent plus the
 # pipeline, whatever) serialize instead of racing on the shared DOOM3_BASEPATH/chextrek mount and
 # the shared per-mod save dir; today that's just a documented "one at a time" rule (see
-# docs/dev-setup.md), not something enforced. Defaults outside the repo and outside any worktree,
-# so every worktree on this machine shares the same lock file by default.
-# CHEXTREK_LOCK_FILE overrides it - a test that wants to prove the locking itself, without
+# docs/dev-setup.md), not something enforced. A fixed path (not `$TMPDIR`, which can differ between
+# sessions/users and would silently split them onto different, non-serializing lock files) outside
+# the repo and outside any worktree, so every worktree on this machine shares the same lock file by
+# default. CHEXTREK_LOCK_FILE overrides it - a test that wants to prove the locking itself, without
 # colliding with a real run on the machine, sets its own private path.
 # Windows is out of scope for #62 (the Windows branch still just kills every dhewm3.exe by image
 # name on timeout, unchanged) - only the Linux/Wine call sites below take this lock.
 chextrek_lock_file() {
-	echo "${CHEXTREK_LOCK_FILE:-${TMPDIR:-/tmp}/chextrek-harness.lock}"
+	echo "${CHEXTREK_LOCK_FILE:-/tmp/chextrek-harness.lock}"
 }
 
 # _chextrek_acquire_lock
 #
-# Opens chextrek_lock_file on fd CHEXTREK_LOCK_FD and takes an exclusive flock on it, printing a
-# "waiting" line (#62 AC2) once if another run already holds it, then blocking until it's free.
+# Opens chextrek_lock_file on fd CHEXTREK_LOCK_FD (exported, so a background/exec'd child that must
+# close it - see below - can find which fd to close by name even once it's a separate process) and
+# takes an exclusive flock on it, printing a "waiting" line (#62 AC2) once if another run already
+# holds it, then blocking until it's free. Exits the calling script with 1 if the lock file itself
+# can't even be opened (e.g. permissions) - proceeding unlocked would defeat the whole point.
+#
 # flock's lock lives on the open file descriptor, not on the file's contents or a pid recorded in
 # it, so a run that dies while holding it - crash, SIGKILL, whatever - has the kernel close that fd
-# and drop the lock automatically when the process goes away; there is never a stale lock left
-# behind for a later run to clean up or get stuck behind (#62 AC3).
+# and drop the lock, with nothing left to clean up (#62 AC3) - *provided* nothing else still has a
+# copy of that fd open. A plain fork (every external command this script runs, including Xvfb and
+# the wine launch) inherits it regardless of what the child later execs into, so a harness process
+# killed while such a child is still running would otherwise leave the lock held by that orphan
+# indefinitely. chextrek_ensure_display_or_exit's Xvfb and the wine launch below - the two children
+# that can outlive this call - both close their inherited copy (`exec ${CHEXTREK_LOCK_FD}>&-`) as
+# the very first thing they do, before exec'ing into Xvfb/wine, so only *this* process's own copy
+# of the fd ever matters for the lock.
 _chextrek_acquire_lock() {
 	local LOCK_FILE
 	LOCK_FILE="$(chextrek_lock_file)"
-	exec {CHEXTREK_LOCK_FD}>"$LOCK_FILE"
+	if ! exec {CHEXTREK_LOCK_FD}>"$LOCK_FILE"; then
+		echo "error: couldn't open the harness lock file ${LOCK_FILE}. See docs/dev-setup.md." >&2
+		exit 1
+	fi
+	export CHEXTREK_LOCK_FD
 	if ! flock -n "$CHEXTREK_LOCK_FD"; then
 		echo "==> Waiting for the harness lock (another run holds ${LOCK_FILE}) ..."
 		flock "$CHEXTREK_LOCK_FD"
@@ -287,7 +307,7 @@ _chextrek_acquire_lock() {
 _chextrek_release_lock() {
 	[ -n "${CHEXTREK_LOCK_FD:-}" ] || return 0
 	flock -u "$CHEXTREK_LOCK_FD" 2>/dev/null || true
-	exec {CHEXTREK_LOCK_FD}>&- 2>/dev/null || true
+	eval "exec ${CHEXTREK_LOCK_FD}>&-" 2>/dev/null || true
 	CHEXTREK_LOCK_FD=""
 }
 
@@ -476,9 +496,16 @@ _chextrek_run_console_script_impl() {
 		# is still tracking exactly one PID - the wine process itself, not a wrapper shell around
 		# it. `--kill-after` guarantees that PID actually dies on timeout instead of just being
 		# asked to (#60 AC: "a timeout kills only the dhewm3 process the harness started" - not
-		# Windows' machine-wide taskkill-by-image-name below).
-		timeout --kill-after=10 "$TIMEOUT_SECS" bash -c 'cd "$1" && shift && exec wine "$@"' _ \
-			"$DHEWM3_HOME" "$DHEWM3_EXE" "${ENGINE_ARGS[@]}"
+		# Windows' machine-wide taskkill-by-image-name below). This runs in the foreground and
+		# normally exits with `timeout`/wine well before this call returns - but if *this* harness
+		# process itself were killed first, wine/dhewm3 (and whatever it forks, e.g. wineserver)
+		# would keep running and, having inherited the single-run lock fd (#62) across the fork
+		# chain above, would keep holding the lock indefinitely. Closing this bash -c's copy of it
+		# before it execs into wine means only this function's own fd matters for the lock.
+		timeout --kill-after=10 "$TIMEOUT_SECS" bash -c '
+			[ -n "${CHEXTREK_LOCK_FD:-}" ] && eval "exec ${CHEXTREK_LOCK_FD}>&-"
+			cd "$1" && shift && exec wine "$@"
+		' _ "$DHEWM3_HOME" "$DHEWM3_EXE" "${ENGINE_ARGS[@]}"
 	else
 		timeout "$TIMEOUT_SECS" "$DHEWM3_EXE" "${ENGINE_ARGS[@]}"
 	fi

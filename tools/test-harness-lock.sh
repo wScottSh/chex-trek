@@ -5,17 +5,25 @@
 # for #62 (still just the documented "one at a time" rule, unenforced - see docs/dev-setup.md), so
 # this test is a no-op there.
 #
-# Uses a private CHEXTREK_LOCK_FILE (not the machine-wide default) throughout, so this test can
-# neither be blocked by, nor interfere with, a real harness run already using the default lock -
-# same idea as tools/test-harness-no-display.sh's curated PATH keeping that self-test isolated from
-# the real environment while exercising the exact same code paths.
+# Case 1 and 2 use a private CHEXTREK_LOCK_FILE so they can't be blocked by a real harness run
+# already using the default lock - same idea as tools/test-harness-no-display.sh's curated PATH
+# keeping that self-test isolated from the real environment while exercising the exact same code
+# paths. Case 3 and 4 launch the *real* harness scripts and deliberately leave CHEXTREK_LOCK_FILE
+# unset, so they exercise the actual default lock (`/tmp/chextrek-harness.lock`) two real, unrelated
+# invocations would use - the scenario #62 exists for.
 #
-# Case 1 and 3 prove AC2 (the second run prints that it's waiting) deterministically, by holding
-# the lock with a plain `flock FILE sleep N` for a known duration and timing the acquirer against
-# it, rather than hoping two independent real runs happen to race within the same few hundred
-# milliseconds. Case 2 proves AC3 (a killed lock holder leaves no stale lock). Case 4 proves AC1
-# (two real runs started at once both complete, correctly, without touching each other's log/save
-# dir) with two genuinely concurrent real harness invocations.
+# Case 1 proves AC2 (the second run prints that it's waiting) deterministically, by holding the
+# lock with a plain `flock FILE sleep N` for a known duration and timing the acquirer against it,
+# rather than hoping two independent real runs happen to race within the same few hundred
+# milliseconds. Case 2 proves AC3 (a harness run killed while a child it started - Xvfb, or the wine
+# launch - is still running leaves no stale lock): it mirrors those two call sites' actual shape
+# (acquire the lock, background a child that closes its own inherited copy of the lock fd before
+# exec'ing into a long-running process, get killed itself while that child is still alive) rather
+# than a generic "kill -9 a process holding a lock" case, which a naive fix (e.g. relying on
+# close-on-exec) could pass without actually covering Xvfb/wine. Case 3 proves AC1+AC2 against a
+# real harness run. Case 4 proves AC1 (two real runs started at once both complete, correctly,
+# without touching each other's log/save dir) with two genuinely concurrent real harness
+# invocations.
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -32,12 +40,25 @@ FAIL=0
 SCRATCH="$(mktemp -d)"
 trap 'rm -rf "$SCRATCH"' EXIT
 
+# _wait_until_locked LOCK_FILE - polls until LOCK_FILE is actually held by someone else, instead of
+# a fixed sleep guessing how long a just-backgrounded `flock`/holder takes to actually take the
+# lock (thin on a loaded machine). Gives up after 2s so a genuinely broken case still fails fast.
+_wait_until_locked() {
+	local LOCK_FILE="$1" WAITED=0
+	while [ $WAITED -lt 20 ]; do
+		flock -n "$LOCK_FILE" -c true 2>/dev/null || return 0
+		sleep 0.1
+		WAITED=$((WAITED + 1))
+	done
+	return 1
+}
+
 export CHEXTREK_LOCK_FILE="${SCRATCH}/test-harness.lock"
 
 echo "=== #62 lock test: case 1 - a held lock blocks the second acquirer, which prints it's waiting (AC2) ==="
 flock "$CHEXTREK_LOCK_FILE" sleep 3 &
 HOLDER_PID=$!
-sleep 0.5 # give the holder a head start so it reliably wins the lock first
+_wait_until_locked "$CHEXTREK_LOCK_FILE" || { echo "FAIL: holder never actually took the lock"; FAIL=1; }
 
 START=$(date +%s%N)
 OUT="$(bash -c '
@@ -70,54 +91,112 @@ else
 fi
 
 echo
-echo "=== #62 lock test: case 2 - a killed lock holder leaves no stale lock (AC3) ==="
-# Holds the lock the same way a real run does: _chextrek_acquire_lock opens the lock file on an
-# fd owned by *this* process (bash auto-closes such fds on exec, so a forked/exec'd child like
-# `sleep` below never gets a copy of it - only this process's own fd matters). Killing this single
-# process with SIGKILL is what "a crashed or killed run" means (#62 AC3): the kernel closes its fd
-# and drops the lock right along with it. (A plain `flock FILE sleep N &` isn't equivalent here -
-# flock(1) deliberately leaves the lock fd open across its own exec of the command, so killing just
-# the wrapper process would leave the `sleep` child still holding it for the rest of its run.)
+echo "=== #62 lock test: case 2 - killing a run while its own long-lived child (Xvfb/wine) is still alive leaves no stale lock (AC3) ==="
+# Mirrors the actual shape of chextrek_ensure_display_or_exit's Xvfb spawn and the wine launch in
+# _chextrek_run_console_script_impl: acquire the lock, background a child that closes its own
+# inherited copy of the lock fd before exec'ing into something long-running, then (simulating this
+# whole "run" getting killed, e.g. an operator's Ctrl-C or an OOM kill) SIGKILL only the top-level
+# process while that child is still alive. If the lock were still held by the child afterwards (the
+# bug a naive fix could leave in - e.g. trusting exec's close-on-exec instead of closing the fd by
+# hand), the next acquire below would block for the child's whole remaining sleep.
 bash -c '
 	source "$1/lib-harness.sh"
 	_chextrek_acquire_lock
-	sleep 60
-' _ "$SCRIPT_DIR" &
-KILL_PID=$!
-sleep 0.5 # give it time to actually take the lock before it's killed out from under it
-kill -9 "$KILL_PID" 2>/dev/null
-wait "$KILL_PID" 2>/dev/null
+	( [ -n "${CHEXTREK_LOCK_FD:-}" ] && eval "exec ${CHEXTREK_LOCK_FD}>&-"
+	  exec sleep 60 ) &
+	echo "child-pid=$!"
+	wait
+' _ "$SCRIPT_DIR" > "${SCRATCH}/case2-holder.out" 2>&1 &
+HOLDER_PID=$!
 
-START2=$(date +%s%N)
-OUT2="$(bash -c '
-	source "$1/lib-harness.sh"
-	_chextrek_acquire_lock
-	echo "acquired-after-kill"
-	_chextrek_release_lock
-' _ "$SCRIPT_DIR" 2>&1)"
-ELAPSED2_MS=$(( ($(date +%s%N) - START2) / 1000000 ))
-
-if echo "$OUT2" | grep -qF "acquired-after-kill"; then
-	echo "PASS: acquired the lock after its holder was killed"
-else
-	echo "FAIL: never acquired the lock after its holder was killed; got:"
-	echo "$OUT2"
+CHILD_PID=""
+for _ in $(seq 1 50); do
+	CHILD_PID="$(sed -n 's/^child-pid=//p' "${SCRATCH}/case2-holder.out" 2>/dev/null)"
+	[ -n "$CHILD_PID" ] && break
+	sleep 0.1
+done
+if [ -z "$CHILD_PID" ]; then
+	echo "FAIL: the simulated run never reported its child's pid; can't run this case"
 	FAIL=1
+else
+	kill -9 "$HOLDER_PID" 2>/dev/null # kill only the "run" - its child (the orphan) keeps running
+	wait "$HOLDER_PID" 2>/dev/null
+	if ! kill -0 "$CHILD_PID" 2>/dev/null; then
+		echo "FAIL: the simulated child didn't survive its parent - this case didn't test what it meant to"
+		FAIL=1
+	fi
+
+	START2=$(date +%s%N)
+	OUT2="$(bash -c '
+		source "$1/lib-harness.sh"
+		_chextrek_acquire_lock
+		echo "acquired-after-kill"
+		_chextrek_release_lock
+	' _ "$SCRIPT_DIR" 2>&1)"
+	ELAPSED2_MS=$(( ($(date +%s%N) - START2) / 1000000 ))
+
+	kill -9 "$CHILD_PID" 2>/dev/null # clean up the orphaned sleep, its job here is done
+	wait "$CHILD_PID" 2>/dev/null
+
+	if echo "$OUT2" | grep -qF "acquired-after-kill"; then
+		echo "PASS: acquired the lock while the orphaned child was still alive"
+	else
+		echo "FAIL: never acquired the lock; got:"
+		echo "$OUT2"
+		FAIL=1
+	fi
+	if [ "$ELAPSED2_MS" -le 2000 ]; then
+		echo "PASS: no stale lock - acquired promptly (${ELAPSED2_MS}ms) despite the surviving orphan"
+	else
+		echo "FAIL: took ${ELAPSED2_MS}ms to acquire - the orphaned child is still holding the lock"
+		FAIL=1
+	fi
 fi
-if [ "$ELAPSED2_MS" -le 2000 ]; then
-	echo "PASS: no stale lock - acquired promptly (${ELAPSED2_MS}ms), not stuck behind the killed holder"
+
+echo
+echo "=== #62 lock test: case 2b - the real Xvfb chextrek_ensure_display_or_exit starts doesn't inherit the lock fd (AC3) ==="
+# Case 2 proves the *mechanism* (a child that closes its inherited fd survives its parent without
+# holding the lock); this ties that directly to the real production code path instead of the test's
+# own stand-in, by starting a real Xvfb through the real function and checking its own /proc fd
+# table doesn't list the lock file - i.e. this isn't testing a copy of the fix, it's testing the fix.
+if command -v Xvfb >/dev/null 2>&1; then
+	OUT2B="$(env -u DISPLAY bash -c '
+		source "$1/lib-harness.sh"
+		_chextrek_acquire_lock
+		chextrek_ensure_display_or_exit
+		echo "xvfb-pid=${CHEXTREK_XVFB_PID}"
+		echo "lock-fd=${CHEXTREK_LOCK_FD}"
+		sleep 1
+	' _ "$SCRIPT_DIR" 2>&1)"
+	XVFB_PID="$(echo "$OUT2B" | sed -n 's/^xvfb-pid=//p')"
+	LOCK_FD_NUM="$(echo "$OUT2B" | sed -n 's/^lock-fd=//p')"
+	if [ -n "$XVFB_PID" ] && [ -n "$LOCK_FD_NUM" ] && [ -e "/proc/${XVFB_PID}/fd" ]; then
+		if [ -e "/proc/${XVFB_PID}/fd/${LOCK_FD_NUM}" ]; then
+			echo "FAIL: the real Xvfb process still has the lock fd (${LOCK_FD_NUM}) open"
+			FAIL=1
+		else
+			echo "PASS: the real Xvfb process doesn't have the lock fd open"
+		fi
+	else
+		echo "SKIP: couldn't find the Xvfb pid/fd table to check (got xvfb-pid='${XVFB_PID}' lock-fd='${LOCK_FD_NUM}')"
+	fi
+	# chextrek_ensure_display_or_exit doesn't stop its own Xvfb (only the run wrapper does, via
+	# _chextrek_stop_xvfb) - this check called it directly, so clean up the Xvfb it started by hand.
+	# It's not a direct child of this shell (it was started by the now-exited bash -c above), so
+	# `wait` doesn't apply - just kill it.
+	[ -n "$XVFB_PID" ] && kill "$XVFB_PID" 2>/dev/null
 else
-	echo "FAIL: took ${ELAPSED2_MS}ms to acquire - looks like a stale lock blocked it"
-	FAIL=1
+	echo "SKIP: Xvfb not installed on this host"
 fi
 
 echo
 echo "=== #62 lock test: case 3 - a real harness run really waits for a held lock, then still passes (AC1+AC2) ==="
 chextrek_build_or_exit
+unset CHEXTREK_LOCK_FILE # exercise the real default lock - the one two unrelated real runs would share
 
-flock "$CHEXTREK_LOCK_FILE" sleep 3 &
+flock "$(chextrek_lock_file)" sleep 3 &
 HOLDER3_PID=$!
-sleep 0.5
+_wait_until_locked "$(chextrek_lock_file)" || { echo "FAIL: holder never actually took the lock"; FAIL=1; }
 
 START3=$(date +%s%N)
 HARNESS_OUT="$(bash "${SCRIPT_DIR}/run-harness.sh" 60 2>&1)"

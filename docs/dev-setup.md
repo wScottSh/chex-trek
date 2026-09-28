@@ -56,7 +56,7 @@ Environment variables (all optional; Linux-specific defaults live in `tools/lib-
   default paths (the table above).
 - `WINEPREFIX` - the Wine prefix dhewm3 runs in. Defaults to `$HOME/games/wineprefix-chextrek`.
 - `CHEXTREK_LOCK_FILE` - the single-run lock file (#62, see "Only run one harness invocation at a
-  time on a given machine" below). Defaults to `${TMPDIR:-/tmp}/chextrek-harness.lock`.
+  time on a given machine" below). Defaults to `/tmp/chextrek-harness.lock`.
 
 What the Linux platform layer does differently (same `chextrek_run_console_script` interface,
 `tools/lib-harness.sh`):
@@ -142,7 +142,7 @@ and two concurrent runs would race on the shared `chextrek` symlink and the shar
 (`Documents\My Games\dhewm3\chextrek\`).
 
 On Unicron it's enforced (#62): `chextrek_run_console_script` (`tools/lib-harness.sh`) takes an
-exclusive `flock` on a lock file (default `${TMPDIR:-/tmp}/chextrek-harness.lock`, override with
+exclusive `flock` on a lock file (default `/tmp/chextrek-harness.lock`, override with
 `CHEXTREK_LOCK_FILE`) before it touches the `chextrek` symlink or the save dir, and holds it for
 the whole run - mount, wipe, launch, the `wineserver -k` cleanup, archiving - releasing it only once
 that's all done. A second run that starts while another holds the lock prints
