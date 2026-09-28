@@ -1,9 +1,15 @@
 # Dev-machine setup: building and testing `chextrek.dll`
 
-Spec #28/#29. This is the one-time, per-machine setup the build and harness scripts assume.
-Everything here is outside this repo on purpose - see "Why none of this lives in the repo" below.
+Spec #28/#29 (Windows dev machine), extended by spec #58/#60 (Unicron, Linux/Wine). This is the
+one-time, per-machine setup the build and harness scripts assume. Everything here is outside this
+repo on purpose - see "Why none of this lives in the repo" below. The harness's *interface*
+(`tools/build-chextrek.sh`, `tools/run-harness.sh`, `tools/run-all-tests.sh`, every
+`tools/test-*.sh`) is identical on both machines; only the one-time setup and a few internals
+differ. The one current exception is `tools/build-chextrek.sh` itself, which only knows how to
+build on Windows - see "Unicron (Linux/Wine)" below for what that means for `run-all-tests.sh`
+until the Linux build step exists.
 
-## What's installed where
+## Windows dev machine
 
 | Thing | Location | Notes |
 |---|---|---|
@@ -19,6 +25,69 @@ Environment variables the scripts read (all optional, default to the table above
 - `DHEWM3_HOME` - the dhewm3 1.5.5 win32 engine's install dir (has `dhewm3.exe` in it).
 - `DOOM3_BASEPATH` - the classic Doom 3 1.3.1 install (`fs_basepath`).
 - `DHEWM3_DOCUMENTS_DIR` - override for the user's Documents folder, if it's not `$HOME/Documents`.
+
+## Unicron (Linux/Wine)
+
+Spec #58/#60. Unicron builds and runs the harness unattended, with nobody ever logged in to a
+desktop; the platform layer this needs lives in `tools/lib-harness.sh` behind `chextrek_is_linux`.
+Building `chextrek.dll` itself on Linux is a later sub-issue - #60 only covers running the harness
+against a prebuilt DLL (built on the Windows dev machine and copied over, or produced by that later
+Linux build step once it exists). Until that build step exists, `tools/build-chextrek.sh` only knows
+how to build on Windows, so on Unicron: copy a Windows-built `chextrek.dll` (+ `.pdb`) to the repo
+root yourself, same gitignored place the Windows build writes to, and set `CHEXTREK_SKIP_BUILD=1`
+before running an individual `tools/test-*.sh` (or `tools/run-harness.sh`, which never builds) so it
+skips the build step and uses the prebuilt DLL as-is. `tools/run-all-tests.sh` always builds first
+regardless of `CHEXTREK_SKIP_BUILD` (it only sets that variable for the `test-*.sh` scripts it goes
+on to run) and so can't run on Unicron until the Linux build step exists.
+
+| Thing | Location | Notes |
+|---|---|---|
+| Wine 11.0, new-WoW64 | `/opt/wine-11.0-wow64` (built from source; add `.../bin` to `PATH`) | The WineHQ `noble` packages can't do new-WoW64 (see spike #59's comment on #58 for the full build recipe). Provides `wine`, `winepath` and `wineserver`, all required on `PATH` - without `wineserver` on `PATH` the post-run cleanup below can't run, and a run can hang forever (see "Wine process cleanup"). |
+| Wine prefix | `$WINEPREFIX`, default `$HOME/games/wineprefix-chextrek` | Needs the **VC++ 2015-2022 x86 redist** installed in it (`vc_redist.x86.exe /install /quiet`) - `dhewm3.exe` imports `mfc140.dll`, which Wine has no builtin for; without it the loader fails with `c0000135`. |
+| Classic Doom 3 1.3.1 | `$HOME/games/doom3` (has `base/pak000.pk4`-`pak008.pk4`) | Copied once from the Windows PC, outside every repo, same as the Windows machine's copy. This is `$DOOM3_BASEPATH`. |
+| dhewm3 1.5.5 win32 (official, unmodified) | `$HOME/games/dhewm3/1.5.5-win32/dhewm3/dhewm3.exe` | The same `dhewm3-1.5.5_win32.zip` as the Windows machine, run under Wine - never built from source. This is `$DHEWM3_HOME`. |
+| `chextrek` mount | `$DOOM3_BASEPATH/chextrek` | A plain `ln -s` to whichever checkout is being tested - no NTFS-symlink privilege quirk on Linux. The harness creates/repoints it automatically, same as Windows. |
+| Xvfb | anywhere on `PATH` (e.g. the distro package) | The harness starts its own (`chextrek_ensure_display_or_exit` in `tools/lib-harness.sh`) on the first free display number when `$DISPLAY` isn't already usable, and stops it again when the run finishes. Nobody needs to be logged in, and no `DISPLAY` needs to be pre-set - that's the whole point on a headless box reached over SSH. |
+| Save/config/screenshot path | `$WINEPREFIX/drive_c/users/<you>/Documents/My Games/dhewm3/chextrek/` | The "Documents" dhewm3 hardcodes is the one inside the Wine prefix it's actually running in, not this Linux user's own `$HOME/Documents`. |
+
+Environment variables (all optional; Linux-specific defaults live in `tools/lib-harness.sh`):
+
+- `DHEWM3_HOME`, `DOOM3_BASEPATH`, `DHEWM3_DOCUMENTS_DIR` - same meaning as on Windows, different
+  default paths (the table above).
+- `WINEPREFIX` - the Wine prefix dhewm3 runs in. Defaults to `$HOME/games/wineprefix-chextrek`.
+
+What the Linux platform layer does differently (same `chextrek_run_console_script` interface,
+`tools/lib-harness.sh`):
+
+- **Path conversion:** `winepath -w` instead of `cygpath -w`, for the `+set fs_basepath`/
+  `+set fs_gameDllPath` command-line values dhewm3 needs in Windows-path form.
+- **Display:** starts (or reuses) its own Xvfb instead of checking `qwinsta` for an active desktop
+  session - see the Xvfb row above.
+- **Mount:** a plain `ln -s`, not the NTFS-symlink dance Windows needs.
+- **Launch:** `wine dhewm3.exe ...`, run from the engine's own directory (it looks for
+  `SDL2.dll`/`OpenAL32.dll` next to itself) so `timeout` tracks exactly the wine process this call
+  started, not a wrapper shell around it.
+- **Timeout kill:** `timeout --kill-after` on that same PID - the one this call started - instead
+  of Windows' `taskkill //IM dhewm3.exe`, which kills every `dhewm3.exe` on the machine by image
+  name (spec #60 AC: "a timeout kills only the dhewm3 process the harness started").
+- **Log normalization:** the win32 engine writes `dhewm3log.txt` with CRLF line endings. Git Bash's
+  `grep` on Windows tolerates the trailing CR; Linux's doesn't, so every `...$`-anchored always-on
+  check would silently fail even though the value is right there (spike #59 finding). The Linux
+  branch strips it (`sed -i 's/\r$//'`) before anything greps the log.
+- **Wine process cleanup:** `wineserver`/`winedevice.exe` daemonize without closing the fds they
+  inherited from the wine invocation that started them - including this call's own stdout/stderr -
+  so a freshly-spawned one left running after dhewm3 exits can hold a caller's `$(...)` capture
+  (e.g. `tools/run-harness.sh`'s own output, or `chextrek_run_scenario`'s) open indefinitely, well
+  past the run actually finishing (spike #59 finding 4). Right after each run, the harness stops
+  this run's own `$WINEPREFIX` server with `wineserver -k` (not `-w` - the spike saw *that* hang
+  instead, when `winedevice.exe` outlives its display) so those fds close; scoped to one prefix, it
+  can't touch a concurrent run's wine processes in a different prefix.
+
+**Not handled by #60** (left for later sub-issues, not asserted by anything here): building
+`chextrek.dll` itself on Linux; a single-run lock across concurrent worktrees (two concurrent runs
+against the same default `$WINEPREFIX` can still race on each other's wine processes, same as the
+existing "one run at a time" note below already says for the shared mount and save dir); the two
+scenarios spike #59 found Wine-only-red (`test-end-level-nextmap.sh`, `test-objectives.sh`).
 
 ## Building
 
@@ -66,17 +135,24 @@ which:
 harness archives everything a run leaves there, so screenshots are kept whatever their name. They
 are never asserted on.
 
-**Only run one harness invocation at a time on a given machine.** It kills every `dhewm3.exe`
-process by image name on timeout (not just the one it started), and concurrent runs - e.g. from
-two worktrees at once - would also race on the shared `chextrek` symlink and the shared
-`Documents\My Games\dhewm3\chextrek\` save dir.
+**Only run one harness invocation at a time on a given machine.** On Windows it kills every
+`dhewm3.exe` process by image name on timeout (not just the one it started). On Unicron a timeout
+itself kills only the PID that run started (see "Unicron (Linux/Wine)" above), but the
+`wineserver -k` cleanup every run does afterwards stops *every* wine process in `$WINEPREFIX` -
+harmless for one run at a time, but two concurrent runs sharing the same default `$WINEPREFIX`
+would still be able to kill each other's dhewm3 via that cleanup, on top of racing on the shared
+`chextrek` symlink and the shared save dir (`Documents\My Games\dhewm3\chextrek\` on Windows, the
+equivalent path inside the Wine prefix on Unicron).
 
-**The harness needs an active desktop session.** dhewm3 opens a real window, so if this Windows
+**The harness needs a display to open a window on.** dhewm3 opens a real window, so it needs
+somewhere to put it. On the Windows dev machine that's an active desktop session: if this Windows
 user session is disconnected (another user switched in on the console, or RDP dropped), SDL dies
-with `No displays available`. The harness checks `qwinsta` before launching and the log after each
-run; on no display it prints `ENVIRONMENT: no display ...` and exits the whole script with code 3.
-Exit 3 is never a test result: stop and get a human to reconnect - don't wait or retry.
-`tools/test-harness-no-display.sh` covers this without needing a display.
+with `No displays available`; the harness checks `qwinsta` before launching and the log after each
+run, and on no display it prints `ENVIRONMENT: no display ...` and exits the whole script with code
+3 - stop and get a human to reconnect, don't wait or retry. On Unicron nobody is ever logged in, so
+the harness brings its own display (Xvfb) instead of treating "no display" as that same kind of
+stop - see "Unicron (Linux/Wine)" above; exit 3 there means Xvfb itself couldn't be started at all.
+`tools/test-harness-no-display.sh` covers both without needing a display itself.
 
 ## Writing a feature scenario
 
