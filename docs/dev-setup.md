@@ -58,6 +58,8 @@ Environment variables (all optional; Linux-specific defaults live in `tools/lib-
 - `DHEWM3_HOME`, `DOOM3_BASEPATH`, `DHEWM3_DOCUMENTS_DIR` - same meaning as on Windows, different
   default paths (the table above).
 - `WINEPREFIX` - the Wine prefix dhewm3 runs in. Defaults to `$HOME/games/wineprefix-chextrek`.
+- `CHEXTREK_LOCK_FILE` - the single-run lock file (#62, see "Only run one harness invocation at a
+  time on a given machine" below). Defaults to `/tmp/chextrek-harness.lock`.
 
 What the Linux platform layer does differently (same `chextrek_run_console_script` interface,
 `tools/lib-harness.sh`):
@@ -87,11 +89,10 @@ What the Linux platform layer does differently (same `chextrek_run_console_scrip
   can't touch a concurrent run's wine processes in a different prefix.
 
 **Not handled by #60** (left for later sub-issues, not asserted by anything here): building
-`chextrek.dll` itself on Linux; a single-run lock across concurrent worktrees (two concurrent runs
-against the same default `$WINEPREFIX` can still race on each other's wine processes, same as the
-existing "one run at a time" note below already says for the shared mount and save dir); the two
-scenarios spike #59 found Wine-only-red (`test-end-level-nextmap.sh`, `test-objectives.sh`) - fixed
-by #61, see the next paragraph.
+`chextrek.dll` itself on Linux; the two scenarios spike #59 found Wine-only-red
+(`test-end-level-nextmap.sh`, `test-objectives.sh`) - fixed by #61, see the next paragraph. The
+single-run lock across concurrent worktrees is #62 - see "Only run one harness invocation at a time
+on a given machine" below.
 
 **Fixed by #61** (both scenarios' Wine-only reds from the spike): in both cases the scenario's own
 assertions were unchanged; only a `wait` count each script sends the game grew, gated on
@@ -155,14 +156,31 @@ which:
 harness archives everything a run leaves there, so screenshots are kept whatever their name. They
 are never asserted on.
 
-**Only run one harness invocation at a time on a given machine.** On Windows it kills every
-`dhewm3.exe` process by image name on timeout (not just the one it started). On Unicron a timeout
-itself kills only the PID that run started (see "Unicron (Linux/Wine)" above), but the
-`wineserver -k` cleanup every run does afterwards stops *every* wine process in `$WINEPREFIX` -
-harmless for one run at a time, but two concurrent runs sharing the same default `$WINEPREFIX`
-would still be able to kill each other's dhewm3 via that cleanup, on top of racing on the shared
-`chextrek` symlink and the shared save dir (`Documents\My Games\dhewm3\chextrek\` on Windows, the
-equivalent path inside the Wine prefix on Unicron).
+**Only run one harness invocation at a time on a given machine.** On Windows this is still just a
+rule: it kills every `dhewm3.exe` process by image name on timeout (not just the one it started),
+and two concurrent runs would race on the shared `chextrek` symlink and the shared save dir
+(`Documents\My Games\dhewm3\chextrek\`).
+
+On Unicron it's enforced (#62): `chextrek_run_console_script` (`tools/lib-harness.sh`) takes an
+exclusive `flock` on a lock file (default `/tmp/chextrek-harness.lock`, override with
+`CHEXTREK_LOCK_FILE`) before it touches the `chextrek` symlink or the save dir, and holds it for
+the whole run - mount, wipe, launch, the `wineserver -k` cleanup, archiving - releasing it only once
+that's all done. #63's environment checks (Wine/`winepath`, Wine prefix, Doom 3 data, dhewm3
+engine) run before the lock is taken, so a broken environment stops with exit 3 at once instead of
+waiting for the lock first. A second run that starts while another holds the lock prints
+`Waiting for the harness lock ...` and blocks until it's free, instead of racing it; a timeout
+itself still kills only the PID that run started (see "Unicron (Linux/Wine)" above), and the
+`wineserver -k` cleanup that follows can no longer reach a concurrent run's wine processes in the
+same `$WINEPREFIX` because the lock means there never is a concurrent run in progress. The lock is
+attached to the run's own open file descriptor on that lock file, not to the file's contents or a
+recorded pid, so a run that crashes or is killed - by any signal, including `SIGKILL` - has its fd
+closed by the kernel and the lock released right along with it; there is no stale lock file to
+clean up by hand. Xvfb, `winepath` and the wine launch itself each close their own inherited copy
+of that fd before they exec, so an orphaned Xvfb or wine/dhewm3 a killed run leaves running can't
+keep holding the lock either. One caveat: the lock freeing immediately doesn't mean the killed
+run's own wine/dhewm3 is gone yet - it can keep running as an orphan for up to its timeout, still
+sharing the mount and save dir, until the *next* run's `wineserver -k` cleanup reaps it.
+`tools/test-harness-lock.sh` covers this.
 
 **The harness needs a display to open a window on.** dhewm3 opens a real window, so it needs
 somewhere to put it. On the Windows dev machine that's an active desktop session: if this Windows

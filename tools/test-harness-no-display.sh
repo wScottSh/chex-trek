@@ -17,12 +17,17 @@ trap 'rm -rf "$SCRATCH"' EXIT
 FAIL=0
 
 if chextrek_is_linux; then
-	# A curated PATH with only the ordinary tools the test itself, chextrek_is_linux and the
-	# harness's early checks need (symlinked from wherever they really live) - and deliberately no
-	# `Xvfb` - so "Xvfb isn't installed" (case 1a) is the real `command -v Xvfb` miss, not a stand-in.
+	# A curated PATH with only the ordinary tools the test itself, chextrek_is_linux, the harness's
+	# early checks, and the single-run lock (#62, chextrek_run_console_script takes it before any of
+	# this) need (symlinked from wherever they really live) - and deliberately no `Xvfb` - so "Xvfb
+	# isn't installed" (case 1a) is the real `command -v Xvfb` miss, not a stand-in. `flock` has to
+	# be here: without it, _chextrek_acquire_lock's own `flock -n`/`flock` calls would fail with
+	# "command not found" (now a loud `exit 1` - see _chextrek_acquire_lock), so this test would stop
+	# on that instead of exercising the real no-display code path below it. Each case uses a private
+	# CHEXTREK_LOCK_FILE so it never queues behind a real harness run on this machine.
 	mkdir -p "${SCRATCH}/no-xvfb-bin"
 	for TOOL in bash uname date cat mkdir rm printf sed grep id readlink basename dirname cp \
-		mktemp kill sleep seq ln tr chmod true env; do
+		mktemp kill sleep seq ln tr chmod true env flock; do
 		T="$(command -v "$TOOL" 2>/dev/null)" && ln -sf "$T" "${SCRATCH}/no-xvfb-bin/${TOOL}"
 	done
 
@@ -46,7 +51,7 @@ EOF
 
 	# --- case 1a: Xvfb genuinely isn't on PATH -> exit 3 before launching dhewm3 (#60) ---
 	START=$(date +%s)
-	OUT="$(env -i PATH="${SCRATCH}/wine-bin:${SCRATCH}/no-xvfb-bin" HOME="$HOME" "${GOOD_ENV[@]}" bash -c '
+	OUT="$(env -i PATH="${SCRATCH}/wine-bin:${SCRATCH}/no-xvfb-bin" HOME="$HOME" CHEXTREK_LOCK_FILE="${SCRATCH}/harness.lock" "${GOOD_ENV[@]}" bash -c '
 		unset DISPLAY
 		source "$1/tools/lib-harness.sh"
 		chextrek_run_console_script "$1" "quit" 60 chextrek_no_display_selftest
@@ -71,7 +76,7 @@ exit 1
 EOF
 	chmod +x "${SCRATCH}/bin/Xvfb"
 	START=$(date +%s)
-	OUT="$(env -i PATH="${SCRATCH}/bin:${SCRATCH}/wine-bin:${SCRATCH}/no-xvfb-bin" HOME="$HOME" "${GOOD_ENV[@]}" bash -c '
+	OUT="$(env -i PATH="${SCRATCH}/bin:${SCRATCH}/wine-bin:${SCRATCH}/no-xvfb-bin" HOME="$HOME" CHEXTREK_LOCK_FILE="${SCRATCH}/harness.lock" "${GOOD_ENV[@]}" bash -c '
 		unset DISPLAY
 		source "$1/tools/lib-harness.sh"
 		chextrek_run_console_script "$1" "quit" 60 chextrek_no_display_selftest
@@ -92,7 +97,7 @@ EOF
 	# stripped-down environment), but that's an ordinary, different failure - not an environment
 	# stop - proving the display check itself isn't what's blocking once a display is available.
 	if command -v Xvfb >/dev/null 2>&1; then
-		OUT2="$(env -i PATH="${SCRATCH}/wine-bin:${PATH}" HOME="$HOME" "${GOOD_ENV[@]}" bash -c '
+		OUT2="$(env -i PATH="${SCRATCH}/wine-bin:${PATH}" HOME="$HOME" CHEXTREK_LOCK_FILE="${SCRATCH}/harness.lock" "${GOOD_ENV[@]}" bash -c '
 			unset DISPLAY
 			source "$1/tools/lib-harness.sh"
 			chextrek_run_console_script "$2" "quit" 60 chextrek_no_display_selftest

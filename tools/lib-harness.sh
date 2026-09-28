@@ -30,6 +30,8 @@
 #   chextrek_to_engine_path     - `winepath -w` (Linux) vs `cygpath -w` (Windows) path conversion.
 #   chextrek_ensure_display_or_exit - starts this run's own Xvfb display when none is usable
 #                                 (Linux), instead of the Windows qwinsta active-session check.
+#   chextrek_lock_file / _chextrek_acquire_lock / _chextrek_release_lock - the single-run lock
+#                                 (spec #62) serializing concurrent runs on Unicron.
 # See docs/dev-setup.md's "Unicron (Linux/Wine)" section for the one-time setup this assumes
 # (Wine, the VC++ x86 redist in the prefix, Xvfb) and for the environment variables this reads
 # (DHEWM3_HOME, DOOM3_BASEPATH, DHEWM3_DOCUMENTS_DIR, WINEPREFIX) and why the mount/save-path/
@@ -149,9 +151,17 @@ chextrek_is_linux() {
 # dhewm3 is a native Windows binary; every `+set fs_*` path it's given on the command line has to
 # be a Windows-style path. Windows dev machine (Git Bash): `cygpath -w`. Unicron (Linux/Wine):
 # `winepath -w`, resolved against $WINEPREFIX the same way the run itself is.
+#
+# `winepath` can itself start a wineserver (#62): closes this call's copy of the single-run lock fd
+# first (see _chextrek_acquire_lock) so that wineserver - which can outlive this whole call - never
+# gets a copy of it either.
 chextrek_to_engine_path() {
 	if chextrek_is_linux; then
-		winepath -w "$1"
+		if [ -n "${CHEXTREK_LOCK_FD:-}" ]; then
+			winepath -w "$1" {CHEXTREK_LOCK_FD}>&-
+		else
+			winepath -w "$1"
+		fi
 	else
 		cygpath -w "$1"
 	fi
@@ -209,7 +219,16 @@ chextrek_ensure_display_or_exit() {
 		[ -e "/tmp/.X${N}-lock" ] && continue
 		ATTEMPTS=$((ATTEMPTS + 1))
 		CHEXTREK_XVFB_LOG="/tmp/chextrek-xvfb-${N}.log"
-		Xvfb ":${N}" -screen 0 1280x1024x24 -nolisten tcp >"$CHEXTREK_XVFB_LOG" 2>&1 &
+		# Xvfb outlives this call by design (stopped explicitly later, see _chextrek_stop_xvfb) - if
+		# this process were killed first, an inherited copy of the single-run lock fd (#62) would
+		# keep that orphaned Xvfb holding the lock forever. `{CHEXTREK_LOCK_FD}>&-` closes this
+		# fork's copy of it before Xvfb itself execs, so only this function's own fd matters for the
+		# lock (see _chextrek_acquire_lock; same reasoning as the wine launch below).
+		if [ -n "${CHEXTREK_LOCK_FD:-}" ]; then
+			Xvfb ":${N}" -screen 0 1280x1024x24 -nolisten tcp >"$CHEXTREK_XVFB_LOG" 2>&1 {CHEXTREK_LOCK_FD}>&- &
+		else
+			Xvfb ":${N}" -screen 0 1280x1024x24 -nolisten tcp >"$CHEXTREK_XVFB_LOG" 2>&1 &
+		fi
 		CHEXTREK_XVFB_PID=$!
 		local WAITED=0
 		while [ $WAITED -lt 10 ] && [ ! -e "/tmp/.X${N}-lock" ]; do
@@ -262,6 +281,10 @@ _chextrek_exit_environment() {
 		echo "$LINE"
 	done
 	_chextrek_stop_xvfb
+	# #62: #63's preflight exits run before the lock is taken (a no-op here); a later stop (display
+	# died mid-run) would have the kernel drop the lock at exit anyway - releasing explicitly just
+	# makes that not depend on nothing else still holding the fd.
+	_chextrek_release_lock
 	exit 3
 }
 
@@ -319,6 +342,71 @@ _chextrek_linux_preflight_or_exit() {
 	fi
 }
 
+# chextrek_lock_file
+#
+# Path to the single-run lock file (#62). Every chextrek_run_console_script call on Unicron
+# (Linux/Wine) takes an exclusive flock on this file for its whole run - mount, save-dir wipe,
+# launch, cleanup - so two concurrent runs on this machine (two worktrees, an agent plus the
+# pipeline, whatever) serialize instead of racing on the shared DOOM3_BASEPATH/chextrek mount and
+# the shared per-mod save dir; today that's just a documented "one at a time" rule (see
+# docs/dev-setup.md), not something enforced. A fixed path (not `$TMPDIR`, which can differ between
+# sessions/users and would silently split them onto different, non-serializing lock files) outside
+# the repo and outside any worktree, so every worktree on this machine shares the same lock file by
+# default. CHEXTREK_LOCK_FILE overrides it - a test that wants to prove the locking itself, without
+# colliding with a real run on the machine, sets its own private path.
+# Windows is out of scope for #62 (the Windows branch still just kills every dhewm3.exe by image
+# name on timeout, unchanged) - only the Linux/Wine call sites below take this lock.
+chextrek_lock_file() {
+	echo "${CHEXTREK_LOCK_FILE:-/tmp/chextrek-harness.lock}"
+}
+
+# _chextrek_acquire_lock
+#
+# Opens chextrek_lock_file on fd CHEXTREK_LOCK_FD and takes an exclusive flock on it, printing a
+# "waiting" line (#62 AC2) once if another run already holds it, then blocking until it's free.
+# Exits the calling script with 1 if the lock file itself can't even be opened (e.g. permissions) -
+# proceeding unlocked would defeat the whole point.
+#
+# flock's lock lives on the open file descriptor, not on the file's contents or a pid recorded in
+# it, so a run that dies while holding it - crash, SIGKILL, whatever - has the kernel close that fd
+# and drop the lock, with nothing left to clean up (#62 AC3) - *provided* nothing else still has a
+# copy of that fd open. A plain fork (every external command this script runs, including Xvfb and
+# the wine launch) inherits it regardless of what the child later execs into, so a harness process
+# killed while such a child is still running would otherwise leave the lock held by that orphan
+# indefinitely. chextrek_ensure_display_or_exit's Xvfb spawn, the winepath call in
+# chextrek_to_engine_path, and the wine launch in _chextrek_run_console_script_impl - the places
+# that can start something able to outlive this call (Xvfb itself; a wineserver `winepath` or
+# `wine` may spawn, which does not exit with the command that started it) - each attach
+# `{CHEXTREK_LOCK_FD}>&-` directly to that command, so the fd is closed in *that fork*, before it
+# execs into anything, and nothing it or its own children (wineserver, winedevice.exe) start ever
+# gets a copy. Only this process's own fd, closed by _chextrek_release_lock, matters for the lock.
+_chextrek_acquire_lock() {
+	local LOCK_FILE
+	LOCK_FILE="$(chextrek_lock_file)"
+	if ! exec {CHEXTREK_LOCK_FD}>"$LOCK_FILE"; then
+		echo "error: couldn't open the harness lock file ${LOCK_FILE}. See docs/dev-setup.md." >&2
+		exit 1
+	fi
+	if ! flock -n "$CHEXTREK_LOCK_FD"; then
+		echo "==> Waiting for the harness lock (another run holds ${LOCK_FILE}) ..."
+		if ! flock "$CHEXTREK_LOCK_FD"; then
+			echo "error: couldn't take the harness lock on ${LOCK_FILE} (is 'flock' installed?). See docs/dev-setup.md." >&2
+			exit 1
+		fi
+	fi
+}
+
+# _chextrek_release_lock
+#
+# Releases the lock _chextrek_acquire_lock took and closes its fd. A no-op if no lock is currently
+# held (CHEXTREK_LOCK_FD unset or already closed).
+_chextrek_release_lock() {
+	[ -n "${CHEXTREK_LOCK_FD:-}" ] || return 0
+	flock -u "$CHEXTREK_LOCK_FD" 2>/dev/null || true
+	exec {CHEXTREK_LOCK_FD}>&- 2>/dev/null || true
+	CHEXTREK_LOCK_FD=""
+}
+
 # chextrek_run_console_script REPO_ROOT CONSOLE_SCRIPT_BODY TIMEOUT_SECS RUN_LABEL
 #
 # CONSOLE_SCRIPT_BODY is the full text written to the .cfg file dhewm3 execs (including
@@ -347,11 +435,36 @@ _chextrek_linux_preflight_or_exit() {
 # every return path out of the impl - without having to remember a cleanup call at each of the
 # impl's several early returns. A no-display exit (chextrek_exit_no_display) bypasses this wrapper
 # entirely (exit, not return), so it does its own Xvfb cleanup inline.
+#
+# On Unicron (Linux/Wine, #62) it also takes the single-run lock (_chextrek_acquire_lock) before
+# calling the impl and releases it (_chextrek_release_lock) on every return path, for the same
+# reason: the impl's early returns would otherwise each need to remember to release it. A
+# no-display exit bypasses this wrapper, but _chextrek_exit_environment releases the lock itself,
+# and since it terminates the whole process anyway, the kernel would close CHEXTREK_LOCK_FD and drop
+# the lock regardless - see _chextrek_acquire_lock.
+#
+# #63's Linux environment preflight (Wine/winepath on PATH, an initialized $WINEPREFIX, Doom 3
+# data, the dhewm3 engine) runs here, *before* the lock is taken: a broken environment stops with
+# exit 3 at once instead of first queueing behind another run's lock, and never holds the lock at
+# all. None of those checks fork anything (`command -v` and `[ -f ]` are builtins), so there's no
+# child that could inherit the lock fd either way.
 chextrek_run_console_script() {
 	CHEXTREK_XVFB_PID=""
+	if chextrek_is_linux; then
+		DHEWM3_HOME="${DHEWM3_HOME:-$HOME/games/dhewm3/1.5.5-win32/dhewm3}"
+		DOOM3_BASEPATH="${DOOM3_BASEPATH:-$HOME/games/doom3}"
+		export WINEPREFIX="${WINEPREFIX:-$HOME/games/wineprefix-chextrek}"
+		# #63: Wine, the Wine prefix, the Doom 3 data and the dhewm3 engine are all fixed, one-time
+		# resources (docs/dev-setup.md) - check the cheap ones before waiting on the lock (#62) or
+		# paying for an Xvfb start.
+		_chextrek_linux_preflight_or_exit
+		_chextrek_check_engine_or_exit
+		_chextrek_acquire_lock
+	fi
 	_chextrek_run_console_script_impl "$@"
 	local RC=$?
 	_chextrek_stop_xvfb
+	chextrek_is_linux && _chextrek_release_lock
 	return $RC
 }
 
@@ -362,13 +475,8 @@ _chextrek_run_console_script_impl() {
 	local RUN_LABEL="${4:-chextrek_harness}"
 
 	if chextrek_is_linux; then
-		DHEWM3_HOME="${DHEWM3_HOME:-$HOME/games/dhewm3/1.5.5-win32/dhewm3}"
-		DOOM3_BASEPATH="${DOOM3_BASEPATH:-$HOME/games/doom3}"
-		export WINEPREFIX="${WINEPREFIX:-$HOME/games/wineprefix-chextrek}"
-		# #63: Wine, the Wine prefix, the Doom 3 data and the dhewm3 engine are all fixed, one-time
-		# resources (docs/dev-setup.md) - check the cheap ones before paying for an Xvfb start.
-		_chextrek_linux_preflight_or_exit
-		_chextrek_check_engine_or_exit
+		# DHEWM3_HOME/DOOM3_BASEPATH/WINEPREFIX defaults and #63's environment preflight were
+		# already applied by chextrek_run_console_script, before it took the lock (#62).
 		# Unicron has nobody logged in, ever (#60 AC: "works over SSH with no DISPLAY set") - bring
 		# our own display instead of treating "no display" as the environment stop qwinsta is for on
 		# Windows below.
@@ -505,9 +613,21 @@ _chextrek_run_console_script_impl() {
 		# is still tracking exactly one PID - the wine process itself, not a wrapper shell around
 		# it. `--kill-after` guarantees that PID actually dies on timeout instead of just being
 		# asked to (#60 AC: "a timeout kills only the dhewm3 process the harness started" - not
-		# Windows' machine-wide taskkill-by-image-name below).
-		timeout --kill-after=10 "$TIMEOUT_SECS" bash -c 'cd "$1" && shift && exec wine "$@"' _ \
-			"$DHEWM3_HOME" "$DHEWM3_EXE" "${ENGINE_ARGS[@]}"
+		# Windows' machine-wide taskkill-by-image-name below). This runs in the foreground and
+		# normally exits with `timeout`/wine well before this call returns - but if *this* harness
+		# process itself were killed first, wine/dhewm3 and everything it in turn forks (wineserver,
+		# winedevice.exe) would keep running and, having inherited the single-run lock fd (#62)
+		# across the fork chain, would keep holding the lock indefinitely. `{CHEXTREK_LOCK_FD}>&-`
+		# closes this call's own copy of it in *timeout's* fork, before timeout execs into anything -
+		# so bash -c, wine, and every process wine goes on to start never have a copy in the first
+		# place, and only this function's own fd matters for the lock.
+		if [ -n "${CHEXTREK_LOCK_FD:-}" ]; then
+			timeout --kill-after=10 "$TIMEOUT_SECS" bash -c 'cd "$1" && shift && exec wine "$@"' _ \
+				"$DHEWM3_HOME" "$DHEWM3_EXE" "${ENGINE_ARGS[@]}" {CHEXTREK_LOCK_FD}>&-
+		else
+			timeout --kill-after=10 "$TIMEOUT_SECS" bash -c 'cd "$1" && shift && exec wine "$@"' _ \
+				"$DHEWM3_HOME" "$DHEWM3_EXE" "${ENGINE_ARGS[@]}"
+		fi
 	else
 		timeout "$TIMEOUT_SECS" "$DHEWM3_EXE" "${ENGINE_ARGS[@]}"
 	fi

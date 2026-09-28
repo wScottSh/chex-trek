@@ -27,9 +27,12 @@ FAIL=0
 # (symlinked from wherever they really live), same technique as
 # tools/test-harness-no-display.sh - so "wine isn't on PATH" is a real `command -v wine` miss, not
 # a stand-in, and no real Wine/Xvfb/dhewm3 install on this host is required to run this test.
+# `flock` is here because the "nothing missing" case gets past the preflight and takes the #62
+# single-run lock - on a private CHEXTREK_LOCK_FILE (see run_case), so it never queues behind a
+# real harness run on this machine.
 mkdir -p "${SCRATCH}/base-bin"
 for TOOL in bash uname date cat mkdir rm printf sed grep id readlink basename dirname cp \
-	mktemp kill sleep seq ln tr chmod true env; do
+	mktemp kill sleep seq ln tr chmod true env flock; do
 	T="$(command -v "$TOOL" 2>/dev/null)" && ln -sf "$T" "${SCRATCH}/base-bin/${TOOL}"
 done
 
@@ -69,7 +72,7 @@ run_case() {
 	local CASE_PATH="$1" CASE_HOME="$2" CASE_DOOM3="$3" CASE_PREFIX="$4"
 	local START
 	START=$(date +%s)
-	OUT="$(env -i PATH="$CASE_PATH" HOME="$SCRATCH" \
+	OUT="$(env -i PATH="$CASE_PATH" HOME="$SCRATCH" CHEXTREK_LOCK_FILE="${SCRATCH}/harness.lock" \
 		DHEWM3_HOME="$CASE_HOME" DOOM3_BASEPATH="$CASE_DOOM3" WINEPREFIX="$CASE_PREFIX" \
 		bash -c '
 			unset DISPLAY
