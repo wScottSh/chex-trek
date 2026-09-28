@@ -28,6 +28,7 @@ functions against the reference files.
 | `chextrek.dll` (not `base.dll`) is the game library that loaded; state-dump command `chextrek_dump` prints a stable header (`CHEXTREK-STATE-DUMP v1`) | always-on checks, every run | covered - each feature below adds its own dump lines. |
 | Main menu loads clean (script compile passes), on both the Windows dev machine and Unicron (Linux/Wine, #60) - same script, same interface, unchanged assertions | `tools/test-menu-smoke.sh` | covered - also checks #29's known `openDoors` unknown-event failure is gone. |
 | Always-on checks on both real maps (`e1m1`, `sf_923`) | every scenario that loads a map | covered - no allowlist. The unknown-spawnclass check matches the engine's real message (`Could not spawn '<classname>'.  Class '<spawnclass>' not found`). |
+| `tools/run-all-tests.sh` skips `build-chextrek.sh` and runs against a prebuilt `chextrek.dll` when the caller pre-sets `CHEXTREK_SKIP_BUILD=1` (Unicron, #61), but still always builds first when it isn't set | `tools/test-run-all-tests-skip-build.sh` | covered - self-test against stubbed `build-chextrek.sh`/`test-*.sh` scripts in a scratch dir; never launches the game. |
 
 ## Per-feature (spec #28 order)
 

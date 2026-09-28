@@ -6,6 +6,13 @@
 #
 # Usage: tools/run-all-tests.sh
 #
+# tools/build-chextrek.sh only knows how to build on Windows (spec #58/#61) - there is no Linux
+# build step yet. On Unicron, set CHEXTREK_SKIP_BUILD=1 *before* calling this script (in addition
+# to copying a prebuilt chextrek.dll to the repo root yourself, same as any tools/test-*.sh run -
+# see docs/dev-setup.md's "Unicron (Linux/Wine)" section) to skip the build step and run the whole
+# suite against that prebuilt DLL as-is. Left unset (the default - nobody sets this before calling
+# run-all-tests.sh on the Windows dev machine), this always builds first, exactly as before.
+#
 # Exit status: 0 if every script passed, 1 if any failed, 3 if a run stopped on a broken-
 # environment blocker - not a test result - the suite stops at once (no display; Linux-only,
 # #63: missing Wine/winepath, an uninitialized Wine prefix, missing Doom 3 data, or a missing
@@ -13,11 +20,21 @@
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-echo "=== build ==="
-if ! bash "${SCRIPT_DIR}/build-chextrek.sh"; then
-	echo "FAIL: build-chextrek.sh failed"
-	exit 1
+if [ "${CHEXTREK_SKIP_BUILD:-0}" = "1" ]; then
+	echo "=== build (skipped: CHEXTREK_SKIP_BUILD=1) ==="
+	if [ ! -f "${REPO_ROOT}/chextrek.dll" ]; then
+		echo "FAIL: CHEXTREK_SKIP_BUILD=1 but ${REPO_ROOT}/chextrek.dll doesn't exist. Copy a prebuilt chextrek.dll to the repo root first - see docs/dev-setup.md."
+		exit 1
+	fi
+	echo "==> Using prebuilt ${REPO_ROOT}/chextrek.dll"
+else
+	echo "=== build ==="
+	if ! bash "${SCRIPT_DIR}/build-chextrek.sh"; then
+		echo "FAIL: build-chextrek.sh failed"
+		exit 1
+	fi
 fi
 export CHEXTREK_SKIP_BUILD=1
 

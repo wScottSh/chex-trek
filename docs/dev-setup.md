@@ -1,8 +1,8 @@
 # Dev-machine setup: building and testing `chextrek.dll`
 
-Spec #28/#29 (Windows dev machine), extended by spec #58/#60 (Unicron, Linux/Wine). This is the
-one-time, per-machine setup the build and harness scripts assume. Everything here is outside this
-repo on purpose - see "Why none of this lives in the repo" below. The harness's *interface*
+Spec #28/#29 (Windows dev machine), extended by spec #58/#60/#61 (Unicron, Linux/Wine). This is
+the one-time, per-machine setup the build and harness scripts assume. Everything here is outside
+this repo on purpose - see "Why none of this lives in the repo" below. The harness's *interface*
 (`tools/build-chextrek.sh`, `tools/run-harness.sh`, `tools/run-all-tests.sh`, every
 `tools/test-*.sh`) is identical on both machines; only the one-time setup and a few internals
 differ. The one current exception is `tools/build-chextrek.sh` itself, which only knows how to
@@ -28,17 +28,20 @@ Environment variables the scripts read (all optional, default to the table above
 
 ## Unicron (Linux/Wine)
 
-Spec #58/#60. Unicron builds and runs the harness unattended, with nobody ever logged in to a
+Spec #58/#60/#61. Unicron builds and runs the harness unattended, with nobody ever logged in to a
 desktop; the platform layer this needs lives in `tools/lib-harness.sh` behind `chextrek_is_linux`.
-Building `chextrek.dll` itself on Linux is a later sub-issue - #60 only covers running the harness
-against a prebuilt DLL (built on the Windows dev machine and copied over, or produced by that later
-Linux build step once it exists). Until that build step exists, `tools/build-chextrek.sh` only knows
-how to build on Windows, so on Unicron: copy a Windows-built `chextrek.dll` (+ `.pdb`) to the repo
-root yourself, same gitignored place the Windows build writes to, and set `CHEXTREK_SKIP_BUILD=1`
-before running an individual `tools/test-*.sh` (or `tools/run-harness.sh`, which never builds) so it
-skips the build step and uses the prebuilt DLL as-is. `tools/run-all-tests.sh` always builds first
-regardless of `CHEXTREK_SKIP_BUILD` (it only sets that variable for the `test-*.sh` scripts it goes
-on to run) and so can't run on Unicron until the Linux build step exists.
+Building `chextrek.dll` itself on Linux is a later sub-issue (#64) - #60/#61 only cover running the
+harness, and the whole suite, against a prebuilt DLL (built on the Windows dev machine and copied
+over, or produced by that later Linux build step once it exists). Until that build step exists,
+`tools/build-chextrek.sh` only knows how to build on Windows, so on Unicron: copy a Windows-built
+`chextrek.dll` (+ `.pdb`) to the repo root yourself, same gitignored place the Windows build writes
+to, and set `CHEXTREK_SKIP_BUILD=1` before running an individual `tools/test-*.sh` (or
+`tools/run-harness.sh`, which never builds) so it skips the build step and uses the prebuilt DLL
+as-is. `tools/run-all-tests.sh` (#61) honors a `CHEXTREK_SKIP_BUILD=1` set *before* it's called the
+same way: it skips `build-chextrek.sh` and runs the whole suite against whatever `chextrek.dll`
+already sits at the repo root, failing fast with a clear error if there isn't one. Left unset (the
+default - nobody sets this before calling `run-all-tests.sh` on the Windows dev machine), it always
+builds first, exactly as before.
 
 | Thing | Location | Notes |
 |---|---|---|
@@ -87,7 +90,22 @@ What the Linux platform layer does differently (same `chextrek_run_console_scrip
 `chextrek.dll` itself on Linux; a single-run lock across concurrent worktrees (two concurrent runs
 against the same default `$WINEPREFIX` can still race on each other's wine processes, same as the
 existing "one run at a time" note below already says for the shared mount and save dir); the two
-scenarios spike #59 found Wine-only-red (`test-end-level-nextmap.sh`, `test-objectives.sh`).
+scenarios spike #59 found Wine-only-red (`test-end-level-nextmap.sh`, `test-objectives.sh`) - fixed
+by #61, see the next paragraph.
+
+**Fixed by #61** (both scenarios' Wine-only reds from the spike): in both cases the scenario's own
+assertions were unchanged; only a `wait` count each script sends the game grew, gated on
+`chextrek_is_linux` so the Windows-verified values are untouched.
+- `test-objectives.sh`: the `wait 150` after each `loadgame` (meant to comfortably outlast
+  `mkObjective::Restore`'s 500ms-after-load re-attach) wasn't enough under Wine/llvmpipe - the spike
+  saw the first round-trip read `empty/empty` instead of `Investigate/empty`. `wait 600` (4x) is
+  verified reliable across runs.
+- `test-end-level-nextmap.sh`: the `wait 10` after triggering `target_endlevelgui_1` (meant to
+  leave `Event_UpdateStats`'s state just past its `-1` -> `0` transition, but short of finishing the
+  monsters line on its own) left state stuck at `-1` for the rest of the run under Wine - every
+  `customui_gui_*` value and `level_time` stayed at their pre-screen defaults. `wait 40` (4x)
+  reliably reaches state `0` with the monsters line only 1-2% into its count, the same "started but
+  not finished" margin the original wait targets.
 
 ## Building
 
