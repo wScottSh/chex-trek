@@ -50,6 +50,7 @@ functions against the reference files.
 | `idPlayer::addItemText` (#32) | `tools/test-item-text.sh` | covered - replays `sf_923`'s real order (`trigger_once_6`, then the pistol pickup that re-triggers `trigger_objective_1`); the dump's `item_text_last` shows "Objective Complete". Proves the text is queued, not that the HUD draws it. |
 | Custom UI (`idCustomUI`) + end-level stats (`idTarget_EndLevelGUI`, stat counting) (#33) | `tools/test-end-level-stats.sh` | covered - on `e1m1`, a kill, a `level_item` pickup and a `secret` door each raise `level_stats` by one, and `target_endlevelgui_1` shows the stats UI with those values; `sf_923`'s screen spawns and activates too. |
 | Stats screen `skip`/`nextmap` (`HandleCustomGUICommand`) (#34) | `tools/test-end-level-nextmap.sh` | covered - `skip` x4 jumps each line (monsters, items, secrets, time) to its final value; `nextmap` on a spawned `target_endlevelgui` with `nextmap e1m1` loads `e1m1`. |
+| End-level stats survive a savegame load: `idPlayer::Save`/`Restore` carry `levelStats` (#52) | `tools/test-end-level-after-load.sh` | covered - on `e1m1`, after a pickup and a secret, save then load: `level_stats` matches its pre-save value (totals and found), and `target_endlevelgui_1` (each line `skip`ped to its final value) shows those counts/percents and a real `mm:ss:MMM` level time. Red on the unfixed `Player.cpp` (`0/0` totals, empty GUI vars). |
 | `g_PDA` cvar + `ArgCompletion_GuiName` (#35) | `tools/test-pda.sh` | covered - `idPlayer::Spawn` loads the PDA gui `g_PDA` names (checked with a third, unrelated gui, then the default `guis/pda_chex.gui`), and opening the PDA shows it; `g_PDA`'s completion is `ArgCompletion_GuiName` by address and lists `guis/pda_chex.gui`. |
 | PDA key (impulse 19) opens and closes the PDA gui, not just the PDA model's "comm down" screen (bug #48) | `tools/test-pda-impulse.sh` | covered - on `e1m1` (PDA owned from the map's start, as in the bug report), four impulse 19s give `pda_open` 0 -> 1 -> 0 -> 1 -> 0 with `guis/pda_chex.gui`, and it's still open 100 waits after opening; on `office` (no PDA owned) impulse 19 leaves it closed. Fails on the pre-fix code (`pda_open` never leaves 0 on e1m1). |
 | HUD map: impulse 23 toggle, fog-of-war reveal (#36) | `tools/test-hud-map.sh` | covered - on `e1m1`, impulse 23 flips the dump's `hud_map visible` 0 -> 1 -> 0, and `coverage` grows after each of three `setviewpos` moves. |
@@ -88,7 +89,8 @@ Detail lives where each bullet points; this list is the index.
 
 **Port choices and fixes beyond the reconstruction** (each in that reference file's Notes).
 - `idTarget_EndLevelGUI::Spawn` zeroes `ticSound` (crash fix); `idMover_Binary` `secret`/
-  `secretFound` are saved (binary unchecked): `decomp-so/reference/end-level-stats.md`.
+  `secretFound` are saved (binary unchecked); `idPlayer` saves `levelStats` counts, not its
+  name pointers (#52): `decomp-so/reference/end-level-stats.md`.
 - `idPlayer` constructor defaults for the unsaved HUD-map members (a savegame load never runs
   `Spawn`/`Init`); `hudmap_alpha` saved in one bulk write: `decomp-so/reference/hud-map.md`.
 - `mkTrail`: `callbackData` instead of the `entityNum` pointer cast; `addNewAnchor` bounds guard
