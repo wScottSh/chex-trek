@@ -11,6 +11,7 @@
 #include "Player.h"
 #include "Target.h"
 #include "Trail.h" // chextrek: spec #43
+#include "Camera.h" // chextrek: #51/#52, the dump's camera: line
 
 #include "ChexTrekDump.h"
 
@@ -47,6 +48,9 @@ static idStr chextrekAIBlockedLast = "none";
 static int chextrekMusicVolumeAppliedCount = 0;
 static float chextrekMusicVolumeLast = 0.0f;
 static bool chextrekMusicVolumeStoppedLast = false;
+
+// chextrek: #51/#52. See ChexTrek_NoteCustomUIDrawn in ChexTrekDump.h.
+static int chextrekCustomUIDrawCount = 0;
 
 // chextrek: spec #30, test-only. The AFK harness drives the game only through console commands
 // (spec #28), including the "script" command to call scriptEvents like setProj/spawnDict that
@@ -176,6 +180,15 @@ void ChexTrek_NoteMusicVolume( float volume, bool stopped ) {
 
 /*
 ==================
+ChexTrek_NoteCustomUIDrawn
+==================
+*/
+void ChexTrek_NoteCustomUIDrawn( void ) {
+	chextrekCustomUIDrawCount++;
+}
+
+/*
+==================
 ChexTrek_Dump_f
 
 Prints the mod's custom state to the game log for the AFK test harness: the stable header line,
@@ -212,6 +225,11 @@ depending on HUD GUI state or racing the queue idPlayer::UpdateHud drains within
   through SetStateInt/SetStateString) - so a scenario can assert the screen counted up without
   depending on idTarget_EndLevelGUI's private displayStats/state members, which nothing outside the
   class can read.
+
+#51/#52 add `customui_draw_count: <N>` (see ChexTrek_NoteCustomUIDrawn), `camera: <name|none>`
+(gameLocal.GetCamera(), e.g. the func_cameraview trigger_credits fires once the stats screen
+finishes) and `player_weapon: <idealWeapon>` (-1 without a local player), so a scenario can assert
+the stats screen is drawn, rolls the credits, and blocks weapon switching while it's up.
 
 #35 adds `pda_gui: <name|none>` (idPlayer::objectiveSystem's idUserInterface::Name(), the gui file
 it was loaded from - #35's edit makes idPlayer::Spawn read that from g_PDA instead of
@@ -468,6 +486,12 @@ void ChexTrek_Dump_f( const idCmdArgs &args ) {
 			}
 		}
 	}
+
+	// chextrek: #51/#52. See the ChexTrek_Dump_f header comment above.
+	gameLocal.Printf( "customui_draw_count: %d\n", chextrekCustomUIDrawCount );
+	idCamera *camera = gameLocal.GetCamera();
+	gameLocal.Printf( "camera: %s\n", camera ? camera->GetName() : "none" );
+	gameLocal.Printf( "player_weapon: %d\n", player ? player->GetIdealWeapon() : -1 );
 }
 
 /*

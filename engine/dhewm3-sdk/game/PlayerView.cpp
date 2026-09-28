@@ -35,6 +35,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "Player.h"
 
 #include "PlayerView.h"
+#include "ChexTrekDump.h"		// chextrek: #51/#52, ChexTrek_NoteCustomUIDrawn
 
 const int IMPULSE_DELAY = 150;
 /*
@@ -441,6 +442,16 @@ void idPlayerView::SingleView( idUserInterface *hud, const renderView_t *view ) 
 
 	// place the sound origin for the player
 	gameSoundWorld->PlaceListener( view->vieworg, view->viewaxis, player->entityNumber + 1, gameLocal.time, hud ? hud->State().GetString( "location" ) : "Undefined" );
+
+	// chextrek: #51/#52 (decomp-so/reference/custom-ui.md; edits-inside-stock-functions lead,
+	// 0x1764c6-0x1764e9): a registered custom UI (the end-level stats screen) is drawn full screen
+	// instead of the world. The binary tests only customUI here; the stock objectiveSystemOpen test
+	// is kept after it, as in idPlayer::ActiveGui.
+	if ( player->customUI ) {
+		player->customUI->Redraw( gameLocal.time );
+		ChexTrek_NoteCustomUIDrawn();	// chextrek: #51/#52, test-only (ChexTrekDump.h)
+		return;
+	}
 
 	// if the objective system is up, don't do normal drawing
 	if ( player->objectiveSystemOpen ) {
