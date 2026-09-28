@@ -329,7 +329,9 @@ if [ $CODE6C -eq 0 ]; then pass "exits 0 - the ambient CHEXTREK_SKIP_BUILD=1 did
 # >>"$LOG_FILE" inside pipeline-process-commit.sh), not to this run's own $(...) stdout - so the
 # leak check has to read the log file, not OUT6C, or it could never actually fire either way.
 LOG_SKIP_BUILD="$(find "${STATE_DIR}/logs" -name "*-${TAG_SKIP_BUILD}-*.log" | head -1)"
-if [ -n "$LOG_SKIP_BUILD" ] && grep -qF "CHEXTREK_SKIP_BUILD leaked" "$LOG_SKIP_BUILD"; then
+if [ -z "$LOG_SKIP_BUILD" ] || [ ! -f "$LOG_SKIP_BUILD" ]; then
+	fail "no archived log found for ${TAG_SKIP_BUILD} - can't check for a leak"
+elif grep -qF "CHEXTREK_SKIP_BUILD leaked" "$LOG_SKIP_BUILD"; then
 	fail "the suite command's own check caught a CHEXTREK_SKIP_BUILD leak"
 else
 	pass "no leak detected by the suite command's own check"

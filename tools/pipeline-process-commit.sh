@@ -160,8 +160,12 @@ trap cleanup EXIT
 if [ -d "$WT_DIR" ]; then
 	log "==> stale scratch worktree at ${WT_DIR} from an earlier run - removing it first"
 	git -C "$REPO_ROOT" worktree remove --force "$WT_DIR" >>"$LOG_FILE" 2>&1 || rm -rf "$WT_DIR"
-	git -C "$REPO_ROOT" worktree prune >>"$LOG_FILE" 2>&1 || true
 fi
+# Unconditional, even when $WT_DIR itself is already gone (e.g. someone `rm -rf`'d it by hand
+# without telling git): git still has that path registered from an earlier run, and refuses to
+# `worktree add` onto a path it already tracks. Without this, every future run of this exact
+# commit would exit 2 until someone happened to prune by hand.
+git -C "$REPO_ROOT" worktree prune >>"$LOG_FILE" 2>&1 || true
 
 log "==> checking out ${FULL_SHA} into its own worktree at ${WT_DIR}"
 if ! git -C "$REPO_ROOT" worktree add --detach "$WT_DIR" "$FULL_SHA" >>"$LOG_FILE" 2>&1; then
