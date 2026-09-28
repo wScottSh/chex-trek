@@ -2317,6 +2317,7 @@ void idGameLocal::InitConsoleCommands( void ) {
 	cmdSystem->AddCommand( "chextrek_test_projectile_hit", ChexTrek_TestProjectileHit_f, CMD_FL_GAME|CMD_FL_CHEAT, "chextrek: damages an entity as the player's current weapon projectile would on impact (test harness only)" );
 	cmdSystem->AddCommand( "chextrek_test_map_cmd",	ChexTrek_TestMapCmd_f,		CMD_FL_GAME|CMD_FL_CHEAT,	"chextrek: sends a PDA map_* GUI command to the local player (test harness only)" );
 	cmdSystem->AddCommand( "chextrek_test_pda_map_open", ChexTrek_TestPdaMapOpen_f, CMD_FL_GAME|CMD_FL_CHEAT, "chextrek: sets the PDA gui's own HudMap state flag directly (test harness only)" );
+	cmdSystem->AddCommand( "chextrek_test_gui_click", ChexTrek_TestGuiClick_f,	CMD_FL_GAME|CMD_FL_CHEAT,	"chextrek: clicks a point on an entity's in-world gui (test harness only)" );
 	cmdSystem->AddCommand( "listTypeInfo",			ListTypeInfo_f,				CMD_FL_GAME,				"list type info" );
 	cmdSystem->AddCommand( "writeGameState",		WriteGameState_f,			CMD_FL_GAME,				"write game state" );
 	cmdSystem->AddCommand( "testSaveGame",			TestSaveGame_f,				CMD_FL_GAME|CMD_FL_CHEAT,	"test a save game for a level" );

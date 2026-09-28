@@ -78,7 +78,20 @@ namespace map_storage_facility {
 // 			thread crane_mover( SF_CRANE_L );
 // 		}
 // 	}
-	
+
+	// #50: sf_923's crane_panel gui still runScripts these, but sf_923 has no crane entities
+	// ($crane_base etc. only exist in storage_facility.map), so the crane code above stays off.
+	// A missing runScript target is a gameLocal.Error (idEntity::HandleGuiCommands) that drops
+	// the level, so the panel's buttons get no-ops instead.
+	void crane_stop() {
+	}
+
+	void crane_right() {
+	}
+
+	void crane_left() {
+	}
+
 	void chex_gui() {
 		sys.wait( 5 ); //let things settle
 		while( 1 ) {
