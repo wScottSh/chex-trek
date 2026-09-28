@@ -39,8 +39,9 @@
 #
 # Logs: one file per run under CHEXTREK_PIPELINE_STATE_DIR's logs/ subdirectory (see below) -
 # outside every repo and worktree, so they survive worktree cleanup and are readable without a
-# checkout. Every run's outcome (published/red/environment/error) is on the last line. The red
-# issue's body/comment cites this same path as the run's archive location.
+# checkout. Every run's outcome (published/red/environment/error) is on its own "OUTCOME: ..."
+# line, followed only by this run's own red-issue-tracking lines (open/comment/close), if any. The
+# red issue's body/comment cites this same log path as the run's archive location.
 #
 # Injectable for testing (tools/test-pipeline-process-commit.sh stubs every one of these - a test
 # must never point any of them at the real wScottSh/chex-trek repo or a real `gh`):
@@ -146,44 +147,99 @@ log "log: ${LOG_FILE}"
 RED_LABEL="${CHEXTREK_PIPELINE_RED_LABEL:-pipeline:red}"
 RED_TITLE="${CHEXTREK_PIPELINE_RED_TITLE:-Pipeline: chex-trek build is red}"
 
-# find_red_issue - the number of the single open issue carrying RED_LABEL, or empty if none is
-# open. Only label + state are checked (not the title): this pipeline is the only thing that ever
-# applies RED_LABEL, so at most one open issue can ever carry it in normal operation.
+# find_red_issue - prints the number of the single open issue carrying RED_LABEL, prints nothing
+# if none is open, or prints _LIST_FAILED and logs a WARNING if `gh issue list` itself failed (an
+# auth/network/rate-limit error looks like "no output" otherwise, which callers must never treat
+# the same as "confirmed no issue open" - doing so risks opening a duplicate issue on a red run, or
+# silently skipping a close on a green run). Only label + state are checked (not the title): this
+# pipeline is the only thing that ever applies RED_LABEL, so at most one open issue can ever carry
+# it in normal operation.
 find_red_issue() {
-	gh issue list --repo "$REPO" --label "$RED_LABEL" --state open --json number --jq '.[0].number // empty' 2>>"$LOG_FILE"
+	local OUT
+	OUT="$(gh issue list --repo "$REPO" --label "$RED_LABEL" --state open --json number --jq '.[0].number // empty' 2>>"$LOG_FILE")"
+	if [ $? -ne 0 ]; then
+		# Written straight to LOG_FILE, never via log() (which also writes to stdout): every caller
+		# of find_red_issue reads its stdout via command substitution as the return value, so any
+		# extra stdout output here would silently corrupt that value (e.g. turn a clean
+		# "_LIST_FAILED" into a multi-line string that then fails every caller's `[ "$NUM" =
+		# "_LIST_FAILED" ]` check and gets passed straight to `gh issue comment`/`close` as a bogus
+		# issue number instead).
+		printf '%s\n' "==> WARNING: 'gh issue list --label ${RED_LABEL}' failed - can't tell whether one is already open (see the log above for gh's own error)" >>"$LOG_FILE"
+		printf '_LIST_FAILED'
+		return
+	fi
+	printf '%s' "$OUT"
 }
 
 # open_or_update_red_issue BODY - comments on the existing open red issue if there is one,
 # otherwise creates RED_LABEL (idempotent - `--force` is a no-op if it already exists) and opens a
-# new issue with the fixed title. Never opens a second issue while one is already open.
+# new issue with the fixed title. Never opens a second issue while one is already open. If
+# find_red_issue couldn't tell (see above), does nothing rather than risk a duplicate.
 open_or_update_red_issue() {
 	local BODY="$1" NUM
 	NUM="$(find_red_issue)"
+	if [ "$NUM" = "_LIST_FAILED" ]; then
+		log "==> not opening/commenting on a ${RED_LABEL} issue this run - couldn't confirm whether one is already open (see the WARNING above)"
+		return
+	fi
 	if [ -n "$NUM" ]; then
 		log "==> commenting on the existing open ${RED_LABEL} issue #${NUM}"
-		gh issue comment "$NUM" --repo "$REPO" --body "$BODY" >>"$LOG_FILE" 2>&1
+		if ! gh issue comment "$NUM" --repo "$REPO" --body "$BODY" >>"$LOG_FILE" 2>&1; then
+			log "==> WARNING: 'gh issue comment' on #${NUM} failed - see the log above"
+		fi
 		return
 	fi
 	log "==> no open ${RED_LABEL} issue - ensuring the label exists"
-	gh label create "$RED_LABEL" --repo "$REPO" --color b60205 \
+	if ! gh label create "$RED_LABEL" --repo "$REPO" --color b60205 \
 		--description "tools/pipeline-process-commit.sh: the build/test pipeline is currently red or environment-blocked" \
-		--force >>"$LOG_FILE" 2>&1
+		--force >>"$LOG_FILE" 2>&1; then
+		log "==> WARNING: 'gh label create ${RED_LABEL}' failed - see the log above; still attempting the issue create"
+	fi
 	log "==> opening a new ${RED_LABEL} issue: ${RED_TITLE}"
-	gh issue create --repo "$REPO" --title "$RED_TITLE" --label "$RED_LABEL" --body "$BODY" >>"$LOG_FILE" 2>&1
+	if ! gh issue create --repo "$REPO" --title "$RED_TITLE" --label "$RED_LABEL" --body "$BODY" >>"$LOG_FILE" 2>&1; then
+		log "==> WARNING: 'gh issue create' failed - see the log above"
+	fi
 }
 
 # close_red_issue RELEASE_URL - closes the open red issue (if any) with a comment naming this
 # green commit and linking RELEASE_URL. A no-op (not an error) when no red issue is open, which is
-# the common case - most green runs never touch the issue tracker at all.
+# the common case - most green runs never touch the issue tracker at all. If find_red_issue
+# couldn't tell (see above), does nothing rather than guess - a still-open issue, if any, is closed
+# on a later green run instead.
 close_red_issue() {
 	local RELEASE_URL="${1:-}" NUM BODY
 	NUM="$(find_red_issue)"
+	if [ "$NUM" = "_LIST_FAILED" ]; then
+		log "==> couldn't check for an open ${RED_LABEL} issue to close (see the WARNING above)"
+		return 0
+	fi
 	if [ -z "$NUM" ]; then
 		return 0
 	fi
 	BODY="$(printf 'Commit %s (%s) is green.\n\nRelease: %s\n' "$FULL_SHA" "$TAG" "${RELEASE_URL:-(release URL unavailable)}")"
 	log "==> closing ${RED_LABEL} issue #${NUM} - commit ${FULL_SHA} is green"
-	gh issue close "$NUM" --repo "$REPO" --comment "$BODY" >>"$LOG_FILE" 2>&1
+	if ! gh issue close "$NUM" --repo "$REPO" --comment "$BODY" >>"$LOG_FILE" 2>&1; then
+		log "==> WARNING: 'gh issue close' on #${NUM} failed - see the log above"
+	fi
+}
+
+# release_url_or_empty TAG - TAG's release URL (`gh release view --json url --jq .url`), or empty
+# if that lookup itself fails. Shared by both places that close the red issue against a release
+# this run didn't just create with `gh release create` (the idempotent fast path below, and the
+# "lost the race but the release exists" recheck near the bottom).
+release_url_or_empty() {
+	gh release view "$1" --repo "$REPO" --json url --jq .url 2>>"$LOG_FILE"
+}
+
+# suite_summary_block - the *last* "=== summary: ..." block in SUITE_TAIL to end-of-output (i.e.
+# tools/run-all-tests.sh's own final block - see its own header). A nested self-test (this suite
+# includes tools/test-pipeline-process-commit.sh itself) can print its own summary/FAIL: lines
+# earlier in the output; `tac`/`tac` takes the *last* match so those are never mistaken for the
+# real, final summary. Shared by the red-issue body's failing-scenario list and the green release
+# notes, so both cite the same, single block instead of the whole (possibly huge, possibly noisy)
+# suite output.
+suite_summary_block() {
+	printf '%s\n' "$SUITE_TAIL" | tac | sed -n '0,/^=== summary:/p' | tac
 }
 
 # --- per-tag lock: two runs of the *same* commit (e.g. a caller and #68's poller racing, or two
@@ -208,11 +264,12 @@ fi
 # lock above, so this and the eventual publish can't race with another run of the same commit. ---
 if gh release view "$TAG" --repo "$REPO" >>"$LOG_FILE" 2>&1; then
 	log "OUTCOME: already published - ${TAG} already exists on ${REPO}, nothing to do"
-	# Still close a still-open red issue: this commit is confirmed green even though this
-	# particular run built nothing (e.g. a stale red issue outlived the run that actually fixed
-	# it, or a caller re-processed an old already-green commit).
-	EXISTING_RELEASE_URL="$(gh release view "$TAG" --repo "$REPO" --json url --jq .url 2>>"$LOG_FILE")"
-	close_red_issue "$EXISTING_RELEASE_URL"
+	# Deliberately does NOT touch the red issue here: this fast path can be hit by re-processing
+	# ANY already-published commit, including an old one from well before the current HEAD - e.g.
+	# a caller re-checks a commit that went green a while ago, while a *later* commit has since
+	# gone red and left the issue open. Closing the issue on this old commit's idempotent re-check
+	# would falsely report "green" while the real, current HEAD is still broken. Only a run whose
+	# own suite just genuinely passed (the fresh-publish and lost-the-race paths below) closes it.
 	exit 0
 fi
 
@@ -287,7 +344,12 @@ if [ "$SUITE_EXIT" = "3" ]; then
 fi
 if [ "$SUITE_EXIT" = "1" ]; then
 	log "OUTCOME: red - the suite failed; nothing published"
-	FAIL_LINES="$(printf '%s\n' "$SUITE_TAIL" | grep '^FAIL: ' || true)"
+	# Only the *final* summary block's own FAIL: lines (see suite_summary_block above) - not every
+	# FAIL:-prefixed line anywhere in the suite's output, which would also pick up individual
+	# scenario scripts' own per-assertion FAIL: lines and (since this suite includes
+	# tools/test-pipeline-process-commit.sh itself) a nested self-test's FAIL: lines too, bloating
+	# and duplicating the issue body for no reason.
+	FAIL_LINES="$(suite_summary_block | grep '^FAIL: ' || true)"
 	RED_BODY="$(printf 'Commit %s (%s) is red.\n\nFailing scenarios:\n%s\n\nRun archive: %s\n' \
 		"$FULL_SHA" "$TAG" "${FAIL_LINES:-(no FAIL: lines captured - see the full run archive)}" "$LOG_FILE")"
 	open_or_update_red_issue "$RED_BODY"
@@ -309,29 +371,30 @@ if [ ! -f "$DLL" ] || [ ! -f "$PDB" ]; then
 	exit 2
 fi
 
-# The *last* "=== summary:" line in the suite's own output to end-of-output: tools/run-all-tests.sh
-# prints exactly one, as its final block, but a nested self-test (this suite includes
-# tools/test-pipeline-process-commit.sh itself) can print its own earlier - `tac`/`tac` takes the
-# last match instead of the first so that one is never mistaken for run-all-tests.sh's real one.
-SUMMARY="$(printf '%s\n' "$SUITE_TAIL" | tac | sed -n '0,/^=== summary:/p' | tac)"
+SUMMARY="$(suite_summary_block)"
 NOTES="$(printf 'Pipeline build of %s (%s).\n\n%s\n' "$FULL_SHA" "$TAG" "$SUMMARY")"
 
 log "==> publishing ${TAG} (target ${FULL_SHA}) with chextrek.dll + chextrek.pdb, marked Latest"
-# Captured separately from LOG_FILE (rather than `>>"$LOG_FILE" 2>&1` like every other `gh` call
-# here) because on success `gh release create`'s only stdout line is the release's own URL - the
-# link the red issue's closing comment cites (AC "closes with a comment linking its release").
-CREATE_OUT="$(gh release create "$TAG" \
+# stdout and stderr captured separately (rather than `>>"$LOG_FILE" 2>&1` like every other `gh`
+# call here): on success, `gh release create`'s *stdout* is exactly one line, the release's own
+# URL - the link the red issue's closing comment cites (AC "closes with a comment linking its
+# release"). Mixing stderr in (e.g. via a combined 2>&1 capture) risks a trailing warning line
+# being mistaken for that URL; here, only CREATE_STDOUT ever feeds close_red_issue.
+CREATE_STDERR_FILE="$(mktemp)"
+CREATE_STDOUT="$(gh release create "$TAG" \
 	--repo "$REPO" \
 	--target "$FULL_SHA" \
 	--title "$TAG" \
 	--notes "$NOTES" \
 	--latest \
-	"$DLL" "$PDB" 2>&1)"
+	"$DLL" "$PDB" 2>"$CREATE_STDERR_FILE")"
 CREATE_STATUS=$?
-printf '%s\n' "$CREATE_OUT" >>"$LOG_FILE"
+cat "$CREATE_STDERR_FILE" >>"$LOG_FILE"
+rm -f "$CREATE_STDERR_FILE"
+printf '%s\n' "$CREATE_STDOUT" >>"$LOG_FILE"
 if [ "$CREATE_STATUS" = "0" ]; then
 	log "OUTCOME: published - ${TAG} created on ${REPO}, marked Latest"
-	close_red_issue "$(printf '%s\n' "$CREATE_OUT" | tail -1)"
+	close_red_issue "$(printf '%s\n' "$CREATE_STDOUT" | tail -1)"
 	exit 0
 fi
 
@@ -341,8 +404,7 @@ fi
 # script doesn't know about). Re-check before calling it a pipeline error.
 if gh release view "$TAG" --repo "$REPO" >>"$LOG_FILE" 2>&1; then
 	log "OUTCOME: already published - lost a race with another run of the same commit; nothing to do"
-	RACE_RELEASE_URL="$(gh release view "$TAG" --repo "$REPO" --json url --jq .url 2>>"$LOG_FILE")"
-	close_red_issue "$RACE_RELEASE_URL"
+	close_red_issue "$(release_url_or_empty "$TAG")"
 	exit 0
 fi
 

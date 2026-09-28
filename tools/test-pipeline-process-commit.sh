@@ -52,6 +52,15 @@ printf '%s %s %s %s\n' "$CALL_ID" "${1:-}" "${2:-}" "${3:-}" >>"${STUB_GH_ARGV_L
 if [ "${1:-}" = "release" ] && [ "${2:-}" = "view" ]; then
 	TAG="${3:-}"
 	if [ -n "${STUB_GH_RELEASES:-}" ] && [ -f "${STUB_GH_RELEASES}" ] && grep -qxF "$TAG" "${STUB_GH_RELEASES}"; then
+		# When called with `--json url --jq .url` (release_url_or_empty in the real script), real
+		# gh prints just the URL - stand in with the same fake URL `release create` would have
+		# printed, so a caller closing the red issue off this lookup cites a real-shaped link.
+		for a in "$@"; do
+			if [ "$a" = "--json" ]; then
+				echo "https://github.com/stub/stub/releases/tag/${TAG}"
+				exit 0
+			fi
+		done
 		echo "$TAG"
 		exit 0
 	fi
@@ -94,6 +103,10 @@ _stub_flag() {
 	done
 }
 if [ "${1:-}" = "issue" ] && [ "${2:-}" = "list" ]; then
+	if [ "${STUB_GH_ISSUE_LIST_FAIL:-0}" = "1" ]; then
+		echo "stub: simulated 'gh issue list' failure (e.g. auth/network/rate-limit)" >&2
+		exit 1
+	fi
 	# Emulates `--json number --jq '.[0].number // empty'`: the stub only ever needs the single
 	# oldest still-open issue number for a given --repo/--label pair, so it looks that up directly
 	# rather than interpreting --json/--jq generically. Issues file: number, repo, label, state,
@@ -260,6 +273,7 @@ commit_sha() {
 
 SHA_GREEN="$(commit_sha "green commit")"
 SHA_RED="$(commit_sha "red commit")"
+SHA_RED2="$(commit_sha "second red commit")"
 SHA_ENV="$(commit_sha "environment-blocker commit")"
 SHA_NOASSETS="$(commit_sha "green-but-no-assets commit")"
 SHA_DEFAULT_REPO="$(commit_sha "default-repo-parsing commit")"
@@ -269,6 +283,8 @@ SHA_CREATE_FAIL="$(commit_sha "create-call-fails-cleanly commit")"
 SHA_CREATE_RACE="$(commit_sha "create-call-fails-after-succeeding commit")"
 SHA_ISSUE_CLOSE_GREEN="$(commit_sha "green-after-red-and-env commit")"
 SHA_ISSUE_RED_AGAIN="$(commit_sha "red-again-after-close commit")"
+SHA_ISSUE_LIST_FAIL_RED="$(commit_sha "red-with-issue-list-failure commit")"
+SHA_ISSUE_LIST_FAIL_GREEN="$(commit_sha "green-with-issue-list-failure commit")"
 SHA_CONCURRENT="$(commit_sha "processed-by-two-overlapping-runs commit")"
 SHA_STALE_WORKTREE="$(commit_sha "stale-worktree-from-a-crashed-run commit")"
 
@@ -369,9 +385,28 @@ if [ -n "$RED_ISSUE_ARGF" ] && grep -A1 -xF -- "--label" "$RED_ISSUE_ARGF" | gre
 if [ -n "$RED_ISSUE_ARGF" ] && grep -A1 -xF -- "--title" "$RED_ISSUE_ARGF" | grep -qxF "Pipeline: chex-trek build is red"; then pass "the issue carries the fixed title"; else fail "expected the fixed red-issue title"; [ -n "$RED_ISSUE_ARGF" ] && cat "$RED_ISSUE_ARGF"; fi
 if [ -n "$RED_ISSUE_ARGF" ] && grep -qF "test-fake.sh" "$RED_ISSUE_ARGF"; then pass "the issue body lists the failing scenario"; else fail "expected the failing scenario (test-fake.sh) in the issue body"; [ -n "$RED_ISSUE_ARGF" ] && cat "$RED_ISSUE_ARGF"; fi
 if [ -n "$RED_ISSUE_ARGF" ] && grep -qF "$SHA_RED" "$RED_ISSUE_ARGF"; then pass "the issue body names the commit"; else fail "expected the commit sha in the issue body"; fi
+if [ -n "$RED_ISSUE_ARGF" ] && grep -qF "Run archive:" "$RED_ISSUE_ARGF"; then pass "the issue body cites the run's own archive log path"; else fail "expected a 'Run archive:' line in the issue body"; [ -n "$RED_ISSUE_ARGF" ] && cat "$RED_ISSUE_ARGF"; fi
+
+echo
+echo "=== case 3b: a second red commit comments on the same issue instead of opening another (AC2) ==="
+CREATE_CALLS_BEFORE_3B="$(count_gh_calls issue create)"
+COMMENT_CALLS_BEFORE_3B="$(count_gh_calls issue comment)"
+OUT3B="$(run_pipeline "$SHA_RED2" "${SCRATCH}/suite-red.sh")"
+CODE3B=$?
+if [ $CODE3B -eq 1 ]; then pass "exits 1 on the second red commit"; else fail "exit code $CODE3B, want 1"; echo "$OUT3B"; fi
+if [ "$(count_gh_calls issue create)" = "$CREATE_CALLS_BEFORE_3B" ]; then pass "no second issue was opened"; else fail "expected no new 'gh issue create' call, before=${CREATE_CALLS_BEFORE_3B} after=$(count_gh_calls issue create)"; fi
+if [ "$(count_gh_calls issue comment)" = "$((COMMENT_CALLS_BEFORE_3B + 1))" ]; then pass "exactly one new comment was posted on the existing issue"; else fail "expected exactly one new 'gh issue comment' call, before=${COMMENT_CALLS_BEFORE_3B} after=$(count_gh_calls issue comment)"; fi
+RED2_COMMENT_ARGF="$(find_last_gh_call issue comment)"
+if [ -n "$RED2_COMMENT_ARGF" ] && grep -qF "$SHA_RED2" "$RED2_COMMENT_ARGF"; then pass "the comment names the second red commit"; else fail "expected the second commit's sha in the comment"; [ -n "$RED2_COMMENT_ARGF" ] && cat "$RED2_COMMENT_ARGF"; fi
+if [ -n "$RED2_COMMENT_ARGF" ] && grep -qF "is red" "$RED2_COMMENT_ARGF" && ! grep -qF "environment blocker" "$RED2_COMMENT_ARGF"; then pass "worded as an ordinary red run, not an environment blocker"; else fail "expected 'is red' wording, no 'environment blocker' wording"; [ -n "$RED2_COMMENT_ARGF" ] && cat "$RED2_COMMENT_ARGF"; fi
+SHORT_RED2="$(git -C "$REPO" rev-parse --short=10 "$SHA_RED2")"
+TAG_RED2="win-${SHORT_RED2}"
+if grep -qxF "$TAG_RED2" "$STUB_GH_RELEASES"; then fail "a release was recorded for the second red commit"; else pass "no release recorded for the second red commit either"; fi
 
 echo
 echo "=== case 4: a simulated environment blocker (exit 3) is reported as such, not a test FAIL ==="
+CREATE_CALLS_BEFORE_4="$(count_gh_calls issue create)"
+COMMENT_CALLS_BEFORE_4="$(count_gh_calls issue comment)"
 OUT4="$(run_pipeline "$SHA_ENV" "${SCRATCH}/suite-env.sh")"
 CODE4=$?
 SHORT_ENV="$(git -C "$REPO" rev-parse --short=10 "$SHA_ENV")"
@@ -379,8 +414,8 @@ TAG_ENV="win-${SHORT_ENV}"
 if [ $CODE4 -eq 3 ]; then pass "exits 3 on a simulated environment blocker"; else fail "exit code $CODE4, want 3"; echo "$OUT4"; fi
 if echo "$OUT4" | grep -qF "environment blocker"; then pass "outcome line names it an environment blocker"; else fail "expected an 'environment blocker' outcome line"; fi
 if grep -qxF "$TAG_ENV" "$STUB_GH_RELEASES"; then fail "a release was recorded for the environment-blocker commit"; else pass "no release recorded for the environment-blocker commit"; fi
-if [ "$(count_gh_calls issue create)" = "1" ]; then pass "the environment blocker commented on the existing red issue rather than opening a second one"; else fail "expected still exactly 1 issue create call total, found $(count_gh_calls issue create)"; fi
-if [ "$(count_gh_calls issue comment)" = "1" ]; then pass "exactly one comment was posted for the environment blocker"; else fail "expected exactly 1 issue comment call, found $(count_gh_calls issue comment)"; fi
+if [ "$(count_gh_calls issue create)" = "$CREATE_CALLS_BEFORE_4" ]; then pass "the environment blocker commented on the existing red issue rather than opening a second one"; else fail "expected no new 'gh issue create' call, before=${CREATE_CALLS_BEFORE_4} after=$(count_gh_calls issue create)"; fi
+if [ "$(count_gh_calls issue comment)" = "$((COMMENT_CALLS_BEFORE_4 + 1))" ]; then pass "exactly one new comment was posted for the environment blocker"; else fail "expected exactly one new 'gh issue comment' call, before=${COMMENT_CALLS_BEFORE_4} after=$(count_gh_calls issue comment)"; fi
 ENV_COMMENT_ARGF="$(find_last_gh_call issue comment)"
 if [ -n "$ENV_COMMENT_ARGF" ] && grep -qF "environment blocker" "$ENV_COMMENT_ARGF" && grep -qF "ENVIRONMENT:" "$ENV_COMMENT_ARGF"; then
 	pass "the comment names this an environment blocker and cites its ENVIRONMENT line - worded distinctly from a test failure"
@@ -439,7 +474,12 @@ else
 fi
 
 echo
-echo "=== case 4f: re-processing an already-published green commit (idempotent path) still closes a still-open red issue ==="
+echo "=== case 4f: re-processing an unrelated already-published green commit (idempotent path) does NOT touch a still-open red issue ==="
+# Deliberately does not use SHA_ISSUE_RED_AGAIN's own would-be fix commit - it re-processes
+# SHA_GREEN, an old, unrelated commit published back in case 1, while the case-4e issue is still
+# open. A real "current HEAD is still red" situation looks exactly like this: closing the issue
+# here would be a false all-clear, since nothing about SHA_GREEN going idempotently green again
+# says anything about whether the *current* red commit has been fixed.
 CLOSE_CALLS_BEFORE_4F="$(count_gh_calls issue close)"
 CREATE_RELEASE_CALLS_BEFORE_4F="$(count_create_calls "$TAG_GREEN")"
 OUT4F="$(run_pipeline "$SHA_GREEN" "${SCRATCH}/suite-green.sh")"
@@ -450,15 +490,55 @@ if [ "$(count_create_calls "$TAG_GREEN")" = "$CREATE_RELEASE_CALLS_BEFORE_4F" ];
 else
 	fail "the idempotent path unexpectedly created a release"
 fi
-if [ "$(count_gh_calls issue close)" = "$((CLOSE_CALLS_BEFORE_4F + 1))" ]; then
-	pass "the idempotent (already-published) path still closed the still-open red issue"
+if [ "$(count_gh_calls issue close)" = "$CLOSE_CALLS_BEFORE_4F" ]; then
+	pass "the idempotent (already-published) path made no 'gh issue close' call - it never touches the red issue"
 else
-	fail "expected exactly one new 'gh issue close' call from the idempotent path, before=${CLOSE_CALLS_BEFORE_4F} after=$(count_gh_calls issue close)"
+	fail "expected no new 'gh issue close' call from the idempotent path, before=${CLOSE_CALLS_BEFORE_4F} after=$(count_gh_calls issue close)"
 fi
-if [ -n "$OPEN_ISSUE_4E" ] && [ "$(issue_state "$OPEN_ISSUE_4E")" = "closed" ]; then
-	pass "the issue opened in case 4e is now closed"
+if [ -n "$OPEN_ISSUE_4E" ] && [ "$(issue_state "$OPEN_ISSUE_4E")" = "open" ]; then
+	pass "the issue opened in case 4e is still open - re-processing an unrelated old green commit didn't falsely close it"
 else
-	fail "expected issue #${OPEN_ISSUE_4E} to be closed by the idempotent path"
+	fail "expected issue #${OPEN_ISSUE_4E} to still be open after the idempotent path ran"
+fi
+
+echo
+echo "=== case 4g: a 'gh issue list' failure (e.g. auth/network) on a red run never opens a duplicate issue ==="
+# The still-open issue from case 4e is the control here: if find_red_issue's failure were ever
+# mistaken for "no issue open", this red run would wrongly open a second one.
+SHORT_ISSUE_LIST_FAIL_RED="$(git -C "$REPO" rev-parse --short=10 "$SHA_ISSUE_LIST_FAIL_RED")"
+TAG_ISSUE_LIST_FAIL_RED="win-${SHORT_ISSUE_LIST_FAIL_RED}"
+CREATE_CALLS_BEFORE_4G="$(count_gh_calls issue create)"
+COMMENT_CALLS_BEFORE_4G="$(count_gh_calls issue comment)"
+OUT4G="$(STUB_GH_ISSUE_LIST_FAIL=1 run_pipeline "$SHA_ISSUE_LIST_FAIL_RED" "${SCRATCH}/suite-red.sh")"
+CODE4G=$?
+if [ $CODE4G -eq 1 ]; then pass "still exits 1 on the red commit itself, even though the issue lookup failed"; else fail "exit code $CODE4G, want 1"; echo "$OUT4G"; fi
+if [ "$(count_gh_calls issue create)" = "$CREATE_CALLS_BEFORE_4G" ]; then pass "no issue was opened while the lookup was failing - never risks a duplicate"; else fail "expected no new 'gh issue create' call, before=${CREATE_CALLS_BEFORE_4G} after=$(count_gh_calls issue create)"; fi
+if [ "$(count_gh_calls issue comment)" = "$COMMENT_CALLS_BEFORE_4G" ]; then pass "no comment was posted either, while the lookup was failing"; else fail "expected no new 'gh issue comment' call, before=${COMMENT_CALLS_BEFORE_4G} after=$(count_gh_calls issue comment)"; fi
+# The WARNING is written straight to this run's own archived log, not to the run's stdout (see
+# find_red_issue's own comment on why: its stdout is a return value read via command substitution,
+# so anything else written there would corrupt it) - so it has to be checked there, not in OUT4G.
+LOG_4G="$(find "${STATE_DIR}/logs" -name "*-${TAG_ISSUE_LIST_FAIL_RED}-*.log" | head -1)"
+if [ -n "$LOG_4G" ] && [ -f "$LOG_4G" ] && grep -qi "WARNING.*gh issue list" "$LOG_4G"; then
+	pass "the run logs an explicit WARNING that the issue lookup failed, rather than staying silent"
+else
+	fail "expected a WARNING line naming the 'gh issue list' failure in the archived log"
+fi
+
+echo
+echo "=== case 4h: a 'gh issue list' failure on a green run doesn't crash - just skips the close ==="
+SHORT_ISSUE_LIST_FAIL_GREEN="$(git -C "$REPO" rev-parse --short=10 "$SHA_ISSUE_LIST_FAIL_GREEN")"
+TAG_ISSUE_LIST_FAIL_GREEN="win-${SHORT_ISSUE_LIST_FAIL_GREEN}"
+CLOSE_CALLS_BEFORE_4H="$(count_gh_calls issue close)"
+OUT4H="$(STUB_GH_ISSUE_LIST_FAIL=1 run_pipeline "$SHA_ISSUE_LIST_FAIL_GREEN" "${SCRATCH}/suite-green.sh")"
+CODE4H=$?
+if [ $CODE4H -eq 0 ]; then pass "still exits 0 and publishes, even though the issue lookup failed"; else fail "exit code $CODE4H, want 0"; echo "$OUT4H"; fi
+if grep -qxF "$TAG_ISSUE_LIST_FAIL_GREEN" "$STUB_GH_RELEASES"; then pass "the release itself was still published"; else fail "expected ${TAG_ISSUE_LIST_FAIL_GREEN} to be published despite the issue-list failure"; fi
+if [ "$(count_gh_calls issue close)" = "$CLOSE_CALLS_BEFORE_4H" ]; then pass "no close was attempted while the lookup was failing - the still-open issue (if any) waits for a later run"; else fail "expected no new 'gh issue close' call, before=${CLOSE_CALLS_BEFORE_4H} after=$(count_gh_calls issue close)"; fi
+LOG_4H="$(find "${STATE_DIR}/logs" -name "*-${TAG_ISSUE_LIST_FAIL_GREEN}-*.log" | head -1)"
+if [ -n "$LOG_4H" ] && [ -f "$LOG_4H" ] && grep -qi "WARNING.*gh issue list" "$LOG_4H"; then
+	pass "the run logs an explicit WARNING that the issue lookup failed"
+else
+	fail "expected a WARNING line naming the 'gh issue list' failure in the archived log"
 fi
 
 echo

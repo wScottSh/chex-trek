@@ -281,22 +281,30 @@ notification, without ever spamming a second issue for the same ongoing problem:
   second one. Found by `gh issue list --label pipeline:red --state open` - this pipeline is the
   only thing that ever applies that label, so at most one is ever open at a time.
 - **Green**: if an issue is open, it's closed (`gh issue close ... --comment`) with a comment naming
-  the now-green commit and linking the release that was just published. This runs both right after a
-  fresh publish and on the idempotent (already-published) fast path, so a red issue left open from
-  an earlier run still gets closed the next time this exact already-green commit is (re-)processed.
+  the now-green commit and linking the release that was just published. This only runs after a run
+  whose own suite just genuinely passed for this exact commit (a fresh publish, or losing a
+  same-commit publish race but confirming the release exists) - **not** on the idempotent
+  (already-published) fast path, since that path can be hit by re-processing any old,
+  already-published commit while a *later* commit is the one that's actually still red; closing the
+  issue there would be a false all-clear.
 - A pipeline-level error (exit `2`) never touches the issue - it isn't a game result either way, and
-  filing it as "red" would misreport a pipeline/environment problem as a game bug.
+  filing it as "red" would misreport a pipeline/environment problem as a game bug. Likewise, if the
+  `gh issue list` lookup itself fails (auth/network/rate-limit), the run does nothing to the issue
+  tracker rather than risk a duplicate open or a wrongly-skipped close - the failure is logged as a
+  WARNING in that run's own archive log, and a still-open issue waits for a later run.
 
 `tools/test-pipeline-process-commit.sh` covers the label/issue create-vs-comment-vs-close logic end
-to end against a stubbed `gh` (never the real repo). **Live-verified** against the real
+to end against a stubbed `gh` (never the real repo), including the `gh issue list` failure case and
+the idempotent-path-doesn't-falsely-close case above. **Live-verified** against the real
 `wScottSh/chex-trek` repo and a real (open/comment/close only - release publishing stayed
 stubbed/dry-run, since no real release/tag is allowed yet - see "Publishing pipeline" above) `gh`:
-opening the real `pipeline:red` issue from a genuinely broken throwaway commit, commenting on it
+opening a real `pipeline:red` issue from a genuinely broken throwaway commit, commenting on it
 instead of duplicating for a second red commit, commenting on it again worded as an environment
 blocker (simulated via `CHEXTREK_PIPELINE_SUITE_CMD`, since Unicron's own Wine/Xvfb setup was
 already proven working by the suite run above), and finally closing it with a comment linking a
-dry-run release URL for a genuinely green commit. See issue #67's closing comment for that run's
-issue number and log pointers.
+dry-run release URL for a genuinely green commit. That verification issue was
+`wScottSh/chex-trek#72` - left closed, with a summary comment identifying it as this run, once the
+verification finished (not the same issue as this spec ticket, #67).
 
 ## Building
 
