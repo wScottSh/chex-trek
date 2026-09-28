@@ -63,13 +63,19 @@ functions against the reference files.
 | Worldspawn music volume (`g_MusicVolume`, `idWorldspawn::Think`) (#45) | `tools/test-music-volume.sh` | covered - on `e1m1`, setting `g_MusicVolume` to 80, 0, 45 mid-map re-runs `Think` each time; the dump shows each value applied, 0 stopping the music, 45 resuming it. |
 | New Game plays `sf_923` clean, its exit loads `e1m1`, which plays clean (#46) | `tools/test-new-game.sh` | covered - from the main menu, `sf_923` then `e1m1` each run 300 frames clean with stable trail counts (18, 19) and `level_stats` totals (27/30/1, 22/34/3). |
 
+## Bug regressions
+
+| Bug | Scenario | Status |
+|---|---|---|
+| Clicking `sf_923`'s crane panel (`crane_panel`, `guis/storage_facility/crane.gui`) dropped the level: its arrows `runScript` `map_storage_facility::crane_left`/`crane_right`/`crane_stop`, which didn't exist (#50) | `tools/test-crane-panel.sh` | covered - standing at the panel (crosshair focus on it), left, left, right, right clicks via `chextrek_test_gui_click` send all three `runScript`s through crane.gui's own `onAction` scripts and `idEntity::HandleGuiCommands`; no "Can't find function", `sf_923` still running after. Fails with the level drop against the unfixed script. |
+
 ## Recorded deviations, port choices and known gaps
 
 Detail lives where each bullet points; this list is the index.
 
 **Test code in the library.**
 - The test surface beyond `chextrek_dump` (`ChexTrek_Note*` recorders, `chextrek_test_str1..15`
-  cvars, five input stand-in commands) is a recorded deviation from spec #28's "only test code"
+  cvars, six input stand-in commands) is a recorded deviation from spec #28's "only test code"
   clause: `engine/dhewm3-sdk/game/ChexTrekDump.h`, top comment.
 - Test commands aren't gated on `developer`, because the engine's `map` command resets it to 0
   (`Session_Map_f`); same file.
@@ -113,7 +119,10 @@ Detail lives where each bullet points; this list is the index.
   so the scenario uses `map sf_923`; the exit fires `target_endlevel_3` (`nextMap e1m1`) with
   `trigger` instead of clicking through `end_trek.gui`.
 - `nextmap`: no shipped `target_endlevelgui` sets a `nextmap` spawnArg, so the scenario spawns one.
-
+- Crane panel (#50): `chextrek_test_gui_click` replays `idPlayer::UpdateFocus`/`Weapon_GUI`'s
+  gui calls on the named entity at an explicit gui point; the attack-button usercmd edge and the
+  crosshair choosing the cursor point aren't exercised (the scenario does check the player's own
+  crosshair has a gui in focus). The crane stays a no-op in `sf_923` (no crane entities there).
 **Harness facts for scenario writers.**
 - A console `wait` tick is one rendered frame, a few ms of game time that varies by run, not a
   fixed server tick; scenarios poll with margin rather than trust one fixed wait.
@@ -122,3 +131,6 @@ Detail lives where each bullet points; this list is the index.
   `chextrek_test_pda_map_open 1` around every step.
 - A bare `CHEXTREK-STATE-DUMP v1` header is sometimes flushed early during a map load, so
   multi-dump scenarios read fields by dump position (`chextrek_line_field_values`).
+- An in-world gui's time only advances while the renderer draws it, so clicking a gui with timed
+  state (crane.gui's 1 s `Noclick` after each click) needs the player looking at it and enough
+  `wait` between clicks: `test-crane-panel.sh`.

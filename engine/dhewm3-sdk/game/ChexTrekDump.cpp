@@ -667,3 +667,79 @@ void ChexTrek_TestGuiCompletion_f( const idCmdArgs &args ) {
 		gameLocal.Printf( "gui_completion_%d: %s\n", i, chextrekGuiCompletions[ i ].c_str() );
 	}
 }
+
+/*
+==================
+ChexTrek_TestGuiClick_f
+
+Test-only, #50. See ChexTrek_TestGuiClick_f's comment in ChexTrekDump.h for why a console command
+has to stand in for a real mouse click on an in-world GUI panel here. Replays, against the named
+entity's own gui (renderEntity.gui[0]), the same calls the stock click path makes: a mouse move
+to put the GUI's cursor over the given point (idPlayer::UpdateFocus's GenerateMouseMoveEvent +
+HandleEvent + HandleGuiCommands), then a mouse-1 press and release (idPlayer::Weapon_GUI's
+GenerateMouseButtonEvent + HandleEvent + UpdateVisuals + HandleGuiCommands( focusGUIent, command )).
+The GUI's own window scripts decide what command string each event produces (e.g. crane.gui's
+`runScript "gui::gui_parm7"`), and idEntity::HandleGuiCommands runs it - all real, unchanged code.
+Each event's command string is printed *before* HandleGuiCommands runs it, so the log still shows
+what was sent when HandleGuiCommands errors out.
+
+Test-only input stand-in; see the test-surface note (and its recorded deviation) in
+ChexTrekDump.h.
+==================
+*/
+void ChexTrek_TestGuiClick_f( const idCmdArgs &args ) {
+	if ( !gameLocal.CheatsOk( false ) ) {
+		return;
+	}
+
+	if ( args.Argc() != 4 ) {
+		gameLocal.Printf( "usage: chextrek_test_gui_click <entity> <x> <y>   (x/y in the gui's 640x480 space)\n" );
+		return;
+	}
+
+	idPlayer *player = gameLocal.GetLocalPlayer();
+	if ( !player ) {
+		gameLocal.Printf( "chextrek_test_gui_click: no local player\n" );
+		return;
+	}
+
+	idEntity *ent = gameLocal.FindEntity( args.Argv( 1 ) );
+	if ( !ent ) {
+		gameLocal.Printf( "chextrek_test_gui_click: no entity '%s'\n", args.Argv( 1 ) );
+		return;
+	}
+
+	idUserInterface *ui = ent->GetRenderEntity()->gui[ 0 ];
+	if ( !ui ) {
+		gameLocal.Printf( "chextrek_test_gui_click: entity '%s' has no gui\n", ent->name.c_str() );
+		return;
+	}
+
+	const int x = atoi( args.Argv( 2 ) );
+	const int y = atoi( args.Argv( 3 ) );
+	sysEvent_t ev;
+	const char *command;
+
+	// Cursor to (x, y): the GUI's cursor moves by deltas, so first pin it to 0,0 (the same
+	// -2000,-2000 move idPlayer::UpdateFocus sends when focus changes), then move by (x, y).
+	ev = sys->GenerateMouseMoveEvent( -2000, -2000 );
+	command = ui->HandleEvent( &ev, gameLocal.time );
+	player->HandleGuiCommands( ent, command );
+	ev = sys->GenerateMouseMoveEvent( x, y );
+	command = ui->HandleEvent( &ev, gameLocal.time );
+	player->HandleGuiCommands( ent, command );
+
+	for ( int i = 0; i < 2; i++ ) {
+		const bool down = ( i == 0 );
+		bool updateVisuals = false;
+		ev = sys->GenerateMouseButtonEvent( 1, down );
+		command = ui->HandleEvent( &ev, gameLocal.time, &updateVisuals );
+		if ( updateVisuals ) {
+			ent->UpdateVisuals();
+		}
+		gameLocal.Printf( "chextrek_test_gui_click: %s %d %d %s cmd='%s'\n", ent->name.c_str(), x, y, down ? "down" : "up", command ? command : "" );
+		player->HandleGuiCommands( ent, command );
+	}
+
+	gameLocal.Printf( "chextrek_test_gui_click: done %s %d %d map=%s time=%d focus=%d\n", ent->name.c_str(), x, y, gameLocal.GetMapName(), gameLocal.time, player->GuiActive() ? 1 : 0 );
+}

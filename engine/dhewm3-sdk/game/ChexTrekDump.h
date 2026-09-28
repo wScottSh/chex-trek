@@ -8,11 +8,11 @@
 //     shows nothing about; read only by chextrek_dump. They record, they don't change behavior.
 //   - chextrek_test_str1..15 cvars: string/vector literals for console `script` lines (the console
 //     tokenizer strips quotes - see ChexTrekDump.cpp).
-//   - Five input stand-in commands, for input a console script can't produce (a GUI button click,
+//   - Six input stand-in commands, for input a console script can't produce (a GUI button click,
 //     a held bind key, interactive tab completion): chextrek_test_customui_cmd,
-//     chextrek_test_impulse, chextrek_test_map_cmd, chextrek_test_pda_map_open and
-//     chextrek_test_gui_completion. Each hands its argument to the real, ported game code at the
-//     point the real input would reach it.
+//     chextrek_test_impulse, chextrek_test_map_cmd, chextrek_test_pda_map_open,
+//     chextrek_test_gui_completion and chextrek_test_gui_click. Each hands its argument to the
+//     real, ported game code at the point the real input would reach it.
 //
 // Recorded deviation from spec #28: the input stand-ins are test code beyond the one dump command.
 // Without them the stats screen's skip/nextmap (#34), g_PDA completion (#35), impulse 23 (#36) and
@@ -126,6 +126,17 @@ void ChexTrek_TestMapCmd_f( const idCmdArgs &args );
 // idPlayer::GivePDA/TogglePDA path opens one - see tools/test-pda.sh for how a scenario gives the
 // player a PDA without mouse/impulse input).
 void ChexTrek_TestPdaMapOpen_f( const idCmdArgs &args );
+
+// chextrek: #50, test-only. Registered as the "chextrek_test_gui_click" console command by
+// idGameLocal::InitConsoleCommands. A click on an in-world GUI panel (e.g. sf_923's crane_panel)
+// needs the player's crosshair on the panel plus a held attack button - input the console-only
+// harness can't produce (same class of gap as #34/#37's GUI-button stand-ins). Takes an entity name
+// and a point in that entity's gui space (640x480), moves the gui's cursor there and sends a
+// mouse-1 press and release through idUserInterface::HandleEvent, handing each returned command
+// string to the local player's idEntity::HandleGuiCommands( ent, command ) - the same calls
+// idPlayer::UpdateFocus/Weapon_GUI make for a real click. Not covered: UpdateFocus's own crosshair
+// trace that picks the focused entity and cursor point, and the usercmd attack-button edge.
+void ChexTrek_TestGuiClick_f( const idCmdArgs &args );
 
 // chextrek: spec #40. idPlayer::tryOpen (decomp-so/reference/door-opening.md, Player.cpp) calls
 // this right after its trace resolves to an idDoor (before evaluating lock state), passing that
