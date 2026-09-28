@@ -165,11 +165,16 @@ main() {
 			echo "error: 'git fetch origin' failed in ${REPO_ROOT}: ${FETCH_OUT}. Nothing was checked out or launched." >&2
 			exit 1
 		fi
-		RESOLVE_OUT="$(git -C "$REPO_ROOT" rev-parse --verify "${COMMIT_ARG}^{commit}" 2>&1)"
+		# stdout and stderr are captured separately here (unlike most other git/gh calls in this
+		# script): `rev-parse --verify` can print a *warning* to stderr and still exit 0 - e.g. an
+		# ambiguous name that's both a branch and a tag - and merging the two would land that
+		# warning text in FULL_SHA instead of an actual sha. The explicit 40-hex-digit check below
+		# catches that (and anything else non-sha-shaped) regardless.
+		FULL_SHA="$(git -C "$REPO_ROOT" rev-parse --verify "${COMMIT_ARG}^{commit}" 2>/dev/null)"
 		RESOLVE_RC=$?
-		FULL_SHA="$RESOLVE_OUT"
-		if [ $RESOLVE_RC -ne 0 ] || [ -z "$FULL_SHA" ]; then
-			echo "error: '${COMMIT_ARG}' doesn't resolve to a single commit in ${REPO_ROOT} (even after 'git fetch origin'): ${RESOLVE_OUT}. Nothing was checked out or launched." >&2
+		RESOLVE_ERR="$(git -C "$REPO_ROOT" rev-parse --verify "${COMMIT_ARG}^{commit}" 2>&1 >/dev/null)"
+		if [ $RESOLVE_RC -ne 0 ] || ! [[ "$FULL_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+			echo "error: '${COMMIT_ARG}' doesn't resolve to a single commit in ${REPO_ROOT} (even after 'git fetch origin'): ${RESOLVE_ERR:-<no output>}. Nothing was checked out or launched." >&2
 			exit 1
 		fi
 		# Same fixed length as tools/pipeline-process-commit.sh's own tag scheme (spec #66) - a

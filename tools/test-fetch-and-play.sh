@@ -500,15 +500,20 @@ echo "=== case 10: self-rewriting checkout - a git wrapper simulates the exact s
 # A real Linux `git checkout` replaces a changed tracked file via unlink+recreate (a new inode) -
 # bash's already-open read handle, pinned to the old (now-unlinked) inode, never observes that, so
 # a plain checkout of a commit with a differing tools/fetch-and-play.sh can't exercise the same
-# hazard on its own (confirmed directly while writing this test: main() removed, this case still
-# passed). REWRITE_CONTENT_FILE holds a version of tools/fetch-and-play.sh with a marker line
-# inserted right after the shebang - the *middle* of the file, not appended at the tail - since a
-# tail-only change wouldn't exercise "resume reading into different bytes mid-file": nothing
-# already read by the time of the checkout would differ. The "git" shim above, armed via
-# STUB_GIT_REWRITE_TARGET/STUB_GIT_REWRITE_CONTENT below, performs the actual same-inode overwrite
-# (a plain `>` redirection to the existing file) when it sees fetch-and-play.sh's own
-# `checkout --detach` call, simulating the race directly rather than hoping a real checkout
-# reproduces it.
+# hazard on its own - confirmed directly while writing this test (an earlier, weaker version of
+# this case, whose injected difference sat in a region bash had already read by sabotage time,
+# passed with main() removed too; it didn't actually prove anything). REWRITE_CONTENT_FILE holds a
+# version of tools/fetch-and-play.sh with an `exit 91` spliced in right after the checkout's own
+# "Checked out ... (detached)" line - i.e. into the *not-yet-executed remainder* of the file at the
+# moment the checkout runs, not appended at the tail and not placed somewhere already read: only
+# content bash hasn't consumed yet can distinguish "read the old, already-buffered bytes" (this
+# case passes) from "read the new, sabotaged bytes" (exit 91, this case would fail). The "git" shim
+# above, armed via STUB_GIT_REWRITE_TARGET/STUB_GIT_REWRITE_CONTENT below, performs the actual
+# same-inode overwrite (a plain `>` redirection to the existing file) when it sees
+# fetch-and-play.sh's own `checkout --detach` call, simulating the race directly rather than hoping
+# a real checkout reproduces it. Mutation-tested: with the main() wrap temporarily removed (a local,
+# uncommitted edit), this case genuinely fails - exit 91, zero engine launches - and with the wrap
+# restored it passes.
 REWRITE_CONTENT_FILE="${SCRATCH}/rewrite-fetch-and-play.sh"
 awk '/^\techo "==> Checked out \${TARGET} \(detached\)"$/{print; print "\texit 91  # case-10 marker: only in bytes the currently-running script has not read yet at sabotage time"; next} {print}' \
 	"${SCRIPT_DIR}/fetch-and-play.sh" >"$REWRITE_CONTENT_FILE"
@@ -540,7 +545,15 @@ CUR10_SHA="$(git -C "$CHECKOUT" rev-parse HEAD)"
 if [ "$CUR10_SHA" = "$REWRITE_SHA" ]; then pass "HEAD landed on the differing commit"; else fail "HEAD is ${CUR10_SHA}, want ${REWRITE_SHA}"; fi
 POST10_INODE="$(stat -c %i "${CHECKOUT}/tools/fetch-and-play.sh" 2>/dev/null || echo "<missing>")"
 if grep -q "case-10 marker" "${CHECKOUT}/tools/fetch-and-play.sh" 2>/dev/null; then pass "the on-disk tools/fetch-and-play.sh now matches the checked-out commit (the sabotage write and the real checkout both landed)"; else fail "expected ${CHECKOUT}/tools/fetch-and-play.sh to contain the case-10 marker after checkout"; fi
-if [ "$PRE10_INODE" != "$POST10_INODE" ]; then pass "tools/fetch-and-play.sh's inode changed by the end of the run (inode ${PRE10_INODE} -> ${POST10_INODE}) - the same-inode overwrite this case injects mid-run genuinely happened, not just a final state that looks right"; else fail "expected tools/fetch-and-play.sh's inode to change (still ${PRE10_INODE}) - the sabotage/checkout may not have run"; fi
+# Note on what this inode check does and doesn't show: the shim's own same-inode sabotage write
+# happens on the *original* inode (that's the whole point - it's what makes the hazard real for
+# whatever already has that inode open), but the real `checkout -f` the shim runs right after it
+# still does its own ordinary unlink+recreate for every file, this one included - so by the end of
+# the run the final inode has almost certainly changed again. That's expected, not a sign the
+# sabotage didn't happen; it only confirms the real checkout ran to completion afterward. The actual
+# proof that the same-inode sabotage was observed mid-run is the exit-91 mutation test described
+# above (main() wrap removed -> this case fails), not this inode comparison.
+if [ "$PRE10_INODE" != "$POST10_INODE" ]; then pass "tools/fetch-and-play.sh's inode changed by the end of the run (inode ${PRE10_INODE} -> ${POST10_INODE}) - the real checkout ran to completion after the sabotage write"; else fail "expected tools/fetch-and-play.sh's inode to change (still ${PRE10_INODE}) - the checkout may not have completed"; fi
 if [ "$(wine_call_count)" = "1" ]; then pass "the engine was still launched exactly once despite the mid-run rewrite"; else fail "expected exactly one engine launch, found $(wine_call_count)"; fi
 
 echo
