@@ -572,6 +572,8 @@ public:
 	void					NextBestWeapon( void );
 	void					PrevWeapon( void );
 	void					SelectWeapon( int num, bool force );
+	// chextrek: #51/#52, test-only: read by chextrek_dump's `player_weapon` (ChexTrekDump.cpp).
+	int						GetIdealWeapon( void ) const { return idealWeapon; }
 	void					DropWeapon( bool died ) ;
 	void					StealWeapon( idPlayer *player );
 	void					AddProjectilesFired( int count );

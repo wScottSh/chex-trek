@@ -174,4 +174,12 @@ void ChexTrek_NoteAIBlocked( const char *entName );
 // change what Think does.
 void ChexTrek_NoteMusicVolume( float volume, bool stopped );
 
+// chextrek: #51/#52. idPlayerView::SingleView calls this each time it draws the registered custom
+// UI (the end-level stats screen) full screen in place of the world. #33's scenarios passed with
+// that draw missing, since the screen's GUI state (all chextrek_dump could read) counts up whether
+// or not anything draws it; this is the only way a scenario can tell from the log that it's drawn.
+// Test-only instrumentation, same pattern as the recorders above: it counts calls, it doesn't
+// change what SingleView does.
+void ChexTrek_NoteCustomUIDrawn( void );
+
 #endif /* !__CHEXTREK_DUMP_H__ */

@@ -35,6 +35,7 @@ If you have questions concerning this license or the applicable additional terms
 #include "Player.h"
 
 #include "PlayerView.h"
+#include "ChexTrekDump.h"		// chextrek: #51/#52, ChexTrek_NoteCustomUIDrawn
 
 const int IMPULSE_DELAY = 150;
 /*
@@ -448,6 +449,7 @@ void idPlayerView::SingleView( idUserInterface *hud, const renderView_t *view ) 
 	// is kept after it, as in idPlayer::ActiveGui.
 	if ( player->customUI ) {
 		player->customUI->Redraw( gameLocal.time );
+		ChexTrek_NoteCustomUIDrawn();	// chextrek: #51/#52, test-only (ChexTrekDump.h)
 		return;
 	}
 
