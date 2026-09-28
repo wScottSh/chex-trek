@@ -44,6 +44,17 @@
 # ~167ms). If a future map/setup ever makes that fastest line's target percentage 1% or less
 # (needing only one tic), this wait would need shortening to match, and the ASSERTION_BELOW check
 # would start failing loudly instead of silently mis-attributing which line each skip landed on.
+#
+# Unicron/Wine (#61): that same wait leaves state stuck at -1 the whole way through all four
+# 'skip' calls (spike #59 finding: every customui_gui_* value and level_time stayed 0/"00:00:000").
+# A waited frame under Wine/llvmpipe's software rendering doesn't carry the same ~16.7ms of sim
+# time the Windows dev machine's ~167ms-for-10-frames estimate above assumes - not even enough for
+# Event_UpdateStats' very first, zero-delay-scheduled tic (the one that flips state from -1 to 0)
+# to run. 40 waited frames was verified empirically, across multiple runs, to reliably reach state
+# 0 with the monsters line only 1%-2% into its count (comfortably short of its 4% final value) -
+# the same "started but not finished" margin the Windows-tuned wait above targets, just scaled for
+# Wine's slower per-frame sim-time rate. This is a platform timing margin only, using the same
+# ASSERTION_BELOW guard to catch it directly if it's ever wrong for a future map/setup.
 # Four `chextrek_test_customui_cmd skip` calls are then chained back to back with no `wait` between them
 # (each reads and mutates state instantly, in the same engine frame, so no naturally-scheduled tic
 # - which only fires on a later frame boundary - can interleave and change the picture mid-sequence):
@@ -116,7 +127,7 @@ wait 10
 chextrek_dump
 
 trigger target_endlevelgui_1
-wait 10
+wait CHEXTREK_PRE_SKIP_WAIT_PLACEHOLDER
 chextrek_dump
 
 chextrek_test_customui_cmd skip
@@ -132,6 +143,9 @@ screenshot chextrek_end_level_skip_e1m1
 wait 10
 quit
 EOF
+PRE_SKIP_WAIT=10
+chextrek_is_linux && PRE_SKIP_WAIT=40
+sed -i "s/CHEXTREK_PRE_SKIP_WAIT_PLACEHOLDER/${PRE_SKIP_WAIT}/" "$CONSOLE_SCRIPT"
 
 echo
 echo "=== #34 end-level-nextmap test: e1m1 'skip' scenario run ==="

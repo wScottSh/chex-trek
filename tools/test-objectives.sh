@@ -27,13 +27,24 @@ chextrek_build_or_exit
 # A save/load round-trip after that must leave the still-active objective (trigger_objective_2)
 # re-attached (mkObjective::Restore re-attaches anything left `active` half a second after load;
 # `wait 150` gives that PostEventMS( ..., 500, this ) plenty of real frames to fire - 500ms of
-# *game* time comfortably fits inside 150 frames at the engine's fixed 16ms game tick). See the
-# comment above the slot-value assertion below for why this checks its exact post-load slot, not
-# just that it's present somewhere. A second save/load immediately after (taken from that
-# already-loaded state) checks the literal wording of AC2 ("the same objective slots"): with the
-# objective already sitting in its first-free slot, that round-trip cannot move it.
+# *game* time comfortably fits inside 150 frames at the engine's fixed 16ms game tick, on the
+# Windows dev machine). See the comment above the slot-value assertion below for why this checks
+# its exact post-load slot, not just that it's present somewhere. A second save/load immediately
+# after (taken from that already-loaded state) checks the literal wording of AC2 ("the same
+# objective slots"): with the objective already sitting in its first-free slot, that round-trip
+# cannot move it.
+#
+# Unicron/Wine (#61): empirically, 150 frames post-load isn't enough there - a first run read
+# 'empty/empty' instead of 'Investigate/empty' after the first round-trip, then correctly
+# 'Investigate/empty' after the second (spike #59 finding, reproduced here). Software-rendered
+# frames under Wine/llvmpipe don't advance sim time 1:1 with the Windows dev machine's assumption
+# above, so the same 500ms game-time re-attach delay needs more waited frames to reliably land
+# inside the window before the dump; 600 was verified sufficient across runs. This is a platform
+# timing margin only - the assertions and the scenario itself are unchanged.
+POST_LOAD_WAIT=150
+chextrek_is_linux && POST_LOAD_WAIT=600
 CONSOLE_SCRIPT="${SCRATCH_DIR}/objectives.cfg"
-cat > "$CONSOLE_SCRIPT" <<'EOF'
+cat > "$CONSOLE_SCRIPT" <<EOF
 developer 1
 map sf_923
 wait 20
@@ -54,13 +65,13 @@ chextrek_dump
 savegame chextrek_objectives_test
 wait 20
 loadgame chextrek_objectives_test
-wait 150
+wait ${POST_LOAD_WAIT}
 chextrek_dump
 
 savegame chextrek_objectives_test2
 wait 20
 loadgame chextrek_objectives_test2
-wait 150
+wait ${POST_LOAD_WAIT}
 chextrek_dump
 
 screenshot chextrek_objectives
