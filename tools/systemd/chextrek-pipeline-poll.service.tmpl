@@ -1,0 +1,23 @@
+[Unit]
+Description=chex-trek pipeline: poll origin/@@BRANCH@@ and process new commits (spec #58/#68)
+# Best-effort only: a poll tick that runs before the network is up simply fails fast
+# (tools/pipeline-poll.sh's `git fetch` exit 2) and is retried at the next timer interval - this
+# unit deliberately doesn't hard-require network-online.target, since Unicron booting without one
+# poll tick succeeding right away must never block anything else.
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=@@REPO_DIR@@
+# /opt/wine-11.0-wow64/bin is prepended here too (belt and braces - pipeline-process-commit.sh
+# already adds it itself if `wine` isn't already on PATH, see docs/dev-setup.md) so a poll tick's
+# own `git`/`gh` calls and every child process it starts see the same PATH a human's shell would
+# after `docs/agents/unicron-build-test.md`'s own `export`. docker and gh need nothing special
+# here: this unit runs as this login user with this user's normal group membership (docker group,
+# per docs/dev-setup.md) and $HOME (gh's token lives under $HOME/.config/gh) - a systemd --user
+# service already runs as that user, with that user's groups and $HOME, no desktop session needed.
+Environment=PATH=/opt/wine-11.0-wow64/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ExecStart=/usr/bin/env bash tools/pipeline-poll.sh
+# No DISPLAY set on purpose: the harness (tools/lib-harness.sh) brings up its own Xvfb per run -
+# see docs/dev-setup.md's "Unicron (Linux/Wine)" section.
