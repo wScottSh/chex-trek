@@ -7,7 +7,7 @@
 #     a timeout, archives the run's log/screenshots/cfg outside the repo, and asserts the spec #28
 #     always-on checks (chextrek.dll loaded, state-dump header present, no ERROR/unknown-event/
 #     unknown-spawnclass/script-compile lines, no timeout kill).
-#   chextrek_ensure_mount_or_exit - just the "chextrek" mount step on its own (#69): shared by
+#   chextrek_ensure_mount - just the "chextrek" mount step on its own (#69): shared by
 #     chextrek_run_console_script and tools/fetch-and-play.sh, which needs the mount but not a
 #     console script, a timeout or the display/lock machinery.
 #   chextrek_log_has_no_display / chextrek_exit_no_display - the no-display environment stop
@@ -410,7 +410,24 @@ _chextrek_release_lock() {
 	CHEXTREK_LOCK_FD=""
 }
 
-# chextrek_ensure_mount_or_exit REPO_ROOT
+# chextrek_apply_engine_defaults
+#
+# Sets DHEWM3_HOME/DOOM3_BASEPATH (and, on Linux, WINEPREFIX) to their per-platform defaults
+# (docs/dev-setup.md) whenever the environment doesn't already set them - never overrides an
+# explicit override. Shared by chextrek_run_console_script and tools/fetch-and-play.sh (#69), so
+# the two default paths can't drift apart.
+chextrek_apply_engine_defaults() {
+	if chextrek_is_linux; then
+		DHEWM3_HOME="${DHEWM3_HOME:-$HOME/games/dhewm3/1.5.5-win32/dhewm3}"
+		DOOM3_BASEPATH="${DOOM3_BASEPATH:-$HOME/games/doom3}"
+		export WINEPREFIX="${WINEPREFIX:-$HOME/games/wineprefix-chextrek}"
+	else
+		DHEWM3_HOME="${DHEWM3_HOME:-/c/Users/Scott/dhewm3/1.5.5-win32/dhewm3}"
+		DOOM3_BASEPATH="${DOOM3_BASEPATH:-/c/Program Files (x86)/Steam/steamapps/common/Doom 3}"
+	fi
+}
+
+# chextrek_ensure_mount REPO_ROOT
 #
 # Points the ${DOOM3_BASEPATH}/chextrek mount at REPO_ROOT, creating or repointing the symlink as
 # needed. On Windows this must be a real NTFS symlink (`MSYS=winsymlinks:nativestrict ln -s`) -
@@ -426,10 +443,12 @@ _chextrek_release_lock() {
 # directly rather than going through the console-script/timeout/display machinery below, which it
 # doesn't want (interactive play has no console script and no timeout).
 #
-# Never exits: prints an `error:` line and returns 1 on failure so each caller decides what "the
-# mount failed" becomes (the harness turns it into CHEXTREK_RUN_STATUS=1; fetch-and-play into its
-# own exit 1). Returns 0 (no-op, nothing printed) when the mount already points at REPO_ROOT.
-chextrek_ensure_mount_or_exit() {
+# Never exits (despite the name of every other *_or_exit helper in this file - this one really
+# doesn't exit, on purpose): prints an `error:` line and returns 1 on failure so each caller decides
+# what "the mount failed" becomes (the harness turns it into CHEXTREK_RUN_STATUS=1; fetch-and-play
+# into its own exit 1). Returns 0 (no-op, nothing printed) when the mount already points at
+# REPO_ROOT.
+chextrek_ensure_mount() {
 	local REPO_ROOT="$1"
 	local MOD_LINK="${DOOM3_BASEPATH}/chextrek"
 	local CURRENT_TARGET=""
@@ -502,10 +521,8 @@ chextrek_ensure_mount_or_exit() {
 # child that could inherit the lock fd either way.
 chextrek_run_console_script() {
 	CHEXTREK_XVFB_PID=""
+	chextrek_apply_engine_defaults
 	if chextrek_is_linux; then
-		DHEWM3_HOME="${DHEWM3_HOME:-$HOME/games/dhewm3/1.5.5-win32/dhewm3}"
-		DOOM3_BASEPATH="${DOOM3_BASEPATH:-$HOME/games/doom3}"
-		export WINEPREFIX="${WINEPREFIX:-$HOME/games/wineprefix-chextrek}"
 		# #63: Wine, the Wine prefix, the Doom 3 data and the dhewm3 engine are all fixed, one-time
 		# resources (docs/dev-setup.md) - check the cheap ones before waiting on the lock (#62) or
 		# paying for an Xvfb start.
@@ -534,9 +551,6 @@ _chextrek_run_console_script_impl() {
 		# Windows below.
 		chextrek_ensure_display_or_exit
 	else
-		DHEWM3_HOME="${DHEWM3_HOME:-/c/Users/Scott/dhewm3/1.5.5-win32/dhewm3}"
-		DOOM3_BASEPATH="${DOOM3_BASEPATH:-/c/Program Files (x86)/Steam/steamapps/common/Doom 3}"
-
 		# qwinsta marks this process's own session with ">"; anything but Active means no display.
 		# Windows behavior here is unchanged by #63 (its AC): a missing dhewm3.exe still falls
 		# through to the ordinary FAIL/exit-1 check just below, not the Linux-only ENVIRONMENT/
@@ -559,19 +573,10 @@ _chextrek_run_console_script_impl() {
 		return 1
 	fi
 
-	# --- keep the basepath's "chextrek" mount pointed at *this* checkout (worktrees change this) ---
-	# On Windows this must be a real NTFS symlink (readlink resolves it, `fsutil reparsepoint
-	# query` shows a "Symbolic Link" tag). Plain `ln -s` on a directory falls back to a full
-	# recursive copy on this toolchain when it can't get symlink privilege - that would silently
-	# test a stale copy instead of this checkout, and `rm -rf` on a *copy* is safe but on a real
-	# reparse point it must never be used (it would recurse through the link and could delete the
-	# checkout it points at). `MSYS=winsymlinks:nativestrict` forces the real symlink; if that
-	# ever stops being permitted on a dev machine, fix the privilege (Developer Mode) rather than
-	# loosening this. Unicron (Linux/Wine, #60) has no such privilege quirk - a plain `ln -s`
-	# creates a real symlink outright (spike #59 confirmed this "just works" unmodified) - but the
-	# readlink verification below still applies on both, so a silent fallback would be caught the
-	# same way.
-	if ! chextrek_ensure_mount_or_exit "$REPO_ROOT"; then
+	# --- keep the basepath's "chextrek" mount pointed at *this* checkout (worktrees change this) -
+	# see chextrek_ensure_mount's own header above for why it must be a real symlink on both
+	# platforms and how a silent fallback is caught ---
+	if ! chextrek_ensure_mount "$REPO_ROOT"; then
 		CHEXTREK_RUN_STATUS=1
 		return 1
 	fi

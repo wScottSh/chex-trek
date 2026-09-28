@@ -121,7 +121,13 @@ wine_call_count() {
 	wc -l <"${SCRATCH}/wine-invoked-count" | tr -d ' '
 }
 last_wine_argv() {
-	ls -t "${SCRATCH}/wine-invocations"/*.args 2>/dev/null | head -1
+	# Every case that calls this clears/recreates ${SCRATCH}/wine-invocations first and expects at
+	# most one engine launch, so "the" argv file (not sorted by mtime - avoids relying on `ls -t`
+	# for this) is whichever single *.args file the glob below finds.
+	local f
+	for f in "${SCRATCH}/wine-invocations"/*.args; do
+		[ -f "$f" ] && printf '%s\n' "$f"
+	done
 }
 
 # --- bare "origin" repo standing in for the real GitHub remote ---
@@ -186,8 +192,8 @@ echo "=== case 1: clean tree, a real Latest release -> lands detached on the rel
 : >"${SCRATCH}/wine-invoked-count"
 rm -rf "${SCRATCH}/wine-invocations"
 mkdir -p "${SCRATCH}/wine-invocations"
-STUB_GH_TAG="win-1234567890" STUB_GH_TARGET="$RELEASE_SHA" STUB_GH_ASSET_NAMES="chextrek.dll,chextrek.pdb" \
-	OUT1="$(run_fetch_and_play 2>&1)"
+OUT1="$(STUB_GH_TAG="win-1234567890" STUB_GH_TARGET="$RELEASE_SHA" STUB_GH_ASSET_NAMES="chextrek.dll,chextrek.pdb" \
+	run_fetch_and_play 2>&1)"
 CODE1=$?
 if [ $CODE1 -eq 0 ]; then pass "exits 0 on a clean tree with a real Latest release"; else fail "exit code $CODE1, want 0"; echo "$OUT1"; fi
 CUR_SHA="$(git -C "$CHECKOUT" rev-parse HEAD)"
@@ -257,13 +263,26 @@ POST_MISSING_SHA="$(git -C "$CHECKOUT" rev-parse HEAD)"
 if [ "$POST_MISSING_SHA" = "$PRE_MISSING_SHA" ]; then pass "HEAD unchanged when an asset is missing"; else fail "HEAD moved despite the missing asset"; fi
 
 echo
-echo "=== case 4: gh release download fails -> refuses with a clear message ==="
+echo "=== case 4: gh release download fails -> refuses with a clear message, HEAD unchanged (download happens before checkout) ==="
 rm -f "${CHECKOUT}/chextrek.dll" "${CHECKOUT}/chextrek.pdb"
+PRE_DLFAIL_SHA="$(git -C "$CHECKOUT" rev-parse HEAD)"
 OUT4="$(STUB_GH_TAG="win-dlfail" STUB_GH_TARGET="$RELEASE_SHA" STUB_GH_DOWNLOAD_FAIL=1 run_fetch_and_play 2>&1)"
 CODE4=$?
 if [ $CODE4 -ne 0 ]; then pass "exits non-zero when gh release download fails"; else fail "exit code 0, want non-zero"; fi
 if echo "$OUT4" | grep -qi "release download"; then pass "names the reason: the download failed"; else fail "expected a message naming the failed download"; echo "$OUT4"; fi
 if [ -f "${CHECKOUT}/chextrek.dll" ] || [ -f "${CHECKOUT}/chextrek.pdb" ]; then fail "a DLL/PDB exists despite the simulated download failure"; else pass "no DLL/PDB left behind by the failed download"; fi
+POST_DLFAIL_SHA="$(git -C "$CHECKOUT" rev-parse HEAD)"
+if [ "$POST_DLFAIL_SHA" = "$PRE_DLFAIL_SHA" ]; then pass "HEAD unchanged when the download fails (download happens before checkout)"; else fail "HEAD moved despite the failed download"; fi
+
+echo
+echo "=== case 4b: gh release download succeeds but the checkout itself fails (bad target commit) -> refuses, HEAD unchanged, no DLL/PDB left in the checkout root ==="
+PRE_BADTARGET_SHA="$(git -C "$CHECKOUT" rev-parse HEAD)"
+OUT4B="$(STUB_GH_TAG="win-badtarget" STUB_GH_TARGET="0000000000000000000000000000000000dead" run_fetch_and_play 2>&1)"
+CODE4B=$?
+if [ $CODE4B -ne 0 ]; then pass "exits non-zero when the release's target commit isn't reachable"; else fail "exit code 0, want non-zero"; fi
+POST_BADTARGET_SHA="$(git -C "$CHECKOUT" rev-parse HEAD)"
+if [ "$POST_BADTARGET_SHA" = "$PRE_BADTARGET_SHA" ]; then pass "HEAD unchanged when the checkout itself fails"; else fail "HEAD moved despite the checkout failing"; fi
+if [ -f "${CHECKOUT}/chextrek.dll" ] || [ -f "${CHECKOUT}/chextrek.pdb" ]; then fail "a DLL/PDB was left in the checkout root despite the checkout failing"; else pass "no DLL/PDB left in the checkout root - the scratch download dir, not the checkout root, held them"; fi
 
 echo
 echo "=== case 5: a positional argument is rejected (usage error) - #70's commit argument isn't implemented here ==="
