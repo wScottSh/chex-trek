@@ -16,7 +16,7 @@ bash tools/run-all-tests.sh
 Run it plain - no `CHEXTREK_SKIP_BUILD` set. That builds `chextrek.dll` with the Unicron
 toolchain (msvc-wine, spec #64) and then runs the harness self-test, the main-menu smoke check
 and every feature scenario, the same one command as on the Windows dev machine (spec #28 story
-38, extended to Unicron by spec #58 story 5). It's mode `100644` in git (a repo convention, not a
+38, extended to Unicron by spec #58 story 18). It's mode `100644` in git (a repo convention, not a
 mistake) - invoke it with `bash`, not directly.
 
 The `export` matters: the harness's Wine (`/opt/wine-11.0-wow64/bin`, built from source for

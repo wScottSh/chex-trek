@@ -9,9 +9,9 @@
 # no real build) and fake test-*.sh scripts, one of which deliberately fails, so it exercises only
 # run-all-tests.sh's own pass/fail bookkeeping. It doesn't prove a real, in-game scenario's own
 # assertion failure exits 1 under Wine - that's existing tools/test-*.sh/tools/lib-harness.sh
-# behavior (every scenario's own assertions already exit 1 on mismatch), demonstrated with a real
-# scenario on a throwaway branch for this issue's PR instead of here, to avoid baking an extra full
-# game run into every future test suite run.
+# behavior (every scenario's own assertions already exit 1 on mismatch), demonstrated manually for
+# this issue's PR (see the PR body) instead of baked in here, to avoid an extra full game run in
+# every future test suite run.
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -66,7 +66,7 @@ else
 fi
 if ! echo "$OUT" | grep -qx "FAIL: test-a-passing-scenario.sh"; then echo "PASS: passing scenario a not listed as FAIL"; else echo "FAIL: test-a-passing-scenario.sh wrongly listed as FAIL"; FAIL=1; fi
 if ! echo "$OUT" | grep -qx "FAIL: test-c-passing-scenario.sh"; then echo "PASS: passing scenario c not listed as FAIL"; else echo "FAIL: test-c-passing-scenario.sh wrongly listed as FAIL"; FAIL=1; fi
-if echo "$OUT" | grep -q "2 passed, 1 failed"; then echo "PASS: summary counts exactly 2 passed, 1 failed"; else echo "FAIL: expected the summary to read '2 passed, 1 failed'"; echo "$OUT"; FAIL=1; fi
+if echo "$OUT" | grep -qx "=== summary: 2 passed, 1 failed ==="; then echo "PASS: summary counts exactly 2 passed, 1 failed"; else echo "FAIL: expected the summary line '=== summary: 2 passed, 1 failed ==='"; echo "$OUT"; FAIL=1; fi
 
 [ $FAIL -eq 0 ] && { echo "PASS: whole self-test"; exit 0; }
 echo "FAIL: whole self-test"
