@@ -153,7 +153,12 @@ same `$WINEPREFIX` because the lock means there never is a concurrent run in pro
 attached to the run's own open file descriptor on that lock file, not to the file's contents or a
 recorded pid, so a run that crashes or is killed - by any signal, including `SIGKILL` - has its fd
 closed by the kernel and the lock released right along with it; there is no stale lock file to
-clean up by hand. `tools/test-harness-lock.sh` covers this.
+clean up by hand. Xvfb, `winepath` and the wine launch itself each close their own inherited copy
+of that fd before they exec, so an orphaned Xvfb or wine/dhewm3 a killed run leaves running can't
+keep holding the lock either. One caveat: the lock freeing immediately doesn't mean the killed
+run's own wine/dhewm3 is gone yet - it can keep running as an orphan for up to its timeout, still
+sharing the mount and save dir, until the *next* run's `wineserver -k` cleanup reaps it.
+`tools/test-harness-lock.sh` covers this.
 
 **The harness needs a display to open a window on.** dhewm3 opens a real window, so it needs
 somewhere to put it. On the Windows dev machine that's an active desktop session: if this Windows

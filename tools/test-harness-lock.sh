@@ -314,44 +314,92 @@ echo "=== #62 lock test: case 5 - SIGKILLing a real run while its wine/dhewm3 is
 # process itself - simulating an operator's Ctrl-C or an OOM kill - while dhewm3 is still actually
 # running under wine, then checks the lock is free at once even though that orphaned dhewm3/wine
 # keeps running for a while after.
-LONGRUN_LABEL="chextrek_lock_test_killme"
-{
-	echo "developer 1"
-	i=0
-	while [ $i -lt 600 ]; do
-		echo "wait"
-		i=$((i + 1))
-	done
-	echo "quit"
-} > "${SCRATCH}/longrun.cfg"
-
-bash "${SCRIPT_DIR}/run-scenario.sh" "$LONGRUN_LABEL" "${SCRATCH}/longrun.cfg" 120 \
-	> "${SCRATCH}/case5.out" 2>&1 &
-RUN5_PID=$!
-
-for _ in $(seq 1 100); do
-	grep -q "Launching dhewm3" "${SCRATCH}/case5.out" 2>/dev/null && break
-	sleep 0.1
-done
-sleep 1 # give wine a moment to actually be running dhewm3, not just be mid-exec into it
-
-kill -9 "$RUN5_PID" 2>/dev/null
-wait "$RUN5_PID" 2>/dev/null
-
-DEFAULT_LOCK="$(chextrek_lock_file)"
-if flock -n "$DEFAULT_LOCK" -c true 2>/dev/null; then
-	echo "PASS: the lock is free immediately after SIGKILLing the run, even with its wine/dhewm3 possibly still alive"
+#
+# Starts its own Xvfb and points DISPLAY at it first: over SSH with no DISPLAY set (the Unicron
+# norm), the killed run would otherwise start its *own* Xvfb (chextrek_ensure_display_or_exit) that
+# this case has no handle to and would leak forever. Giving it a display to reuse instead means this
+# case owns the only Xvfb involved and can clean it up itself.
+if ! command -v Xvfb >/dev/null 2>&1; then
+	echo "SKIP: Xvfb not installed on this host - can't run this case without leaking one"
 else
-	echo "FAIL: the lock is still held after SIGKILLing the run - wine/wineserver is holding it"
-	FAIL=1
-fi
+	CASE5_XVFB_LOG="${SCRATCH}/case5-xvfb.log"
+	CASE5_DISPLAY_N=""
+	for N in $(seq 150 199); do
+		[ -e "/tmp/.X${N}-lock" ] && continue
+		Xvfb ":${N}" -screen 0 1280x1024x24 -nolisten tcp >"$CASE5_XVFB_LOG" 2>&1 &
+		CASE5_XVFB_PID=$!
+		WAITED=0
+		while [ $WAITED -lt 10 ] && [ ! -e "/tmp/.X${N}-lock" ]; do
+			sleep 0.1
+			WAITED=$((WAITED + 1))
+		done
+		if [ -e "/tmp/.X${N}-lock" ]; then
+			CASE5_DISPLAY_N="$N"
+			break
+		fi
+		kill "$CASE5_XVFB_PID" 2>/dev/null
+	done
 
-# Best-effort cleanup: only this test's own orphaned dhewm3, matched by its distinctive cfg name
-# (embedded in the engine's own +exec argument, so this can't match an unrelated concurrent run).
-pkill -9 -f "${LONGRUN_LABEL}_" 2>/dev/null || true
-sleep 0.3
-if command -v wineserver >/dev/null 2>&1; then
-	WINEPREFIX="${WINEPREFIX:-$HOME/games/wineprefix-chextrek}" wineserver -k >/dev/null 2>&1 || true
+	if [ -z "$CASE5_DISPLAY_N" ]; then
+		echo "SKIP: couldn't start a private Xvfb for this case"
+	else
+		LONGRUN_LABEL="chextrek_lock_test_killme"
+		{
+			echo "developer 1"
+			i=0
+			while [ $i -lt 600 ]; do
+				echo "wait"
+				i=$((i + 1))
+			done
+			echo "quit"
+		} > "${SCRATCH}/longrun.cfg"
+
+		DISPLAY=":${CASE5_DISPLAY_N}" bash "${SCRIPT_DIR}/run-scenario.sh" "$LONGRUN_LABEL" "${SCRATCH}/longrun.cfg" 120 \
+			> "${SCRATCH}/case5.out" 2>&1 &
+		RUN5_PID=$!
+
+		for _ in $(seq 1 100); do
+			grep -q "Launching dhewm3" "${SCRATCH}/case5.out" 2>/dev/null && break
+			sleep 0.1
+		done
+		sleep 1 # give wine a moment to actually be running dhewm3, not just be mid-exec into it
+
+		kill -9 "$RUN5_PID" 2>/dev/null
+		wait "$RUN5_PID" 2>/dev/null
+
+		# Confirm this actually exercised the scenario it claims to (a real orphan survived the
+		# kill) - otherwise an early exit or a slow start would let this pass without proving
+		# anything, the same way case 2 checks its own simulated child survived.
+		if pgrep -f "${LONGRUN_LABEL}_" >/dev/null 2>&1; then
+			echo "PASS: the killed run's dhewm3/wine survived as an orphan, as intended"
+		else
+			echo "FAIL: no surviving orphan found - this case didn't test what it meant to (never launched, or exited before the kill)"
+			FAIL=1
+		fi
+
+		DEFAULT_LOCK="$(chextrek_lock_file)"
+		if flock -n "$DEFAULT_LOCK" -c true 2>/dev/null; then
+			echo "PASS: the lock is free immediately after SIGKILLing the run, even with its wine/dhewm3 possibly still alive"
+		else
+			echo "FAIL: the lock is still held after SIGKILLing the run - wine/wineserver is holding it"
+			FAIL=1
+		fi
+
+		# Cleanup: only this test's own orphaned dhewm3, matched by its distinctive cfg name
+		# (embedded in the engine's own +exec argument, so this can't match an unrelated concurrent
+		# run), and only this test's own Xvfb (by pid, not by display number, for the same reason).
+		# The lock is free by now (just proved above), so take it ourselves around the wineserver
+		# cleanup - wineserver -k stops every wine process in $WINEPREFIX, which would otherwise be
+		# able to hit a real concurrent run's wine processes in the same default prefix.
+		pkill -9 -f "${LONGRUN_LABEL}_" 2>/dev/null || true
+		sleep 0.3
+		if command -v wineserver >/dev/null 2>&1; then
+			flock "$DEFAULT_LOCK" bash -c '
+				WINEPREFIX="${1:-$HOME/games/wineprefix-chextrek}" wineserver -k
+			' _ "${WINEPREFIX:-}" >/dev/null 2>&1 || true
+		fi
+		kill "$CASE5_XVFB_PID" 2>/dev/null
+	fi
 fi
 
 echo

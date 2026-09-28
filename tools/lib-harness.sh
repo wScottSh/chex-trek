@@ -309,7 +309,10 @@ _chextrek_acquire_lock() {
 	fi
 	if ! flock -n "$CHEXTREK_LOCK_FD"; then
 		echo "==> Waiting for the harness lock (another run holds ${LOCK_FILE}) ..."
-		flock "$CHEXTREK_LOCK_FD"
+		if ! flock "$CHEXTREK_LOCK_FD"; then
+			echo "error: couldn't take the harness lock on ${LOCK_FILE} (is 'flock' installed?). See docs/dev-setup.md." >&2
+			exit 1
+		fi
 	fi
 }
 
