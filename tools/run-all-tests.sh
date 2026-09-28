@@ -6,9 +6,10 @@
 #
 # Usage: tools/run-all-tests.sh
 #
-# Exit status: 0 if every script passed, 1 if any failed, 3 if a run stopped because there is no
-# display (an environment blocker, not a test result - the suite stops at once; see
-# docs/dev-setup.md).
+# Exit status: 0 if every script passed, 1 if any failed, 3 if a run stopped on a broken-
+# environment blocker - not a test result - the suite stops at once (no display; Linux-only,
+# #63: missing Wine/winepath, an uninitialized Wine prefix, missing Doom 3 data, or a missing
+# dhewm3 engine); see docs/dev-setup.md.
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -29,7 +30,7 @@ for t in "${SCRIPT_DIR}"/test-*.sh; do
 	bash "$t"
 	CODE=$?
 	if [ $CODE -eq 3 ]; then
-		echo "ENVIRONMENT: ${NAME} stopped with exit 3 (no display) - stopping the suite."
+		echo "ENVIRONMENT: ${NAME} stopped with exit 3 (broken environment, see its own ENVIRONMENT line above) - stopping the suite."
 		exit 3
 	fi
 	if [ $CODE -eq 0 ]; then PASSED+=("$NAME"); else FAILED+=("$NAME"); fi

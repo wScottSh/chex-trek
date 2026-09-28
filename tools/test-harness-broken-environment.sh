@@ -29,7 +29,7 @@ FAIL=0
 # a stand-in, and no real Wine/Xvfb/dhewm3 install on this host is required to run this test.
 mkdir -p "${SCRATCH}/base-bin"
 for TOOL in bash uname date cat mkdir rm printf sed grep id readlink basename dirname cp \
-	mktemp kill sleep seq ln tr chmod true env command; do
+	mktemp kill sleep seq ln tr chmod true env; do
 	T="$(command -v "$TOOL" 2>/dev/null)" && ln -sf "$T" "${SCRATCH}/base-bin/${TOOL}"
 done
 
@@ -67,7 +67,7 @@ EOF
 # doesn't kill this script. Sets OUT/CODE/ELAPSED.
 run_case() {
 	local CASE_PATH="$1" CASE_HOME="$2" CASE_DOOM3="$3" CASE_PREFIX="$4"
-	local START ELAPSED_LOCAL
+	local START
 	START=$(date +%s)
 	OUT="$(env -i PATH="$CASE_PATH" HOME="$SCRATCH" \
 		DHEWM3_HOME="$CASE_HOME" DOOM3_BASEPATH="$CASE_DOOM3" WINEPREFIX="$CASE_PREFIX" \
