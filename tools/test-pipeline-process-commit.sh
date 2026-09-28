@@ -75,6 +75,56 @@ if [ "${1:-}" = "release" ] && [ "${2:-}" = "create" ]; then
 	echo "https://github.com/stub/stub/releases/tag/${TAG}"
 	exit 0
 fi
+if [ "${1:-}" = "label" ] && [ "${2:-}" = "create" ]; then
+	NAME="${3:-}"
+	printf '%s\n' "$NAME" >>"${STUB_GH_LABELS}"
+	exit 0
+fi
+# _stub_flag NAME "$@" - value of the first occurrence of --NAME in the remaining argv, else "".
+_stub_flag() {
+	local WANT="$1" a i j
+	shift
+	for ((i = 1; i <= $#; i++)); do
+		a="${!i}"
+		if [ "$a" = "$WANT" ]; then
+			j=$((i + 1))
+			echo "${!j}"
+			return
+		fi
+	done
+}
+if [ "${1:-}" = "issue" ] && [ "${2:-}" = "list" ]; then
+	# Emulates `--json number --jq '.[0].number // empty'`: the stub only ever needs the single
+	# oldest still-open issue number for a given --repo/--label pair, so it looks that up directly
+	# rather than interpreting --json/--jq generically. Issues file: number, repo, label, state,
+	# title, tab-separated - repo-scoped, since a real `gh issue list` is too.
+	REPO_ARG="$(_stub_flag --repo "$@")"
+	LABEL="$(_stub_flag --label "$@")"
+	awk -v repo="$REPO_ARG" -v label="$LABEL" -F'\t' '$2==repo && $3==label && $4=="open" {print $1; exit}' "${STUB_GH_ISSUES}"
+	exit 0
+fi
+if [ "${1:-}" = "issue" ] && [ "${2:-}" = "create" ]; then
+	REPO_ARG="$(_stub_flag --repo "$@")"
+	TITLE="$(_stub_flag --title "$@")"
+	LABEL="$(_stub_flag --label "$@")"
+	NUM="$(("$(wc -l <"${STUB_GH_ISSUES}")" + 1))"
+	printf '%s\t%s\t%s\topen\t%s\n' "$NUM" "$REPO_ARG" "$LABEL" "$TITLE" >>"${STUB_GH_ISSUES}"
+	echo "https://github.com/stub/stub/issues/${NUM}"
+	exit 0
+fi
+if [ "${1:-}" = "issue" ] && [ "${2:-}" = "comment" ]; then
+	NUM="${3:-}"
+	echo "$NUM" >>"${STUB_GH_ISSUE_COMMENTS}"
+	exit 0
+fi
+if [ "${1:-}" = "issue" ] && [ "${2:-}" = "close" ]; then
+	NUM="${3:-}"
+	echo "$NUM" >>"${STUB_GH_ISSUE_CLOSES}"
+	# Flip that issue's own state field to "closed" in place.
+	awk -v n="$NUM" -F'\t' 'BEGIN{OFS="\t"} $1==n {$4="closed"} {print}' "${STUB_GH_ISSUES}" >"${STUB_GH_ISSUES}.tmp"
+	mv "${STUB_GH_ISSUES}.tmp" "${STUB_GH_ISSUES}"
+	exit 0
+fi
 echo "stub gh: unhandled invocation: $*" >&2
 exit 1
 STUBEOF
@@ -84,9 +134,19 @@ export PATH="${SCRATCH}/bin:${PATH}"
 export STUB_GH_ARGV_LOG="${SCRATCH}/gh-argv.log"
 export STUB_GH_ARGV_DIR="${SCRATCH}/gh-argv.d"
 export STUB_GH_RELEASES="${SCRATCH}/gh-releases.txt"
+# Issues: one line per issue, tab-separated "<number>\t<label>\t<state>\t<title>". Comments/closes
+# are each appended, one issue number per line, to their own flat log for easy counting/grepping.
+export STUB_GH_LABELS="${SCRATCH}/gh-labels.txt"
+export STUB_GH_ISSUES="${SCRATCH}/gh-issues.txt"
+export STUB_GH_ISSUE_COMMENTS="${SCRATCH}/gh-issue-comments.txt"
+export STUB_GH_ISSUE_CLOSES="${SCRATCH}/gh-issue-closes.txt"
 mkdir -p "$STUB_GH_ARGV_DIR"
 : >"$STUB_GH_ARGV_LOG"
 : >"$STUB_GH_RELEASES"
+: >"$STUB_GH_LABELS"
+: >"$STUB_GH_ISSUES"
+: >"$STUB_GH_ISSUE_COMMENTS"
+: >"$STUB_GH_ISSUE_CLOSES"
 
 # find_create_argv TAG - path to the recorded argv file (one arg per line) of the
 # "release create TAG ..." call, or empty if there was no such call.
@@ -100,6 +160,32 @@ find_create_argv() {
 count_create_calls() {
 	local TAG="$1"
 	awk -v tag="$TAG" '$2=="release" && $3=="create" && $4==tag' "$STUB_GH_ARGV_LOG" | wc -l | tr -d ' '
+}
+
+# find_last_gh_call A1 A2 - path to the recorded argv file (one arg per line) of the most recent
+# "gh A1 A2 ..." call (e.g. A1=issue A2=create), or empty if there was no such call. Generic
+# counterpart to find_create_argv above, for the issue-tracker calls #67 adds.
+find_last_gh_call() {
+	local A1="$1" A2="$2" ID
+	ID="$(awk -v a1="$A1" -v a2="$A2" '$2==a1 && $3==a2 {print $1}' "$STUB_GH_ARGV_LOG" | tail -1)"
+	[ -n "$ID" ] && echo "${STUB_GH_ARGV_DIR}/${ID}.args"
+}
+
+# count_gh_calls A1 A2 - how many "gh A1 A2 ..." calls the stub gh has seen so far.
+count_gh_calls() {
+	local A1="$1" A2="$2"
+	awk -v a1="$A1" -v a2="$A2" '$2==a1 && $3==a2' "$STUB_GH_ARGV_LOG" | wc -l | tr -d ' '
+}
+
+# open_issue_number - the number of the (single, by construction) currently-open stub issue, or
+# empty if none is open. Issues file columns: number, repo, label, state, title.
+open_issue_number() {
+	awk -F'\t' '$4=="open" {print $1; exit}' "$STUB_GH_ISSUES"
+}
+
+# issue_state NUM - "open" or "closed" for stub issue NUM.
+issue_state() {
+	awk -F'\t' -v n="$1" '$1==n {print $4}' "$STUB_GH_ISSUES"
 }
 
 # --- fake suites: stand-ins for tools/run-all-tests.sh's three outcomes ---
@@ -181,6 +267,8 @@ SHA_SIGNAL="$(commit_sha "signal-killed-suite commit")"
 SHA_SKIP_BUILD="$(commit_sha "ambient-skip-build commit")"
 SHA_CREATE_FAIL="$(commit_sha "create-call-fails-cleanly commit")"
 SHA_CREATE_RACE="$(commit_sha "create-call-fails-after-succeeding commit")"
+SHA_ISSUE_CLOSE_GREEN="$(commit_sha "green-after-red-and-env commit")"
+SHA_ISSUE_RED_AGAIN="$(commit_sha "red-again-after-close commit")"
 SHA_CONCURRENT="$(commit_sha "processed-by-two-overlapping-runs commit")"
 SHA_STALE_WORKTREE="$(commit_sha "stale-worktree-from-a-crashed-run commit")"
 
@@ -253,6 +341,7 @@ if [ -n "$LOG_GREEN" ] && [ -f "$LOG_GREEN" ] && grep -qF "3 passed, 0 failed" "
 else
 	fail "expected the archived log to contain the suite summary"
 fi
+if [ "$(count_gh_calls issue close)" = "0" ]; then pass "no pipeline:red issue existed yet, so nothing was closed"; else fail "unexpectedly closed an issue on the very first green run"; fi
 
 echo
 echo "=== case 2: re-processing the same commit doesn't create a duplicate release (idempotent) ==="
@@ -273,6 +362,13 @@ TAG_RED="win-${SHORT_RED}"
 if [ $CODE3 -eq 1 ]; then pass "exits 1 on a red commit"; else fail "exit code $CODE3, want 1"; echo "$OUT3"; fi
 if grep -qxF "$TAG_RED" "$STUB_GH_RELEASES"; then fail "a release was recorded for the red commit"; else pass "no release recorded for the red commit"; fi
 if [ "$(count_create_calls "$TAG_RED")" != "0" ]; then fail "gh release create was called for the red commit"; else pass "gh release create was never called for the red commit"; fi
+if [ "$(count_gh_calls issue create)" = "1" ]; then pass "the red commit opened exactly one pipeline:red issue"; else fail "expected exactly 1 'gh issue create' call, found $(count_gh_calls issue create)"; fi
+if grep -qxF "pipeline:red" "$STUB_GH_LABELS"; then pass "the pipeline:red label was created (idempotent, --force)"; else fail "expected a 'gh label create pipeline:red' call"; fi
+RED_ISSUE_ARGF="$(find_last_gh_call issue create)"
+if [ -n "$RED_ISSUE_ARGF" ] && grep -A1 -xF -- "--label" "$RED_ISSUE_ARGF" | grep -qxF "pipeline:red"; then pass "the issue carries --label pipeline:red"; else fail "expected --label pipeline:red on the issue create call"; [ -n "$RED_ISSUE_ARGF" ] && cat "$RED_ISSUE_ARGF"; fi
+if [ -n "$RED_ISSUE_ARGF" ] && grep -A1 -xF -- "--title" "$RED_ISSUE_ARGF" | grep -qxF "Pipeline: chex-trek build is red"; then pass "the issue carries the fixed title"; else fail "expected the fixed red-issue title"; [ -n "$RED_ISSUE_ARGF" ] && cat "$RED_ISSUE_ARGF"; fi
+if [ -n "$RED_ISSUE_ARGF" ] && grep -qF "test-fake.sh" "$RED_ISSUE_ARGF"; then pass "the issue body lists the failing scenario"; else fail "expected the failing scenario (test-fake.sh) in the issue body"; [ -n "$RED_ISSUE_ARGF" ] && cat "$RED_ISSUE_ARGF"; fi
+if [ -n "$RED_ISSUE_ARGF" ] && grep -qF "$SHA_RED" "$RED_ISSUE_ARGF"; then pass "the issue body names the commit"; else fail "expected the commit sha in the issue body"; fi
 
 echo
 echo "=== case 4: a simulated environment blocker (exit 3) is reported as such, not a test FAIL ==="
@@ -283,6 +379,87 @@ TAG_ENV="win-${SHORT_ENV}"
 if [ $CODE4 -eq 3 ]; then pass "exits 3 on a simulated environment blocker"; else fail "exit code $CODE4, want 3"; echo "$OUT4"; fi
 if echo "$OUT4" | grep -qF "environment blocker"; then pass "outcome line names it an environment blocker"; else fail "expected an 'environment blocker' outcome line"; fi
 if grep -qxF "$TAG_ENV" "$STUB_GH_RELEASES"; then fail "a release was recorded for the environment-blocker commit"; else pass "no release recorded for the environment-blocker commit"; fi
+if [ "$(count_gh_calls issue create)" = "1" ]; then pass "the environment blocker commented on the existing red issue rather than opening a second one"; else fail "expected still exactly 1 issue create call total, found $(count_gh_calls issue create)"; fi
+if [ "$(count_gh_calls issue comment)" = "1" ]; then pass "exactly one comment was posted for the environment blocker"; else fail "expected exactly 1 issue comment call, found $(count_gh_calls issue comment)"; fi
+ENV_COMMENT_ARGF="$(find_last_gh_call issue comment)"
+if [ -n "$ENV_COMMENT_ARGF" ] && grep -qF "environment blocker" "$ENV_COMMENT_ARGF" && grep -qF "ENVIRONMENT:" "$ENV_COMMENT_ARGF"; then
+	pass "the comment names this an environment blocker and cites its ENVIRONMENT line - worded distinctly from a test failure"
+else
+	fail "expected the issue comment to name this an environment blocker and cite its ENVIRONMENT line"
+	[ -n "$ENV_COMMENT_ARGF" ] && cat "$ENV_COMMENT_ARGF"
+fi
+if [ -n "$ENV_COMMENT_ARGF" ] && grep -qF "FAIL:" "$ENV_COMMENT_ARGF"; then fail "the environment-blocker comment wrongly includes test-failure (FAIL:) wording"; else pass "no FAIL: wording in the environment-blocker comment"; fi
+
+echo
+echo "=== case 4c: a later green commit closes the pipeline:red issue with a comment linking its release ==="
+OPEN_ISSUE_BEFORE_4C="$(open_issue_number)"
+CLOSE_CALLS_BEFORE_4C="$(count_gh_calls issue close)"
+SHORT_ISSUE_CLOSE_GREEN="$(git -C "$REPO" rev-parse --short=10 "$SHA_ISSUE_CLOSE_GREEN")"
+TAG_ISSUE_CLOSE_GREEN="win-${SHORT_ISSUE_CLOSE_GREEN}"
+OUT4C="$(run_pipeline "$SHA_ISSUE_CLOSE_GREEN" "${SCRATCH}/suite-green.sh")"
+CODE4C=$?
+if [ $CODE4C -eq 0 ]; then pass "exits 0 on the green commit that follows the red/env-blocker pair"; else fail "exit code $CODE4C, want 0"; echo "$OUT4C"; fi
+if [ -z "$OPEN_ISSUE_BEFORE_4C" ]; then
+	fail "expected an open pipeline:red issue going into case 4c (cases 3/4 should have left one open)"
+elif [ "$(count_gh_calls issue close)" = "$((CLOSE_CALLS_BEFORE_4C + 1))" ]; then
+	pass "exactly one new 'gh issue close' call was made"
+else
+	fail "expected exactly one new 'gh issue close' call, before=${CLOSE_CALLS_BEFORE_4C} after=$(count_gh_calls issue close)"
+fi
+if [ -n "$OPEN_ISSUE_BEFORE_4C" ] && [ "$(issue_state "$OPEN_ISSUE_BEFORE_4C")" = "closed" ]; then
+	pass "the previously-open pipeline:red issue is now closed"
+else
+	fail "expected issue #${OPEN_ISSUE_BEFORE_4C} to be closed"
+fi
+CLOSE_ARGF_4C="$(find_last_gh_call issue close)"
+if [ -n "$CLOSE_ARGF_4C" ] && grep -qF "https://github.com/stub/stub/releases/tag/${TAG_ISSUE_CLOSE_GREEN}" "$CLOSE_ARGF_4C"; then
+	pass "the closing comment links the release that was just published"
+else
+	fail "expected the closing comment to link https://github.com/stub/stub/releases/tag/${TAG_ISSUE_CLOSE_GREEN}"
+	[ -n "$CLOSE_ARGF_4C" ] && cat "$CLOSE_ARGF_4C"
+fi
+if [ -n "$CLOSE_ARGF_4C" ] && grep -qF "$SHA_ISSUE_CLOSE_GREEN" "$CLOSE_ARGF_4C"; then pass "the closing comment names the green commit"; else fail "expected the commit sha in the closing comment"; fi
+
+echo
+echo "=== case 4e: a new red commit re-opens a fresh pipeline:red issue after the previous one was closed ==="
+CREATE_CALLS_BEFORE_4E="$(count_gh_calls issue create)"
+OUT4E="$(run_pipeline "$SHA_ISSUE_RED_AGAIN" "${SCRATCH}/suite-red.sh")"
+CODE4E=$?
+if [ $CODE4E -eq 1 ]; then pass "exits 1 on the new red commit"; else fail "exit code $CODE4E, want 1"; echo "$OUT4E"; fi
+if [ "$(count_gh_calls issue create)" = "$((CREATE_CALLS_BEFORE_4E + 1))" ]; then
+	pass "a fresh issue was opened, since the previous one was already closed"
+else
+	fail "expected exactly one new 'gh issue create' call, before=${CREATE_CALLS_BEFORE_4E} after=$(count_gh_calls issue create)"
+fi
+OPEN_ISSUE_4E="$(open_issue_number)"
+if [ -n "$OPEN_ISSUE_4E" ] && [ "$OPEN_ISSUE_4E" != "$OPEN_ISSUE_BEFORE_4C" ]; then
+	pass "the newly-opened issue is a distinct issue from the one closed in case 4c"
+else
+	fail "expected a distinct, newly-opened issue number; got '${OPEN_ISSUE_4E}' (previous was '${OPEN_ISSUE_BEFORE_4C}')"
+fi
+
+echo
+echo "=== case 4f: re-processing an already-published green commit (idempotent path) still closes a still-open red issue ==="
+CLOSE_CALLS_BEFORE_4F="$(count_gh_calls issue close)"
+CREATE_RELEASE_CALLS_BEFORE_4F="$(count_create_calls "$TAG_GREEN")"
+OUT4F="$(run_pipeline "$SHA_GREEN" "${SCRATCH}/suite-green.sh")"
+CODE4F=$?
+if [ $CODE4F -eq 0 ]; then pass "exits 0 re-processing the already-published green commit"; else fail "exit code $CODE4F, want 0"; echo "$OUT4F"; fi
+if [ "$(count_create_calls "$TAG_GREEN")" = "$CREATE_RELEASE_CALLS_BEFORE_4F" ]; then
+	pass "the idempotent path did not create another release"
+else
+	fail "the idempotent path unexpectedly created a release"
+fi
+if [ "$(count_gh_calls issue close)" = "$((CLOSE_CALLS_BEFORE_4F + 1))" ]; then
+	pass "the idempotent (already-published) path still closed the still-open red issue"
+else
+	fail "expected exactly one new 'gh issue close' call from the idempotent path, before=${CLOSE_CALLS_BEFORE_4F} after=$(count_gh_calls issue close)"
+fi
+if [ -n "$OPEN_ISSUE_4E" ] && [ "$(issue_state "$OPEN_ISSUE_4E")" = "closed" ]; then
+	pass "the issue opened in case 4e is now closed"
+else
+	fail "expected issue #${OPEN_ISSUE_4E} to be closed by the idempotent path"
+fi
 
 echo
 echo "=== case 5: default --repo parsing from 'git remote get-url origin' (no override) ==="
