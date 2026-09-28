@@ -30,15 +30,17 @@ Spec #58/#60. Unicron builds and runs the harness unattended, with nobody ever l
 desktop; the platform layer this needs lives in `tools/lib-harness.sh` behind `chextrek_is_linux`.
 Building `chextrek.dll` itself on Linux is a later sub-issue - #60 only covers running the harness
 against a prebuilt DLL (built on the Windows dev machine and copied over, or produced by that later
-Linux build step once it exists). Until that build step exists, `tools/build-chextrek.sh` (which
-`tools/run-all-tests.sh` and every `tools/test-*.sh` call before running) only knows how to build on
-Windows, so on Unicron: copy a Windows-built `chextrek.dll` (+ `.pdb`) to the repo root yourself,
-same gitignored place the Windows build writes to, and set `CHEXTREK_SKIP_BUILD=1` so the scripts
-skip the build step and use it as-is.
+Linux build step once it exists). Until that build step exists, `tools/build-chextrek.sh` only knows
+how to build on Windows, so on Unicron: copy a Windows-built `chextrek.dll` (+ `.pdb`) to the repo
+root yourself, same gitignored place the Windows build writes to, and set `CHEXTREK_SKIP_BUILD=1`
+before running an individual `tools/test-*.sh` (or `tools/run-harness.sh`, which never builds) so it
+skips the build step and uses the prebuilt DLL as-is. `tools/run-all-tests.sh` always builds first
+regardless of `CHEXTREK_SKIP_BUILD` (it only sets that variable for the `test-*.sh` scripts it goes
+on to run) and so can't run on Unicron until the Linux build step exists.
 
 | Thing | Location | Notes |
 |---|---|---|
-| Wine 11.0, new-WoW64 | `/opt/wine-11.0-wow64` (built from source; add `.../bin` to `PATH`) | The WineHQ `noble` packages can't do new-WoW64 (see spike #59's comment on #58 for the full build recipe). Provides `wine` and `winepath`, both required on `PATH`. |
+| Wine 11.0, new-WoW64 | `/opt/wine-11.0-wow64` (built from source; add `.../bin` to `PATH`) | The WineHQ `noble` packages can't do new-WoW64 (see spike #59's comment on #58 for the full build recipe). Provides `wine`, `winepath` and `wineserver`, all required on `PATH` - without `wineserver` on `PATH` the post-run cleanup below can't run, and a run can hang forever (see "Wine process cleanup"). |
 | Wine prefix | `$WINEPREFIX`, default `$HOME/games/wineprefix-chextrek` | Needs the **VC++ 2015-2022 x86 redist** installed in it (`vc_redist.x86.exe /install /quiet`) - `dhewm3.exe` imports `mfc140.dll`, which Wine has no builtin for; without it the loader fails with `c0000135`. |
 | Classic Doom 3 1.3.1 | `$HOME/games/doom3` (has `base/pak000.pk4`-`pak008.pk4`) | Copied once from the Windows PC, outside every repo, same as the Windows machine's copy. This is `$DOOM3_BASEPATH`. |
 | dhewm3 1.5.5 win32 (official, unmodified) | `$HOME/games/dhewm3/1.5.5-win32/dhewm3/dhewm3.exe` | The same `dhewm3-1.5.5_win32.zip` as the Windows machine, run under Wine - never built from source. This is `$DHEWM3_HOME`. |
@@ -132,11 +134,13 @@ harness archives everything a run leaves there, so screenshots are kept whatever
 are never asserted on.
 
 **Only run one harness invocation at a time on a given machine.** On Windows it kills every
-`dhewm3.exe` process by image name on timeout (not just the one it started); on Unicron a timeout
-kills only the PID that run started (see "Unicron (Linux/Wine)" above), but concurrent runs on
-either machine - e.g. from two worktrees at once - would still race on the shared `chextrek`
-symlink and the shared save dir (`Documents\My Games\dhewm3\chextrek\` on Windows, the equivalent
-path inside the Wine prefix on Unicron).
+`dhewm3.exe` process by image name on timeout (not just the one it started). On Unicron a timeout
+itself kills only the PID that run started (see "Unicron (Linux/Wine)" above), but the
+`wineserver -k` cleanup every run does afterwards stops *every* wine process in `$WINEPREFIX` -
+harmless for one run at a time, but two concurrent runs sharing the same default `$WINEPREFIX`
+would still be able to kill each other's dhewm3 via that cleanup, on top of racing on the shared
+`chextrek` symlink and the shared save dir (`Documents\My Games\dhewm3\chextrek\` on Windows, the
+equivalent path inside the Wine prefix on Unicron).
 
 **The harness needs a display to open a window on.** dhewm3 opens a real window, so it needs
 somewhere to put it. On the Windows dev machine that's an active desktop session: if this Windows
