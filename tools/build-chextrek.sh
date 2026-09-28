@@ -14,6 +14,12 @@
 # the mod's fs_game folder the engine searches for "<fs_game>.dll" - see docs/dev-setup.md.
 set -euo pipefail
 
+# Exit 3 means "environment blocker" (see Exit status above) and only the checks that print an
+# ENVIRONMENT line may use it: they set ENVIRONMENT_EXIT=1 first. Any other exit 3 (a docker/cmake/
+# ninja/wine failure that happens to return 3) is a build failure, so it's remapped to 1 here.
+ENVIRONMENT_EXIT=0
+trap 'RC=$?; if [ "$RC" -eq 3 ] && [ "$ENVIRONMENT_EXIT" != "1" ]; then exit 1; fi' EXIT
+
 CONFIG="${1:-RelWithDebInfo}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -36,11 +42,13 @@ Linux*)
 	if ! command -v docker >/dev/null 2>&1; then
 		echo "ENVIRONMENT: docker not found on PATH - needed for the Linux (msvc-wine) build."
 		echo "ENVIRONMENT: this is not a test failure. See docs/dev-setup.md; do not wait or retry."
+		ENVIRONMENT_EXIT=1
 		exit 3
 	fi
 	if ! docker image inspect "$CHEXTREK_MSVC_IMAGE" >/dev/null 2>&1; then
 		echo "ENVIRONMENT: docker image '${CHEXTREK_MSVC_IMAGE}' not found (or docker isn't reachable)."
 		echo "ENVIRONMENT: this is not a test failure. One-time setup: bash tools/msvc-wine/build-image.sh (see docs/dev-setup.md); do not wait or retry."
+		ENVIRONMENT_EXIT=1
 		exit 3
 	fi
 

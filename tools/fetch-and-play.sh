@@ -86,7 +86,8 @@ set -uo pipefail
 
 # --- run from a temp copy, never from the checkout's own tools/fetch-and-play.sh (see the header's
 # "Self-rewrite hazard"): before anything else, copy this script to a scratch file and re-exec bash
-# on that copy, passing the original path in CHEXTREK_FETCH_AND_PLAY_SELF. The copy is what bash
+# on that copy, passing the original path in CHEXTREK_FETCH_AND_PLAY_SELF (and the copy's own path
+# in CHEXTREK_FETCH_AND_PLAY_COPY, so main() deletes exactly that file and nothing else). The copy is what bash
 # holds open for the rest of the run, so step 4's checkout can replace the checkout's own
 # tools/fetch-and-play.sh without anything having it open - which is what Git for Windows' "Unlink
 # of file 'tools/fetch-and-play.sh' failed" abort needs. The env var stops a second re-exec.
@@ -103,16 +104,22 @@ if [ -z "${CHEXTREK_FETCH_AND_PLAY_SELF:-}" ]; then
 		echo "error: couldn't copy ${_FAP_SELF} to ${_FAP_COPY} to run from. Nothing was checked out or launched." >&2
 		exit 1
 	fi
-	CHEXTREK_FETCH_AND_PLAY_SELF="$_FAP_SELF" exec "${BASH:-bash}" "$_FAP_COPY" "$@"
+	CHEXTREK_FETCH_AND_PLAY_SELF="$_FAP_SELF" CHEXTREK_FETCH_AND_PLAY_COPY="$_FAP_COPY" \
+		exec "${BASH:-bash}" "$_FAP_COPY" "$@"
 fi
 
 main() {
 	SCRIPT_DIR="$(dirname "$CHEXTREK_FETCH_AND_PLAY_SELF")"
 	# Running from the temp copy made above: main() is already fully parsed, so delete the copy
 	# now rather than leaving it in TMPDIR (the launch below `exec`s, so no EXIT trap would run).
-	# Best effort - a failure here just leaves one small file in TMPDIR.
-	if [ "${BASH_SOURCE[0]}" != "$CHEXTREK_FETCH_AND_PLAY_SELF" ]; then
-		rm -f "${BASH_SOURCE[0]}" 2>/dev/null || true
+	# Best effort - a failure here (e.g. Windows refusing to delete a file bash has open) just
+	# leaves one small file in TMPDIR.
+	# Only ever the exact file the re-exec above created - never the checkout's own script, however
+	# CHEXTREK_FETCH_AND_PLAY_SELF happens to be spelled.
+	if [ -n "${CHEXTREK_FETCH_AND_PLAY_COPY:-}" ] && [ "${BASH_SOURCE[0]}" = "$CHEXTREK_FETCH_AND_PLAY_COPY" ]; then
+		case "$(basename "$CHEXTREK_FETCH_AND_PLAY_COPY")" in
+		chextrek-fetch-and-play-self.*) rm -f "$CHEXTREK_FETCH_AND_PLAY_COPY" 2>/dev/null || true ;;
+		esac
 	fi
 	REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 	# shellcheck source=tools/lib-harness.sh
@@ -193,7 +200,10 @@ main() {
 		fi
 		# The pipeline's own tag scheme (win-<10-char short sha>), from the one shared definition
 		# tools/pipeline-process-commit.sh publishes under (chextrek_release_tag, tools/lib-harness.sh).
-		TAG="$(chextrek_release_tag "$REPO_ROOT" "$FULL_SHA")"
+		if ! TAG="$(chextrek_release_tag "$REPO_ROOT" "$FULL_SHA")" || [ -z "$TAG" ]; then
+			echo "error: couldn't derive the release tag for ${FULL_SHA} in ${REPO_ROOT}. Nothing was checked out or launched." >&2
+			exit 1
+		fi
 		RELEASE_OUT="$(gh release view "$TAG" --repo "$REPO" --json tagName,targetCommitish,assets \
 			--jq '[.tagName, .targetCommitish, ([.assets[].name] | join(","))] | join("\u001f")' 2>&1)"
 		RELEASE_RC=$?

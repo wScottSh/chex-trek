@@ -45,7 +45,8 @@
 # completes correctly - proving the main()-wrap self-rewrite guard (see fetch-and-play.sh's header);
 # and at checkout time no process in the run's ancestry holds the checkout's own
 # tools/fetch-and-play.sh open (the temp-copy re-exec guard against Git for Windows' "Unlink of
-# file ... failed"), with the temp copy itself already deleted.
+# file ... failed"), with the temp copy itself already deleted; and a hand-set, differently-spelled
+# CHEXTREK_FETCH_AND_PLAY_SELF never deletes the checkout's own script.
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -617,6 +618,21 @@ COPY_PATH="${COPY_PATH% (deleted)}"
 if [ -n "$COPY_PATH" ] && [ ! -e "$COPY_PATH" ]; then pass "the temp copy (${COPY_PATH}) was already deleted by checkout time"; else fail "the temp copy '${COPY_PATH}' still exists (or wasn't found)"; fi
 if [ "$(git -C "$CHECKOUT" rev-parse HEAD)" = "$RELEASE_SHA" ]; then pass "HEAD landed on the release commit"; else fail "HEAD is $(git -C "$CHECKOUT" rev-parse HEAD), want ${RELEASE_SHA}"; fi
 if [ "$(wine_call_count)" = "1" ]; then pass "the engine was launched exactly once"; else fail "expected exactly one engine launch, found $(wine_call_count)"; fi
+
+echo
+echo "=== case 12: CHEXTREK_FETCH_AND_PLAY_SELF set by hand, spelled differently from the invoked path -> the checkout's own tools/fetch-and-play.sh is never deleted ==="
+git -C "$CHECKOUT" checkout -q -f main-local
+rm -f "${CHECKOUT}/chextrek.dll" "${CHECKOUT}/chextrek.pdb"
+OUT12="$(STUB_GH_RELEASES="$(printf '%s\x1f%s\x1fchextrek.dll,chextrek.pdb' "$RELEASE_TAG" "$RELEASE_SHA")" \
+	CHEXTREK_FETCH_AND_PLAY_SELF="${CHECKOUT}/tools/../tools/fetch-and-play.sh" \
+	run_fetch_and_play "$RELEASE_SHA" 2>&1)"
+CODE12=$?
+if [ $CODE12 -eq 0 ]; then pass "exits 0"; else fail "exit code $CODE12, want 0"; echo "$OUT12"; fi
+if [ -f "${CHECKOUT}/tools/fetch-and-play.sh" ] && [ -z "$(git -C "$CHECKOUT" status --porcelain -- tools/fetch-and-play.sh)" ]; then
+	pass "the checkout's own tools/fetch-and-play.sh is still there, unmodified"
+else
+	fail "the checkout's own tools/fetch-and-play.sh was deleted or modified"
+fi
 
 echo
 if [ $FAIL -eq 0 ]; then

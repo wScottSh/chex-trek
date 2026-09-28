@@ -181,6 +181,23 @@ CODE=$?
 if [ "$CODE" -eq 3 ]; then echo "PASS: build with docker missing exits 3"; else echo "FAIL: build with docker missing exit code $CODE, want 3"; echo "$OUT" | tail -5; FAIL=1; fi
 if echo "$OUT" | grep -q "^ENVIRONMENT: docker not found"; then echo "PASS: build with docker missing prints an ENVIRONMENT line naming docker"; else echo "FAIL: build with docker missing: no 'ENVIRONMENT: docker not found' line"; FAIL=1; fi
 
+# --- case: build-chextrek.sh whose containerized build itself happens to exit 3 -> remapped to an
+# ordinary build failure (exit 1), so exit 3 stays reserved for real ENVIRONMENT stops. A stub
+# `docker` says the image exists and fails `docker run` with 3. ---
+mkdir -p "${SCRATCH}/docker-bin"
+cat > "${SCRATCH}/docker-bin/docker" <<'EOF'
+#!/usr/bin/env bash
+[ "${1:-}" = "image" ] && exit 0
+cat >/dev/null
+exit 3
+EOF
+chmod +x "${SCRATCH}/docker-bin/docker"
+T="$(command -v timeout)" && ln -sf "$T" "${SCRATCH}/docker-bin/timeout"
+OUT="$(env -i PATH="${SCRATCH}/docker-bin:${SCRATCH}/base-bin" HOME="$SCRATCH" bash "${REPO_ROOT}/tools/build-chextrek.sh" 2>&1)"
+CODE=$?
+if [ "$CODE" -eq 1 ]; then echo "PASS: a build step's own exit 3 is reported as an ordinary build failure (exit 1)"; else echo "FAIL: a build step's own exit 3 gave exit code $CODE, want 1"; echo "$OUT" | tail -5; FAIL=1; fi
+if echo "$OUT" | grep -q "^ENVIRONMENT:"; then echo "FAIL: a build step's own failure printed an ENVIRONMENT line"; FAIL=1; else echo "PASS: no ENVIRONMENT line for a real build failure"; fi
+
 echo
 [ $FAIL -eq 0 ] && echo "PASS: harness broken-environment self-test" || echo "FAIL: harness broken-environment self-test"
 exit $FAIL

@@ -360,9 +360,10 @@ whenever the target commit's copy differs from the one running. Two guards:
 - **Temp-copy re-exec** (for Git for Windows, which can abort with "Unlink of file
   'tools/fetch-and-play.sh' failed" when a running process holds the file open): the script first
   copies itself to a temp file and re-execs bash on that copy, so nothing holds the checkout's own
-  copy open during the checkout. The temp copy deletes itself once parsed.
-  `tools/test-fetch-and-play.sh`'s "temp-copy re-exec" case checks, at checkout time, that no process
-  in the run has the checkout's copy open. It passes on Linux and fails with the re-exec removed.
+  copy open during the checkout. The temp copy deletes itself once parsed (best effort - verified
+  on Linux; if Windows won't delete the open copy, one small file is left in `$TMPDIR`).
+  `tools/test-fetch-and-play.sh`'s "temp-copy re-exec" case checks, at checkout time, that no
+  process in the run has the checkout's copy open. It passes on Linux and fails with the re-exec removed.
   **Owner-pending:** a real Windows run across a commit whose copy differs.
 - **`main()` wrap** (bash reads scripts incrementally, so an in-place rewrite could make it resume
   mid-file into new bytes): the whole body is one `main() { ...; }`, called only at the end, so
@@ -391,9 +392,10 @@ repo/a real `gh` outside that self-test):
 - `CHEXTREK_FETCH_REPO` - `owner/repo` passed to every `gh` call. Defaults to the `owner/repo`
   parsed from this checkout's own `origin` remote (`chextrek_parse_github_repo`,
   `tools/lib-harness.sh`).
-- `CHEXTREK_FETCH_AND_PLAY_SELF` - internal: set by the script's own temp-copy re-exec (above) to
-  its original path. Setting it by hand to the script's own path skips the temp copy (the
-  self-test does, to test the `main()` wrap on its own).
+- `CHEXTREK_FETCH_AND_PLAY_SELF` / `CHEXTREK_FETCH_AND_PLAY_COPY` - internal: set by the script's
+  own temp-copy re-exec (above) to its original path and to the temp copy's path (the only file it
+  ever deletes). Setting `CHEXTREK_FETCH_AND_PLAY_SELF` by hand to the script's own path skips the
+  temp copy (the self-test does, to test the `main()` wrap on its own).
 
 **What's proven where:** `tools/test-fetch-and-play.sh` runs on Unicron against a local bare git
 repo standing in for the real GitHub remote, a stubbed `gh`, and stubbed `wine`/`winepath`/
@@ -635,7 +637,8 @@ bash tools/run-all-tests.sh                   # the whole suite: builds once, ru
 bash tools/run-harness.sh [timeout-seconds]   # just the main-menu smoke run (default timeout: 60s)
 ```
 
-The scripts are mode `100644` in git (a repo convention), so invoke them with `bash`.
+Most `tools/` scripts are mode `100644` in git (not executable - a repo convention), so always
+invoke them with `bash`.
 
 `tools/run-all-tests.sh` is the one command for the whole suite (spec #28 story 38): it builds
 `chextrek.dll`, then runs the harness self-test, the main-menu smoke test and every feature scenario
