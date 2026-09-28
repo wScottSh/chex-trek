@@ -62,6 +62,7 @@ functions against the reference files.
 | Env shots (`func_envshot`, `takeEnvShots`) (#44) | `tools/test-env-shots.sh` | covered - on `e1m1`, `takeEnvShots` shoots one spawned `func_envshot`: log shows `1 envShots taken` and the engine's `Wrote env/...`; all six faces exist, 32 px wide (the fixture's `size`). |
 | Worldspawn music volume (`g_MusicVolume`, `idWorldspawn::Think`) (#45) | `tools/test-music-volume.sh` | covered - on `e1m1`, setting `g_MusicVolume` to 80, 0, 45 mid-map re-runs `Think` each time; the dump shows each value applied, 0 stopping the music, 45 resuming it. |
 | New Game plays `sf_923` clean, its exit loads `e1m1`, which plays clean (#46) | `tools/test-new-game.sh` | covered - from the main menu, `sf_923` then `e1m1` each run 300 frames clean with stable trail counts (18, 19) and `level_stats` totals (27/30/1, 22/34/3). |
+| HUD ammo battery and spare-clip pips (`idPlayer::UpdateHudAmmo`'s `player_clipsize`/`player_ammopercent`/spare-clip `player_clips`) (bug #73) | `tools/test-hud-ammo.sh` | covered - on `e1m1` with the pistol, the dump's `hud_ammo` matches the original DLL's formulas against the weapon's own `weapon_ammo`: after selecting it, after `useAmmo( 3 )` (percent 100% -> 75%), and after an ammo pickup (spare clips 2 -> 6). Proves the HUD state, not that the gui draws it. |
 
 ## Recorded deviations, port choices and known gaps
 

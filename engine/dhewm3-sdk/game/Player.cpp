@@ -3059,8 +3059,13 @@ void idPlayer::UpdateHudAmmo( idUserInterface *_hud ) {
 		// show remaining ammo
 		_hud->SetStateString( "player_totalammo", va( "%i", ammoamount - inclip ) );
 		_hud->SetStateString( "player_ammo", weapon.GetEntity()->ClipSize() ? va( "%i", inclip ) : "--" );		// how much in the current clip
-		_hud->SetStateString( "player_clips", weapon.GetEntity()->ClipSize() ? va( "%i", ammoamount / weapon.GetEntity()->ClipSize() ) : "--" );
+		// chextrek: bug #73, per the original gamex86.so's UpdateHudAmmo (0x14dbb0). hud.gui's
+		// clip1-7 pips count spare clips, so the loaded clip isn't counted; its ammo battery fills
+		// by player_ammo / player_clipsize and prints player_ammopercent, which stock never sets.
+		_hud->SetStateString( "player_clips", weapon.GetEntity()->ClipSize() ? va( "%i", ( ammoamount - inclip ) / weapon.GetEntity()->ClipSize() ) : "--" );
 		_hud->SetStateString( "player_allammo", va( "%i/%i", inclip, ammoamount - inclip ) );
+		_hud->SetStateInt( "player_clipsize", weapon.GetEntity()->ClipSize() );
+		_hud->SetStateString( "player_ammopercent", weapon.GetEntity()->ClipSize() ? va( "%.0f%%", inclip * 100.0f / weapon.GetEntity()->ClipSize() ) : va( "%i", ammoamount ) );
 	}
 
 	_hud->SetStateBool( "player_ammo_empty", ( ammoamount == 0 ) );

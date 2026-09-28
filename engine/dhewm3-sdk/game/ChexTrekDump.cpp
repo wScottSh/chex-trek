@@ -288,6 +288,12 @@ changed but nothing reacted" - `music_volume_last` is the cvar's own value at th
 scenario can assert it followed a `set g_MusicVolume <N>`), `music_volume_stopped` is whether that
 apply stopped the music (g_MusicVolume < 1), and `_applied_count` lets a scenario assert Think
 actually ran again (not just that the cvar's stored value changed) after each change.
+
+Bug #73 adds `hud_ammo` (the HUD gui's player_ammo/player_clipsize/player_clips/
+player_ammopercent/player_totalammo state strings, set by idPlayer::UpdateHudAmmo) and
+`weapon_ammo` (the current weapon's own AmmoInClip/AmmoAvailable/ClipSize), so a scenario can
+check the HUD's ammo battery and spare-clip pips against the weapon without depending on GUI
+rendering. Read directly from HUD state like `hud_tip_*` - no hook.
 ==================
 */
 void ChexTrek_Dump_f( const idCmdArgs &args ) {
@@ -393,6 +399,23 @@ void ChexTrek_Dump_f( const idCmdArgs &args ) {
 		gameLocal.Printf( "hud_tip_up: %s\n", player->IsTipVisible() ? "1" : "0" );
 		gameLocal.Printf( "hud_tip_title: %s\n", player->hud->GetStateString( "tiptitle", "" ) );
 		gameLocal.Printf( "hud_tip_text: %s\n", player->hud->GetStateString( "tip", "" ) );
+	}
+
+	// chextrek: bug #73. The HUD gui's ammo state (hud.gui's ammocharge/chargepercent/clip1-7
+	// windows read these, set by idPlayer::UpdateHudAmmo) next to the current weapon's own
+	// in-clip/available/clip-size, so a scenario can assert the HUD matches the weapon without
+	// depending on GUI rendering.
+	if ( !player || !player->hud || !player->weapon.GetEntity() ) {
+		gameLocal.Printf( "hud_ammo: none\n" );
+		gameLocal.Printf( "weapon_ammo: none\n" );
+	} else {
+		idWeapon *chextrekWeapon = player->weapon.GetEntity();
+		gameLocal.Printf( "hud_ammo: ammo=%s clipsize=%s clips=%s percent=%s totalammo=%s\n",
+			player->hud->GetStateString( "player_ammo", "" ), player->hud->GetStateString( "player_clipsize", "" ),
+			player->hud->GetStateString( "player_clips", "" ), player->hud->GetStateString( "player_ammopercent", "" ),
+			player->hud->GetStateString( "player_totalammo", "" ) );
+		gameLocal.Printf( "weapon_ammo: inclip=%d available=%d clipsize=%d\n",
+			chextrekWeapon->AmmoInClip(), chextrekWeapon->AmmoAvailable(), chextrekWeapon->ClipSize() );
 	}
 
 	// chextrek: spec #16/#43 (decomp-so/reference/trails.md). idGameLocal::trails (every live
