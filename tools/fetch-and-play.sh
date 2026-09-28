@@ -12,12 +12,12 @@
 #    discarded whatever the owner had checked out and hadn't committed yet, which is actively
 #    unsafe, not just incomplete. #70's own job on top of this is the commit argument (play/bisect
 #    a specific release, not just Latest), not implemented here.
-# 2. Resolves the release marked Latest (`gh release view`, no tag - the newest non-draft,
-#    non-prerelease release; spec #66's pipeline always marks a green release Latest) and confirms
-#    both `chextrek.dll` and `chextrek.pdb` are attached, before touching HEAD at all.
-# 3. Checks the engine (`dhewm3.exe`) is actually installed, and downloads `chextrek.dll` +
-#    `chextrek.pdb` from that release into a scratch directory (not the checkout root yet) -
-#    everything that can still fail here does, before HEAD ever moves.
+# 2. Checks the engine (`dhewm3.exe`) is actually installed, then resolves the release marked
+#    Latest (`gh release view`, no tag - the newest non-draft, non-prerelease release; spec #66's
+#    pipeline always marks a green release Latest) and confirms both `chextrek.dll` and
+#    `chextrek.pdb` are attached - all before touching HEAD at all.
+# 3. Downloads `chextrek.dll` + `chextrek.pdb` from that release into a scratch directory (not the
+#    checkout root yet) - everything that can still fail here does, before HEAD ever moves.
 # 4. Fetches and checks out that release's target commit, detached, so mod data (maps/scripts/defs)
 #    matches the DLL about to be played.
 # 5. Moves the already-downloaded DLL/PDB into the checkout root and points the `chextrek` mount at
@@ -36,15 +36,14 @@
 # Exit status:
 #   0 - dhewm3 was launched. Once launched, this script's own exit status is whatever dhewm3 itself
 #       (a real, interactive process, not a pass/fail check) exits with - not necessarily 0.
-#   1 - refused before ever launching anything. In every case except the one below, the working
-#       tree, HEAD, and chextrek.dll/chextrek.pdb are all left exactly as they were: a dirty working
-#       tree, no Latest release (or one missing an asset), a missing gh/dhewm3.exe, a git/gh
-#       failure, or the checkout itself failing. The one exception: once HEAD has moved to the
-#       release's target commit, a failure moving the already-downloaded chextrek.dll/chextrek.pdb
-#       into the checkout root, or pointing the mount, can leave HEAD at that commit with the DLL/
-#       PDB only partially in place (e.g. the disk fills up between the two files) or the mount
-#       unchanged, and dhewm3 was never launched - the error message says so explicitly, and names
-#       exactly what state each file/HEAD is in, whenever this happens.
+#   1 - refused before ever launching anything. Up through and including the checkout itself (a
+#       dirty working tree, no Latest release or one missing an asset, a missing gh/dhewm3.exe, a
+#       git/gh failure, or the checkout failing), the working tree, HEAD, and chextrek.dll/
+#       chextrek.pdb are all left exactly as they were. Every failure *after* the checkout (moving
+#       the already-downloaded DLL/PDB into place, pointing the mount, converting a path for the
+#       engine, or launching it) can instead leave HEAD at the release's target commit with the
+#       DLL/PDB, the mount, or both only partially updated, and dhewm3 never launched - each of
+#       those error messages says exactly what state HEAD and the DLL/PDB are left in.
 #
 # Injectable for tools/test-fetch-and-play.sh (never point these at the real repo/game on Unicron -
 # see that script's own header):
@@ -141,9 +140,10 @@ if [ -z "$DOWNLOAD_DIR" ] || [ ! -d "$DOWNLOAD_DIR" ]; then
 fi
 cleanup_download_dir() { rm -rf "$DOWNLOAD_DIR"; }
 trap cleanup_download_dir EXIT
-if ! gh release download "$TAG" --repo "$REPO" --dir "$DOWNLOAD_DIR" --clobber \
-	--pattern "chextrek.dll" --pattern "chextrek.pdb" >/dev/null 2>&1; then
-	echo "error: 'gh release download ${TAG}' failed - chextrek.dll/chextrek.pdb weren't fetched. Nothing was checked out or launched." >&2
+DOWNLOAD_OUT="$(gh release download "$TAG" --repo "$REPO" --dir "$DOWNLOAD_DIR" --clobber \
+	--pattern "chextrek.dll" --pattern "chextrek.pdb" 2>&1)"
+if [ $? -ne 0 ]; then
+	echo "error: 'gh release download ${TAG}' failed - chextrek.dll/chextrek.pdb weren't fetched: ${DOWNLOAD_OUT}. Nothing was checked out or launched." >&2
 	exit 1
 fi
 if [ ! -f "${DOWNLOAD_DIR}/chextrek.dll" ] || [ ! -f "${DOWNLOAD_DIR}/chextrek.pdb" ]; then
@@ -157,8 +157,9 @@ echo "==> Downloaded chextrek.dll + chextrek.pdb from ${TAG}"
 # reachable from a branch tip (spec #66 always passes `git rev-parse --verify <ref>^{commit}` to
 # `gh release create --target`), so an ordinary fetch of the usual refs already brings it in -
 # no dependency on the server allowing an unadvertised-object fetch by sha. ---
-if ! git -C "$REPO_ROOT" fetch origin >/dev/null 2>&1; then
-	echo "error: 'git fetch origin' failed in ${REPO_ROOT}. Nothing was checked out or launched." >&2
+FETCH_OUT="$(git -C "$REPO_ROOT" fetch origin 2>&1)"
+if [ $? -ne 0 ]; then
+	echo "error: 'git fetch origin' failed in ${REPO_ROOT}: ${FETCH_OUT}. Nothing was checked out or launched." >&2
 	exit 1
 fi
 if ! git -C "$REPO_ROOT" rev-parse --verify "${TARGET}^{commit}" >/dev/null 2>&1; then
@@ -192,7 +193,7 @@ cleanup_download_dir
 trap - EXIT
 
 if ! chextrek_ensure_mount "$REPO_ROOT"; then
-	echo "error: couldn't point the chextrek mount at ${REPO_ROOT} (see above). HEAD is at ${TARGET} and chextrek.dll/chextrek.pdb are already in place; nothing was launched." >&2
+	echo "error: couldn't point the chextrek mount at ${REPO_ROOT} (see above - it may now be missing rather than pointed anywhere). HEAD is at ${TARGET} and chextrek.dll/chextrek.pdb are already in place; nothing was launched." >&2
 	exit 1
 fi
 

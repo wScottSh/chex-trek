@@ -184,6 +184,12 @@ git -C "$CHECKOUT" config user.name "Fetch-and-play Test"
 git -C "$CHECKOUT" checkout -q "$RELEASE_SHA"
 git -C "$CHECKOUT" checkout -q -B main-local
 
+# A commit pushed to $BARE only *after* $CHECKOUT was cloned - $CHECKOUT has never heard of it, so
+# landing on it in case 1 below is only possible because fetch-and-play.sh's own `git fetch origin`
+# actually ran and actually worked, not because the commit happened to already be local.
+LATE_SHA="$(git -C "$SEED" commit -q --allow-empty -m "pushed after \$CHECKOUT was cloned - proves git fetch origin is exercised" && git -C "$SEED" rev-parse HEAD)"
+git -C "$SEED" push -q origin main
+
 DOOM3_BASEPATH="${SCRATCH}/doom3"
 mkdir -p "$DOOM3_BASEPATH"
 
@@ -209,12 +215,14 @@ echo "=== case 1: clean tree, a real Latest release -> lands detached on the rel
 : >"${SCRATCH}/wine-invoked-count"
 rm -rf "${SCRATCH}/wine-invocations"
 mkdir -p "${SCRATCH}/wine-invocations"
-OUT1="$(STUB_GH_TAG="win-1234567890" STUB_GH_TARGET="$RELEASE_SHA" STUB_GH_ASSET_NAMES="chextrek.dll,chextrek.pdb" \
+OUT1="$(STUB_GH_TAG="win-1234567890" STUB_GH_TARGET="$LATE_SHA" STUB_GH_ASSET_NAMES="chextrek.dll,chextrek.pdb" \
 	run_fetch_and_play 2>&1)"
 CODE1=$?
 if [ $CODE1 -eq 0 ]; then pass "exits 0 on a clean tree with a real Latest release"; else fail "exit code $CODE1, want 0"; echo "$OUT1"; fi
 CUR_SHA="$(git -C "$CHECKOUT" rev-parse HEAD)"
-if [ "$CUR_SHA" = "$RELEASE_SHA" ]; then pass "HEAD is at the release's target commit"; else fail "HEAD is ${CUR_SHA}, want the release commit ${RELEASE_SHA}"; fi
+# LATE_SHA (not RELEASE_SHA) was pushed to $BARE only after $CHECKOUT was cloned - landing on it
+# here is only possible if fetch-and-play.sh's own `git fetch origin` actually ran and worked.
+if [ "$CUR_SHA" = "$LATE_SHA" ]; then pass "HEAD is at the release's target commit (only reachable via this run's own git fetch)"; else fail "HEAD is ${CUR_SHA}, want the release commit ${LATE_SHA}"; fi
 if [ "$(git -C "$CHECKOUT" symbolic-ref -q HEAD)" ]; then fail "HEAD is still on a branch - expected detached"; else pass "HEAD is detached"; fi
 if [ -f "${CHECKOUT}/chextrek.dll" ] && [ -f "${CHECKOUT}/chextrek.pdb" ]; then pass "chextrek.dll and chextrek.pdb were downloaded into the checkout root"; else fail "chextrek.dll/chextrek.pdb missing from ${CHECKOUT}"; fi
 if [ -L "${DOOM3_BASEPATH}/chextrek" ] && [ "$(readlink "${DOOM3_BASEPATH}/chextrek")" = "$(cd "$CHECKOUT" && pwd -P)" ]; then
@@ -224,26 +232,44 @@ else
 fi
 if [ "$(wine_call_count)" = "1" ]; then pass "the engine was launched exactly once"; else fail "expected exactly one engine launch, found $(wine_call_count)"; fi
 ARGF="$(last_wine_argv)"
-if [ -n "$ARGF" ] && grep -qF "$(cd "$CHECKOUT" && pwd -P)" "$ARGF"; then
-	pass "fs_gameDllPath/fs_basepath in the launch argv name this checkout"
+# The stub winepath (-w PATH -> PATH unchanged) means each +set value in ARGF is exactly the raw
+# path fetch-and-play.sh passed in, one arg per line - so the value paired with each +set key can
+# be checked precisely (which key got which value), not just "this string appears somewhere".
+arg_value_after() {
+	local KEY="$1" FILE="$2"
+	awk -v key="$KEY" '$0==key{getline; print; exit}' "$FILE"
+}
+CHECKOUT_REAL="$(cd "$CHECKOUT" && pwd -P)"
+if [ -n "$ARGF" ] && [ "$(arg_value_after fs_gameDllPath "$ARGF")" = "$CHECKOUT_REAL" ]; then
+	pass "fs_gameDllPath is set to this checkout"
 else
-	fail "expected the launch argv to name ${CHECKOUT}"
+	fail "expected fs_gameDllPath's value to be ${CHECKOUT_REAL}, got '$([ -n "$ARGF" ] && arg_value_after fs_gameDllPath "$ARGF")'"
 	[ -n "$ARGF" ] && cat "$ARGF"
 fi
-if [ -n "$ARGF" ] && grep -qxF "fs_game" "$ARGF" && grep -qxF "chextrek" "$ARGF"; then
+if [ -n "$ARGF" ] && [ "$(arg_value_after fs_basepath "$ARGF")" = "$DOOM3_BASEPATH" ]; then
+	pass "fs_basepath is set to DOOM3_BASEPATH (not the checkout)"
+else
+	fail "expected fs_basepath's value to be ${DOOM3_BASEPATH}, got '$([ -n "$ARGF" ] && arg_value_after fs_basepath "$ARGF")'"
+	[ -n "$ARGF" ] && cat "$ARGF"
+fi
+if [ -n "$ARGF" ] && [ "$(arg_value_after fs_game "$ARGF")" = "chextrek" ]; then
 	pass "fs_game is set to chextrek"
 else
-	fail "expected fs_game chextrek in the launch argv"
+	fail "expected fs_game's value to be chextrek, got '$([ -n "$ARGF" ] && arg_value_after fs_game "$ARGF")'"
 	[ -n "$ARGF" ] && cat "$ARGF"
 fi
 
 echo
-echo "=== case 2: a dirty tree refuses before any gh/git-remote call, and changes nothing ==="
+echo "=== case 2: a dirty tree refuses before any gh/git-remote call, and changes nothing (including a prior chextrek.dll/pdb already sitting there) ==="
 git -C "$CHECKOUT" checkout -q main-local
 PRE_DIRTY_SHA="$(git -C "$CHECKOUT" rev-parse HEAD)"
 PRE_DIRTY_WINE_COUNT="$(wine_call_count)"
 echo "local uncommitted change" >"${CHECKOUT}/dirty-marker.txt"
-rm -f "${CHECKOUT}/chextrek.dll" "${CHECKOUT}/chextrek.pdb"
+# A prior build's DLL/PDB, gitignored and already sitting in the checkout root (the normal state
+# before ever running fetch-and-play) - proves the dirty-tree refusal leaves *these* untouched too,
+# not just that it skips downloading new ones.
+printf 'prior-dll-content\n' >"${CHECKOUT}/chextrek.dll"
+printf 'prior-pdb-content\n' >"${CHECKOUT}/chextrek.pdb"
 OUT2="$(run_fetch_and_play 2>&1)"
 CODE2=$?
 if [ $CODE2 -ne 0 ]; then pass "exits non-zero on a dirty tree"; else fail "exit code 0 on a dirty tree, want non-zero"; fi
@@ -251,10 +277,14 @@ if echo "$OUT2" | grep -qi "uncommitted"; then pass "reports the uncommitted-cha
 POST_DIRTY_SHA="$(git -C "$CHECKOUT" rev-parse HEAD)"
 if [ "$POST_DIRTY_SHA" = "$PRE_DIRTY_SHA" ]; then pass "HEAD unchanged on a dirty tree"; else fail "HEAD moved from ${PRE_DIRTY_SHA} to ${POST_DIRTY_SHA} despite the dirty tree"; fi
 if [ -f "${CHECKOUT}/dirty-marker.txt" ]; then pass "the uncommitted local file is still there"; else fail "the uncommitted local file was removed"; fi
-if [ -f "${CHECKOUT}/chextrek.dll" ] || [ -f "${CHECKOUT}/chextrek.pdb" ]; then fail "a DLL/PDB was downloaded despite the dirty tree"; else pass "no DLL/PDB was downloaded"; fi
+if [ "$(cat "${CHECKOUT}/chextrek.dll" 2>/dev/null)" = "prior-dll-content" ] && [ "$(cat "${CHECKOUT}/chextrek.pdb" 2>/dev/null)" = "prior-pdb-content" ]; then
+	pass "a prior chextrek.dll/chextrek.pdb already in the checkout root are left byte-for-byte untouched"
+else
+	fail "the prior chextrek.dll/chextrek.pdb were changed or removed despite the dirty tree"
+fi
 if [ -s "${SCRATCH}/gh-argv.log" ]; then fail "gh was called despite the dirty tree - the dirty check must run first"; else pass "gh was never called - the dirty-tree check ran before any gh call"; fi
 if [ "$(wine_call_count)" = "$PRE_DIRTY_WINE_COUNT" ]; then pass "the engine was never launched on a dirty tree"; else fail "the engine was launched despite the dirty tree"; fi
-rm -f "${CHECKOUT}/dirty-marker.txt"
+rm -f "${CHECKOUT}/dirty-marker.txt" "${CHECKOUT}/chextrek.dll" "${CHECKOUT}/chextrek.pdb"
 
 echo
 echo "=== case 3: no Latest release -> refuses with a clear message, HEAD unchanged ==="
