@@ -43,12 +43,12 @@ FAIL=0
 
 # Frames between probes, and probe counts per run. Probes are stamped with game time, so these
 # only control coverage (see the COVERAGE checks below), not what's asserted.
-# Measured on Unicron/Wine: ~3.3ms of game time per waited frame (15 frames ~= 50ms), so 30 frames
-# ~= 100ms per probe -> splash ~10s, zorcher ~25s of game time. At 60fps (~16.7ms/frame) the same
-# counts span ~50s/~125s.
+# Measured on Unicron/Wine: 30 waited frames ~= 70-85ms of game time, so splash spans ~8s (must
+# pass 7s) and zorcher ~24s (must reach 15s if the zorcher never kills). At 60fps (~16.7ms/frame)
+# the same counts span ~50s/~165s.
 PROBE_WAIT=30
-SPLASH_PROBES=100
-ZORCH_PROBES=250
+SPLASH_PROBES=110
+ZORCH_PROBES=330
 
 CONSOLE_SCRIPT="${SCRATCH_DIR}/flemriser-rise.cfg"
 {

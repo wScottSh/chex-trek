@@ -62,7 +62,7 @@ functions against the reference files.
 | Env shots (`func_envshot`, `takeEnvShots`) (#44) | `tools/test-env-shots.sh` | covered - on `e1m1`, `takeEnvShots` shoots one spawned `func_envshot`: log shows `1 envShots taken` and the engine's `Wrote env/...`; all six faces exist, 32 px wide (the fixture's `size`). |
 | Worldspawn music volume (`g_MusicVolume`, `idWorldspawn::Think`) (#45) | `tools/test-music-volume.sh` | covered - on `e1m1`, setting `g_MusicVolume` to 80, 0, 45 mid-map re-runs `Think` each time; the dump shows each value applied, 0 stopping the music, 45 resuming it. |
 | New Game plays `sf_923` clean, its exit loads `e1m1`, which plays clean (#46) | `tools/test-new-game.sh` | covered - from the main menu, `sf_923` then `e1m1` each run 300 frames clean with stable trail counts (18, 19) and `level_stats` totals (27/30/1, 22/34/3). |
-| `sf_923` puddle flemoid (`riseflem`, `weap_enable`) (bug #49) | `tools/test-flemriser-rise.sh` | written, not yet run - `flemriser` takes no damage mid-rise; once out, the zorcher's `weapon_projectile` is back to `projectile_minizorchblast` and damage kills it. |
+| `sf_923` puddle flemoid (`riseflem`, `weap_enable`) (bug #49) | `tools/test-flemriser-rise.sh` | covered - on `sf_923`, probes stamped with game time since `trigger_relay_1`: repeated `damage_rocketSplash` blasts leave `flemriser` at 80 health until the 7s rise ends, the first one after kills it; repeated zorcher hits (`chextrek_test_projectile_hit`, the current projectile's `def_damage`) are `projectile_minizorchblast_nodamage` and harmless mid-rise, `projectile_minizorchblast` after, and kill it before `trigger_relay_3` (15s). |
 
 ## Recorded deviations, port choices and known gaps
 
