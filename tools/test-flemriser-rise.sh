@@ -114,14 +114,17 @@ else
 	# awk prints PASS/FAIL lines itself; exit 1 on any FAIL.
 	if ! echo "$SPLASH" | awk '
 		$1 < 6900 { n++; if ($2 != 80) bad = bad " " $1 "ms:" $2; if ($1 >= 3600) late++ }
-		$1 >= 6900 && $1 < 7000 { next }
-		$1 >= 7000 && first == "" { first = $1; firsthp = $2 }
+		# riseflem starts its own 7s clock a frame or so after the trigger that t0 is taken from, so
+		# a blast at exactly 7000ms can still land in its last rising frame - same 100ms margin as the
+		# zorcher run post-rise check.
+		$1 >= 6900 && $1 < 7100 { next }
+		$1 >= 7100 && first == "" { first = $1; firsthp = $2 }
 		END {
 			rc = 0
 			if (late < 3) { print "FAIL: COVERAGE splash - only " late+0 " blasts in the 3.6-6.9s window (want >=3); raise PROBE_WAIT/SPLASH_PROBES"; rc = 1 }
 			if (bad != "") { print "FAIL: AC1 - splash damaged the flemriser mid-rise (elapsed:health):" bad; rc = 1 }
 			else if (n > 0) print "PASS: AC1 - " n " splash blasts before the rise ended (" late+0 " after the camera cut) all left it at 80"
-			if (first == "") { print "FAIL: COVERAGE splash - no blast after the rise ended (7s); raise PROBE_WAIT/SPLASH_PROBES"; rc = 1 }
+			if (first == "") { print "FAIL: COVERAGE splash - no blast at or after 7.1s (rise ends at 7s); raise PROBE_WAIT/SPLASH_PROBES"; rc = 1 }
 			else if (firsthp > 0) { print "FAIL: AC1 control - first blast after the rise (" first "ms) left health " firsthp ", expected <= 0"; rc = 1 }
 			else print "PASS: AC1 control - first blast after the rise (" first "ms) killed it (health " firsthp ")"
 			exit rc
