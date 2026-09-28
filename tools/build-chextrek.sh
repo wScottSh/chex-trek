@@ -2,7 +2,7 @@
 # One command to build chextrek.dll (32-bit x86) from the vendored dhewm3-sdk import
 # (engine/dhewm3-sdk, pinned at ad837f9b1b - see engine/dhewm3-sdk/UPSTREAM.md). Spec #28/#29
 # (Windows, MSVC via the installed VS 18 Build Tools), extended by spec #58/#64 (Unicron/Linux,
-# the same MSVC version - 14.50.18.0 - run under Wine in a pinned container, see
+# the same MSVC version - 14.50.35717 - run under Wine in a pinned container, see
 # tools/msvc-wine/Dockerfile and docs/dev-setup.md's "Unicron (Linux/Wine)" section).
 #
 # Usage: tools/build-chextrek.sh [Debug|RelWithDebInfo|Release]
@@ -22,10 +22,10 @@ case "$(uname -s)" in
 Linux*)
 	# Unicron (Linux/Wine, spec #58/#64): same CMake project options as Windows
 	# (BASE=ON, BASE_NAME=chextrek, D3XP=OFF, 32-bit), built with Ninja against the pinned
-	# MSVC-14.50.18.0-x86-under-Wine toolchain, packaged as a container image so a rebuild
+	# MSVC-14.50.35717-x86-under-Wine toolchain, packaged as a container image so a rebuild
 	# months later reproduces the same MSVC toolset. One-time setup: tools/msvc-wine/build-image.sh
 	# (see docs/dev-setup.md). Keep this tag in sync with tools/msvc-wine/build-image.sh.
-	CHEXTREK_MSVC_IMAGE="chextrek-msvc-wine:14.50.18.0-x86"
+	CHEXTREK_MSVC_IMAGE="chextrek-msvc-wine:14.50.35717-x86"
 
 	if ! command -v docker >/dev/null 2>&1; then
 		echo "error: docker not found on PATH - needed for the Linux (msvc-wine) build. See docs/dev-setup.md." >&2
@@ -44,7 +44,12 @@ Linux*)
 	# HOST_UID/HOST_GID: the container runs as root (it needs root's own baked-in wine prefix
 	# from the image build, see tools/msvc-wine/Dockerfile), so hand ownership of what it wrote
 	# under engine/build back to the invoking user before exiting.
-	docker run --rm -i \
+	# `timeout 1800`: a wedged cl/link/ninja under Wine must not hang an AFK run forever - 1800s
+	# (30 min) is generous next to the ~10s a normal build takes post-mspdbsrv-fix (see
+	# docs/dev-setup.md), but still bounded. `--init`: bash runs as the container's PID 1, which
+	# ignores SIGTERM by default, so without an init process `timeout`'s SIGTERM (and then SIGKILL)
+	# wouldn't reliably stop it or reap the wine processes underneath it.
+	timeout 1800 docker run --rm -i --init \
 		-v "${REPO_ROOT}:/src" \
 		-w /src \
 		-e CONFIG="$CONFIG" \
@@ -71,20 +76,25 @@ if [ -n "$MSPDBSRV" ]; then
 	wine "$MSPDBSRV" -start -spawn < /dev/null > /dev/null 2>&1 &
 fi
 
-# CMAKE_POLICY_DEFAULT_CMP0141=NEW + CMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded: makes CMake's
-# own compiler-identification/ABI-detection try_compile probes use /Z7 instead of their default
-# /Zi (see mstorsjo/msvc-wine's README) - those probes run before the pre-started mspdbsrv above
-# would otherwise help, cutting configure time dramatically. It also ends up overriding dhewm3-sdk's
-# own explicit /Zi (engine/dhewm3-sdk/CMakeLists.txt sets that directly in CMAKE_CXX_FLAGS_*, not
-# through this CMake abstraction) - CMake appends this flag's /Z7 after it on every compile command
-# line, and cl takes the last debug-format switch, printing a harmless
-# `D9025: overriding '/Zi' with '/Z7'` warning per file. Real source compiles mostly don't need
-# mspdbsrv either way now; the pre-started instance above is the backstop for whatever still does
-# (e.g. /FS-forced synchronous PDB writes at link time).
+# CMAKE_POLICY_DEFAULT_CMP0141=NEW + CMAKE_MSVC_DEBUG_INFORMATION_FORMAT: makes CMake's own
+# compiler-identification/ABI-detection try_compile probes use /Z7 instead of their default /Zi
+# (see mstorsjo/msvc-wine's README) - those probes run before the pre-started mspdbsrv above would
+# otherwise help, cutting configure time dramatically. For Debug/RelWithDebInfo it also ends up
+# overriding dhewm3-sdk's own explicit /Zi for real source compiles (engine/dhewm3-sdk/CMakeLists.txt
+# sets that directly in CMAKE_CXX_FLAGS_DEBUG/_RELWITHDEBINFO, not through this CMake abstraction) -
+# CMake appends this flag's /Z7 after it on every compile command line, and cl takes the last
+# debug-format switch, printing a harmless `D9025: overriding '/Zi' with '/Z7'` warning per file.
+# The generator expression limits this to Debug/RelWithDebInfo (the only configs dhewm3-sdk's own
+# flags put /Zi in to begin with) so Release/MinSizeRel keep the same no-embedded-debug-info
+# behavior as the Windows/MSBuild build, not silently pick up debug info they didn't ask for. Real
+# source compiles mostly don't need mspdbsrv either way now; the pre-started instance above is the
+# backstop for whatever still triggers it (e.g. /FS, still present on the command line by CMake's
+# own default RelWithDebInfo flags).
 CC=cl CXX=cl cmake -S engine/dhewm3-sdk -B engine/build -G Ninja \
 	-DCMAKE_SYSTEM_NAME=Windows -DCMAKE_SYSTEM_PROCESSOR=x86 \
 	-DCMAKE_EXE_LINKER_FLAGS=/MANIFEST:NO -DCMAKE_SHARED_LINKER_FLAGS=/MANIFEST:NO \
-	-DCMAKE_POLICY_DEFAULT_CMP0141=NEW -DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded \
+	-DCMAKE_POLICY_DEFAULT_CMP0141=NEW \
+	"-DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=\$<\$<CONFIG:Debug,RelWithDebInfo>:Embedded>" \
 	-DBASE=ON -DBASE_NAME=chextrek -DD3XP=OFF -DCMAKE_BUILD_TYPE="${CONFIG}"
 echo "==> Building (${CONFIG})"
 cmake --build engine/build --target base

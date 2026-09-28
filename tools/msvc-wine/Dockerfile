@@ -1,4 +1,6 @@
-# Pinned Linux build toolchain for chex-trek spec #58/#64: MSVC 14.50.18.0 (VS 18), x86-only
+# Pinned Linux build toolchain for chex-trek spec #58/#64: MSVC 14.50.35717 (from VS Build Tools
+# product version 18.0, ARG MSVC_VERSION below - vsdownload.py's input is the VS product version,
+# not the MSVC toolset number; cl itself reports this as "Version 19.50.35739"), x86-only
 # target - the same compiler version tools/build-chextrek.sh's Windows branch gets from the
 # "Visual Studio 18 2026" generator. The RUN step below fails the image build outright if
 # vsdownload.py doesn't land on that toolset (it falls back to "whatever's latest" instead of
@@ -55,11 +57,16 @@ RUN PYTHONUNBUFFERED=1 /opt/msvc-wine-src/vsdownload.py --accept-license \
 # that quietly drifting this "pinned" image onto a different compiler. `cl` itself is a wine
 # invocation (msvc-wine's wrapper script); `wineserver -w` waits for it to exit after, same as the
 # wineboot step above, or this layer can close with an unflushed prefix. Wrapped in `timeout` so a
-# wedged wineserver fails the build instead of hanging it forever.
+# wedged wineserver fails the build instead of hanging it forever - its exit status is captured and
+# checked explicitly (not just `&&`-chained) because `cl` with no args, run above to get its version
+# banner, always exits non-zero itself, so this whole RUN is deliberately `;`-joined rather than
+# `&&`-joined up to that point.
 RUN CL_VERSION="$(/opt/msvc/bin/x86/cl 2>&1)"; \
-	timeout 120 wineserver -w; \
+	timeout 120 wineserver -w; WINESERVER_STATUS=$?; \
 	echo "$CL_VERSION" | grep -qE "Version 19\.50\." || \
 	(echo "error: expected MSVC 14.50.x (cl reporting Version 19.50.x), got:" >&2 && \
-	 echo "$CL_VERSION" >&2 && exit 1)
+	 echo "$CL_VERSION" >&2 && exit 1); \
+	[ "$WINESERVER_STATUS" -eq 0 ] || \
+	(echo "error: wineserver -w timed out after checking the cl version - wedged wine prefix" >&2 && exit 1)
 
 ENV PATH="/opt/msvc/bin/x86:${PATH}"

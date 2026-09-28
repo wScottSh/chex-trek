@@ -41,7 +41,7 @@ desktop; the platform layer this needs lives in `tools/lib-harness.sh` behind `c
 | Xvfb | anywhere on `PATH` (e.g. the distro package) | The harness starts its own (`chextrek_ensure_display_or_exit` in `tools/lib-harness.sh`) on the first free display number when `$DISPLAY` isn't already usable, and stops it again when the run finishes. Nobody needs to be logged in, and no `DISPLAY` needs to be pre-set - that's the whole point on a headless box reached over SSH. |
 | Save/config/screenshot path | `$WINEPREFIX/drive_c/users/<you>/Documents/My Games/dhewm3/chextrek/` | The "Documents" dhewm3 hardcodes is the one inside the Wine prefix it's actually running in, not this Linux user's own `$HOME/Documents`. |
 | Docker | already installed, owner in the `docker` group (no `sudo` needed) | Runs the pinned MSVC-under-Wine build-toolchain container below. |
-| Build-toolchain image `chextrek-msvc-wine:14.50.18.0-x86` | one-time: `tools/msvc-wine/build-image.sh` | Builds the image from `tools/msvc-wine/Dockerfile`; see "Building `chextrek.dll` on Unicron" below. |
+| Build-toolchain image `chextrek-msvc-wine:14.50.35717-x86` | one-time: `tools/msvc-wine/build-image.sh` | Builds the image from `tools/msvc-wine/Dockerfile`; see "Building `chextrek.dll` on Unicron" below. |
 
 Environment variables (all optional; Linux-specific defaults live in `tools/lib-harness.sh`):
 
@@ -51,21 +51,23 @@ Environment variables (all optional; Linux-specific defaults live in `tools/lib-
 
 ### Building `chextrek.dll` on Unicron (spec #64)
 
-One-time setup: `tools/msvc-wine/build-image.sh` builds the `chextrek-msvc-wine:14.50.18.0-x86`
+One-time setup: `tools/msvc-wine/build-image.sh` builds the `chextrek-msvc-wine:14.50.35717-x86`
 Docker image from `tools/msvc-wine/Dockerfile`. That Dockerfile pins everything a rebuild needs to
 reproduce the same MSVC toolset months later:
 
 - **msvc-wine** (https://github.com/mstorsjo/msvc-wine, ISC license, not vendored into this repo),
   pinned at a fixed commit, fetches and wraps the real MSVC toolchain so `cl`/`link`/`lib`/etc. run
   transparently under Wine from Linux.
-- **MSVC 14.50.18.0 (VS 18), x86-only** - the same MSVC toolset `tools/build-chextrek.sh`'s
+- **MSVC 14.50.35717 (VS 18), x86-only** - the same MSVC toolset `tools/build-chextrek.sh`'s
   Windows branch gets from the "Visual Studio 18 2026" generator (spec #28's pin). Downloading it
   requires accepting the Visual Studio Build Tools license terms
   (https://go.microsoft.com/fwlink/?LinkId=2327714 at the time of pinning) - spec #64's AC requires
   the owner to confirm this use is acceptable before this lands; record that confirmation on this
   sub-issue's PR, not here.
-- `winbind`, needed for CMake's MSVC probe (`/Zi`+`/FS` spawn a background `mspdbsrv.exe` under
-  Wine; without `winbind` that probe fails with `C1902`, a known msvc-wine limitation).
+- `winbind`, needed for `mspdbsrv.exe` (`/FS`-forced synchronous PDB writes still invoke it even
+  though nothing on Linux compiles with `/Zi` any more, or it's pre-started directly by
+  `tools/build-chextrek.sh` - see "Building `chextrek.dll` on Unicron" below) to work at all under
+  Wine; without `winbind` it fails with `C1902`, a known msvc-wine limitation.
 
 `tools/build-chextrek.sh`'s Linux branch (a `uname` check, the same test `chextrek_is_linux` in
 `tools/lib-harness.sh` makes - this script doesn't source that library, so it repeats the check
@@ -102,13 +104,16 @@ from-scratch configure (once per compiler-ABI probe) and again during the first 
 `tools/build-chextrek.sh`'s Linux branch now starts `mspdbsrv.exe` itself first, stdio pointed at
 `/dev/null`, before configuring, so every `cl.exe` invocation connects to that already-running
 instance instead of spawning (and stalling behind) a new one; it also configures with
-`-DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded` (CMake >= 3.25, msvc-wine's documented workaround)
-so CMake's own ABI-detection probes use `/Z7` instead of `/Zi` and need `mspdbsrv` even less. (This
-also flips dhewm3-sdk's own explicit `/Zi` in `CMAKE_CXX_FLAGS_RELWITHDEBINFO` to `/Z7` - `cl` prints
-a harmless `D9025: overriding '/Zi' with '/Z7'` warning for every file - since dhewm3-sdk sets that
-flag directly rather than through CMake's debug-format abstraction, this repo can't fix that
-warning at the source without patching the pinned SDK import; it doesn't affect correctness or the
-resulting `.pdb`.)
+`-DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=$<$<CONFIG:Debug,RelWithDebInfo>:Embedded>` (CMake >= 3.25,
+msvc-wine's documented workaround, restricted by that generator expression to the two configs
+dhewm3-sdk's own `CMakeLists.txt` sets `/Zi` for in the first place) so CMake's own ABI-detection
+probes use `/Z7` instead of `/Zi` and need `mspdbsrv` even less. For a Debug/RelWithDebInfo build
+this also flips dhewm3-sdk's own explicit `/Zi` (in `CMAKE_C_FLAGS_DEBUG`/`_RELWITHDEBINFO`) to
+`/Z7` - `cl` prints a harmless `D9025: overriding '/Zi' with '/Z7'` warning for every file, since
+dhewm3-sdk sets that flag directly rather than through CMake's debug-format abstraction and this
+repo can't fix that warning at the source without patching the pinned SDK import; it doesn't affect
+correctness or the resulting `.pdb`. Release/MinSizeRel are unaffected (dhewm3-sdk doesn't set
+`/Zi` for them to begin with), same as Windows.
 
 **Measured build times** (Unicron, 32 logical CPUs, `ninja`'s default job count, RelWithDebInfo,
 after the `mspdbsrv` fix above; one-time `docker build`/image-pull setup not included):
@@ -168,7 +173,7 @@ Configures `engine/dhewm3-sdk` (the pinned dhewm3-sdk import, see `engine/dhewm3
 with CMake, `BASE_NAME=chextrek`, `D3XP=OFF`, 32-bit, and copies the resulting `chextrek.dll`
 (+ `.pdb`) to the repo root. Both are gitignored; rebuild any time with this one command, on
 either machine. On Windows this uses `Visual Studio 18 2026` / Win32 and MSBuild, unchanged since
-spec #28/#29. On Unicron (spec #64) this uses Ninja against the pinned MSVC-14.50.18.0-x86-under-
+spec #28/#29. On Unicron (spec #64) this uses Ninja against the pinned MSVC-14.50.35717-x86-under-
 Wine container image - see "Building `chextrek.dll` on Unicron" above for the one-time setup and
 what differs.
 
