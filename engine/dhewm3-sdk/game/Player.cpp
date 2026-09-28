@@ -6248,12 +6248,17 @@ void idPlayer::PerformImpulse( int impulse ) {
 		case IMPULSE_19: {
 			// when we're not in single player, IMPULSE_19 is used for showScores
 			// otherwise it opens the pda
-			if ( !gameLocal.isMultiplayer ) {
-				if ( objectiveSystemOpen ) {
-					TogglePDA();
-				} else if ( weapon_pda >= 0 ) {
+			// chextrek: bug #48 (edits-inside-stock-functions lead: idPlayer::PerformImpulse,
+			// 0x16cc8f-0x16cd99). The mod's item_pda::Idle no longer calls openPDA() (its script
+			// comment: "it's in the SDK now"), so the impulse opens the PDA itself: raise
+			// weapon_pda if closed, then TogglePDA either way. Stock only raised the weapon,
+			// which left the PDA model's "comm down" screen up and never opened the PDA gui.
+			// With no PDA owned it does nothing (no stock "no PDA" tip).
+			if ( !gameLocal.isMultiplayer && weapon_pda >= 0 && inventory.pdas.Num() > 0 ) {
+				if ( !objectiveSystemOpen ) {
 					SelectWeapon( weapon_pda, true );
 				}
+				TogglePDA();
 			}
 			break;
 		}
