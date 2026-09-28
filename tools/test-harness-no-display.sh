@@ -21,9 +21,9 @@ if chextrek_is_linux; then
 	# early checks, and the single-run lock (#62, chextrek_run_console_script takes it before any of
 	# this) need (symlinked from wherever they really live) - and deliberately no `Xvfb` - so "Xvfb
 	# isn't installed" (case 1a) is the real `command -v Xvfb` miss, not a stand-in. `flock` has to
-	# be here: without it, _chextrek_acquire_lock's own `flock -n`/`flock` calls would silently fail
-	# ("command not found", not caught since this isn't `set -e`) and this test would exercise a
-	# harness that never actually took the lock, not the real code path.
+	# be here: without it, _chextrek_acquire_lock's own `flock -n`/`flock` calls would fail with
+	# "command not found" (now a loud `exit 1` - see _chextrek_acquire_lock), so this test would stop
+	# on that instead of exercising the real no-display code path below it.
 	mkdir -p "${SCRATCH}/no-xvfb-bin"
 	for TOOL in bash uname date cat mkdir rm printf sed grep id readlink basename dirname cp \
 		mktemp kill sleep seq ln tr chmod true env flock; do
