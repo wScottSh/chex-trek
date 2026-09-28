@@ -10,6 +10,9 @@
 #   chextrek_ensure_mount - just the "chextrek" mount step on its own (#69): shared by
 #     chextrek_run_console_script and tools/fetch-and-play.sh, which needs the mount but not a
 #     console script, a timeout or the display/lock machinery.
+#   chextrek_apply_engine_defaults / chextrek_parse_github_repo - small, standalone helpers (#69)
+#     also shared with tools/fetch-and-play.sh: per-platform DHEWM3_HOME/DOOM3_BASEPATH/WINEPREFIX
+#     defaults, and parsing `owner/repo` out of a github.com remote URL.
 #   chextrek_log_has_no_display / chextrek_exit_no_display - the no-display environment stop
 #     (exit 3) the run makes when there's no way to open a window (Windows: this session has no
 #     active desktop; Linux/Wine: the display this run had died mid-run).
@@ -410,6 +413,17 @@ _chextrek_release_lock() {
 	CHEXTREK_LOCK_FD=""
 }
 
+# chextrek_parse_github_repo REMOTE_URL
+#
+# Parses an `owner/repo` string out of a git remote URL pointing at github.com, in any of its usual
+# forms (`git@github.com:owner/repo.git`, `https://github.com/owner/repo.git`,
+# `ssh://git@github.com/owner/repo`, with or without the trailing `.git`). Used by
+# tools/fetch-and-play.sh (#69) to default `--repo` for every `gh` call to the same remote this
+# checkout's own `origin` points at, without hardcoding a repo name anywhere.
+chextrek_parse_github_repo() {
+	printf '%s' "$1" | sed -E 's#^(https?://|git\+ssh://|ssh://)?(git@)?github\.com[:/]##; s#\.git$##'
+}
+
 # chextrek_apply_engine_defaults
 #
 # Sets DHEWM3_HOME/DOOM3_BASEPATH (and, on Linux, WINEPREFIX) to their per-platform defaults
@@ -443,11 +457,9 @@ chextrek_apply_engine_defaults() {
 # directly rather than going through the console-script/timeout/display machinery below, which it
 # doesn't want (interactive play has no console script and no timeout).
 #
-# Never exits (despite the name of every other *_or_exit helper in this file - this one really
-# doesn't exit, on purpose): prints an `error:` line and returns 1 on failure so each caller decides
-# what "the mount failed" becomes (the harness turns it into CHEXTREK_RUN_STATUS=1; fetch-and-play
-# into its own exit 1). Returns 0 (no-op, nothing printed) when the mount already points at
-# REPO_ROOT.
+# Never exits: prints an `error:` line and returns 1 on failure so each caller decides what "the
+# mount failed" becomes (the harness turns it into CHEXTREK_RUN_STATUS=1; fetch-and-play into its
+# own exit 1). Returns 0 (no-op, nothing printed) when the mount already points at REPO_ROOT.
 chextrek_ensure_mount() {
 	local REPO_ROOT="$1"
 	local MOD_LINK="${DOOM3_BASEPATH}/chextrek"

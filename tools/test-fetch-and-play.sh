@@ -12,21 +12,38 @@
 #     echoes its argument back unchanged (this self-test only needs to see which path was passed,
 #     not a real Windows-style conversion) and `wine` records its full argv to a file and exits at
 #     once - so "launched" here means "the engine was invoked with the right arguments", not that
-#     any window ever opened. Always exercises the Linux/Wine branch of tools/fetch-and-play.sh
-#     (chextrek_is_linux is true on Unicron) - the Windows branch (direct dhewm3.exe launch,
-#     cygpath) is unverifiable here and is the "pending owner on Windows" part; see the CLAUDE.md
-#     hand-off note this self-test's own PR/issue points at for the exact command the owner runs.
+#     any window ever opened.
+#
+# tools/fetch-and-play.sh's own chextrek_is_linux (tools/lib-harness.sh) branches on the real
+# `uname`, not on anything this self-test can override - run on Unicron, this always exercises the
+# Linux/Wine launch branch (wine, winepath). It's a no-op on Windows (see below), since there the
+# script takes the direct-dhewm3.exe/cygpath branch instead, which this self-test's `wine` stub
+# would never see - proving that branch is the "pending owner on Windows" part; see
+# docs/dev-setup.md's "Playing the latest green build" section for the exact command and what to
+# look for in the engine log.
 #
 # Covers: a clean tree with a real Latest release lands (detached) on that release's target commit,
 # with chextrek.dll/chextrek.pdb downloaded into the checkout root and the mount pointed at it, and
 # the engine is launched with fs_basepath/fs_game/fs_gameDllPath naming this checkout; a dirty tree
 # refuses before any gh/git-remote call and leaves the tree, HEAD and any prior chextrek.dll
-# untouched; no Latest release (or one missing an asset) refuses with a clear message and leaves
-# HEAD untouched; a `gh release download` failure refuses with a clear message; no positional
-# argument is accepted (usage error) - #70's commit argument isn't implemented yet.
+# untouched (also #70's own dirty-tree acceptance criterion - #69 ships and proves the refusal,
+# #70's own job is the commit argument); no Latest release (or one missing an asset) refuses with a
+# clear message and leaves HEAD untouched; a `gh release download` failure refuses with a clear
+# message and leaves HEAD untouched (download happens before checkout); the release's target commit
+# not resolving in this checkout refuses with a clear message and leaves HEAD/the checkout root
+# untouched; no positional argument is accepted (usage error) - #70's commit argument isn't
+# implemented yet.
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# shellcheck source=tools/lib-harness.sh
+source "${SCRIPT_DIR}/lib-harness.sh"
+if ! chextrek_is_linux; then
+	echo "SKIP: fetch-and-play self-test only exercises the Linux/Wine launch branch on Unicron - see this file's own header"
+	exit 0
+fi
+
 SCRATCH="$(mktemp -d)"
 trap 'rm -rf "$SCRATCH"' EXIT
 FAIL=0
@@ -275,14 +292,20 @@ POST_DLFAIL_SHA="$(git -C "$CHECKOUT" rev-parse HEAD)"
 if [ "$POST_DLFAIL_SHA" = "$PRE_DLFAIL_SHA" ]; then pass "HEAD unchanged when the download fails (download happens before checkout)"; else fail "HEAD moved despite the failed download"; fi
 
 echo
-echo "=== case 4b: gh release download succeeds but the checkout itself fails (bad target commit) -> refuses, HEAD unchanged, no DLL/PDB left in the checkout root ==="
+echo "=== case 4b: gh release download succeeds but the release's target commit doesn't resolve in this checkout (bad target) -> refuses before checkout, HEAD unchanged, no DLL/PDB left in the checkout root ==="
+# The download-before-checkout ordering means this download itself succeeds (the stub gh doesn't
+# care what STUB_GH_TARGET is) - it's the *next* step, resolving TARGET as a real commit in this
+# checkout (the `git rev-parse --verify ...^{commit}` guard, before `git checkout` is ever called),
+# that fails here. This is deliberately a 40-hex-digit sha that was never pushed to $BARE, not a
+# malformed one, so it's this reachability check that fails, not argument parsing.
 PRE_BADTARGET_SHA="$(git -C "$CHECKOUT" rev-parse HEAD)"
-OUT4B="$(STUB_GH_TAG="win-badtarget" STUB_GH_TARGET="0000000000000000000000000000000000dead" run_fetch_and_play 2>&1)"
+OUT4B="$(STUB_GH_TAG="win-badtarget" STUB_GH_TARGET="000000000000000000000000000000000000dead" run_fetch_and_play 2>&1)"
 CODE4B=$?
 if [ $CODE4B -ne 0 ]; then pass "exits non-zero when the release's target commit isn't reachable"; else fail "exit code 0, want non-zero"; fi
+if echo "$OUT4B" | grep -qi "isn't reachable"; then pass "names the reason: the target commit isn't reachable"; else fail "expected an 'isn't reachable' message"; echo "$OUT4B"; fi
 POST_BADTARGET_SHA="$(git -C "$CHECKOUT" rev-parse HEAD)"
-if [ "$POST_BADTARGET_SHA" = "$PRE_BADTARGET_SHA" ]; then pass "HEAD unchanged when the checkout itself fails"; else fail "HEAD moved despite the checkout failing"; fi
-if [ -f "${CHECKOUT}/chextrek.dll" ] || [ -f "${CHECKOUT}/chextrek.pdb" ]; then fail "a DLL/PDB was left in the checkout root despite the checkout failing"; else pass "no DLL/PDB left in the checkout root - the scratch download dir, not the checkout root, held them"; fi
+if [ "$POST_BADTARGET_SHA" = "$PRE_BADTARGET_SHA" ]; then pass "HEAD unchanged when the target commit doesn't resolve"; else fail "HEAD moved despite the target commit not resolving"; fi
+if [ -f "${CHECKOUT}/chextrek.dll" ] || [ -f "${CHECKOUT}/chextrek.pdb" ]; then fail "a DLL/PDB was left in the checkout root despite never checking out"; else pass "no DLL/PDB left in the checkout root - the scratch download dir, not the checkout root, held them"; fi
 
 echo
 echo "=== case 5: a positional argument is rejected (usage error) - #70's commit argument isn't implemented here ==="

@@ -6,12 +6,12 @@
 # (see tools/test-fetch-and-play.sh's header for what this self-test proves instead).
 #
 # 1. Refuses on a dirty working tree, before anything else - fetch-and-play never destroys local
-#    work. #70 later adds an explicit AC and its own self-test coverage for this ("refuses to touch
-#    a dirty tree"), plus a commit argument to fetch a specific (not just the latest) release -
-#    neither is implemented here. But shipping this command *without* the refusal in the meantime
-#    would mean every run silently discards whatever the owner had checked out and hadn't committed
-#    yet, which is actively unsafe, not just incomplete - so the safe default lands now, and #70's
-#    job is to add its own test proving it and the commit argument, not to invent the behavior.
+#    work. This is also #70's own acceptance criterion ("refuses to touch a dirty tree"), which #69
+#    ships and proves here (tools/test-fetch-and-play.sh's dirty-tree case) rather than leaving it
+#    for #70 - shipping this command without it in the meantime would mean every run silently
+#    discarded whatever the owner had checked out and hadn't committed yet, which is actively
+#    unsafe, not just incomplete. #70's own job on top of this is the commit argument (play/bisect
+#    a specific release, not just Latest), not implemented here.
 # 2. Resolves the release marked Latest (`gh release view`, no tag - the newest non-draft,
 #    non-prerelease release; spec #66's pipeline always marks a green release Latest) and confirms
 #    both `chextrek.dll` and `chextrek.pdb` are attached, before touching HEAD at all.
@@ -28,8 +28,8 @@
 #
 # This order means every refusal up through and including step 4 (checkout) leaves the working
 # tree, HEAD, and chextrek.dll/chextrek.pdb exactly as they were - see "Exit status" below for the
-# one narrow exception (a local disk/permission failure moving the already-downloaded files into
-# place, after HEAD has already moved).
+# one narrow exception (moving the already-downloaded files into place, or pointing the mount,
+# after HEAD has already moved).
 #
 # Usage: tools/fetch-and-play.sh
 #
@@ -39,16 +39,17 @@
 #   1 - refused before ever launching anything. In every case except the one below, the working
 #       tree, HEAD, and chextrek.dll/chextrek.pdb are all left exactly as they were: a dirty working
 #       tree, no Latest release (or one missing an asset), a missing gh/dhewm3.exe, a git/gh
-#       failure, or the checkout itself failing. The one exception: HEAD has already moved to the
-#       release's target commit, but chextrek.dll/chextrek.pdb weren't put in place and dhewm3 was
-#       never launched, if moving the already-downloaded DLL/PDB into the checkout root or pointing
-#       the mount fails (e.g. the disk is full, or a permissions problem) - the error message says
-#       so explicitly when this happens.
+#       failure, or the checkout itself failing. The one exception: once HEAD has moved to the
+#       release's target commit, a failure moving the already-downloaded chextrek.dll/chextrek.pdb
+#       into the checkout root, or pointing the mount, can leave HEAD at that commit with the DLL/
+#       PDB only partially in place (e.g. the disk fills up between the two files) or the mount
+#       unchanged, and dhewm3 was never launched - the error message says so explicitly, and names
+#       exactly what state each file/HEAD is in, whenever this happens.
 #
 # Injectable for tools/test-fetch-and-play.sh (never point these at the real repo/game on Unicron -
 # see that script's own header):
 #   CHEXTREK_FETCH_REPO - owner/repo for every `gh` call (default: parsed from this checkout's own
-#                         `origin` remote, the same parsing tools/pipeline-process-commit.sh uses).
+#                         `origin` remote via chextrek_parse_github_repo, tools/lib-harness.sh).
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -77,8 +78,7 @@ if [ -n "$GIT_STATUS_OUT" ]; then
 	exit 1
 fi
 
-# --- repo: explicit override for tests, else parsed from this checkout's own origin remote, same
-# parsing as tools/pipeline-process-commit.sh ---
+# --- repo: explicit override for tests, else parsed from this checkout's own origin remote ---
 if [ -n "${CHEXTREK_FETCH_REPO:-}" ]; then
 	REPO="$CHEXTREK_FETCH_REPO"
 else
@@ -87,7 +87,7 @@ else
 		echo "error: no 'origin' remote in ${REPO_ROOT} and CHEXTREK_FETCH_REPO isn't set" >&2
 		exit 1
 	fi
-	REPO="$(printf '%s' "$REMOTE_URL" | sed -E 's#^(https?://|git\+ssh://|ssh://)?(git@)?github\.com[:/]##; s#\.git$##')"
+	REPO="$(chextrek_parse_github_repo "$REMOTE_URL")"
 fi
 
 if ! command -v gh >/dev/null 2>&1; then
@@ -135,6 +135,10 @@ echo "==> Latest release: ${TAG} (target ${TARGET})"
 # failure (network, a missing/renamed asset server-side) leaves HEAD and the checkout untouched.
 # They're moved into the checkout root only after the checkout below succeeds. ---
 DOWNLOAD_DIR="$(mktemp -d "${TMPDIR:-/tmp}/chextrek-fetch-and-play.XXXXXX")"
+if [ -z "$DOWNLOAD_DIR" ] || [ ! -d "$DOWNLOAD_DIR" ]; then
+	echo "error: couldn't create a scratch download directory (mktemp failed). Nothing was checked out or launched." >&2
+	exit 1
+fi
 cleanup_download_dir() { rm -rf "$DOWNLOAD_DIR"; }
 trap cleanup_download_dir EXIT
 if ! gh release download "$TAG" --repo "$REPO" --dir "$DOWNLOAD_DIR" --clobber \
@@ -168,9 +172,15 @@ fi
 echo "==> Checked out ${TARGET} (detached)"
 
 # --- from here on, HEAD has already moved: a failure below leaves it at the release commit even
-# though nothing was launched - each message below says so explicitly (see "Exit status" above) ---
-if ! mv -f "${DOWNLOAD_DIR}/chextrek.dll" "${DOWNLOAD_DIR}/chextrek.pdb" "$REPO_ROOT/" 2>/dev/null; then
-	echo "error: couldn't move the downloaded chextrek.dll/chextrek.pdb into ${REPO_ROOT}. HEAD is at ${TARGET}; nothing was launched." >&2
+# though nothing was launched - each message names that explicitly (see "Exit status" above). The
+# DLL and PDB are moved one at a time (not a single two-argument `mv`) so a failure between them
+# says exactly which file did or didn't make it, instead of leaving that ambiguous. ---
+if ! mv -f "${DOWNLOAD_DIR}/chextrek.dll" "${REPO_ROOT}/chextrek.dll" 2>/dev/null; then
+	echo "error: couldn't move the downloaded chextrek.dll into ${REPO_ROOT}. HEAD is at ${TARGET}; chextrek.pdb wasn't touched; nothing was launched." >&2
+	exit 1
+fi
+if ! mv -f "${DOWNLOAD_DIR}/chextrek.pdb" "${REPO_ROOT}/chextrek.pdb" 2>/dev/null; then
+	echo "error: couldn't move the downloaded chextrek.pdb into ${REPO_ROOT}. HEAD is at ${TARGET}; chextrek.dll is already in place but chextrek.pdb isn't; nothing was launched." >&2
 	exit 1
 fi
 echo "==> chextrek.dll + chextrek.pdb are in ${REPO_ROOT}"
@@ -182,20 +192,26 @@ cleanup_download_dir
 trap - EXIT
 
 if ! chextrek_ensure_mount "$REPO_ROOT"; then
-	echo "error: couldn't point the chextrek mount at ${REPO_ROOT} (see above). HEAD is at ${TARGET}; nothing was launched." >&2
+	echo "error: couldn't point the chextrek mount at ${REPO_ROOT} (see above). HEAD is at ${TARGET} and chextrek.dll/chextrek.pdb are already in place; nothing was launched." >&2
 	exit 1
 fi
 
+FS_BASEPATH="$(chextrek_to_engine_path "$DOOM3_BASEPATH")"
+FS_GAMEDLLPATH="$(chextrek_to_engine_path "$REPO_ROOT")"
+if [ -z "$FS_BASEPATH" ] || [ -z "$FS_GAMEDLLPATH" ]; then
+	echo "error: converting a path for the engine (winepath/cygpath) produced an empty result - DOOM3_BASEPATH=${DOOM3_BASEPATH}, checkout=${REPO_ROOT}. HEAD is at ${TARGET} and chextrek.dll/chextrek.pdb are already in place; nothing was launched." >&2
+	exit 1
+fi
 ENGINE_ARGS=(
-	+set fs_basepath "$(chextrek_to_engine_path "$DOOM3_BASEPATH")"
+	+set fs_basepath "$FS_BASEPATH"
 	+set fs_game chextrek
-	+set fs_gameDllPath "$(chextrek_to_engine_path "$REPO_ROOT")"
+	+set fs_gameDllPath "$FS_GAMEDLLPATH"
 )
 
 echo "==> Launching dhewm3 (mod=chextrek, DLL from ${REPO_ROOT})"
 echo "==> Once it's running, check its log (dhewm3log.txt - see docs/dev-setup.md's save/config path) for a line like:"
-echo "==>   loaded game library 'Z:...chextrek.dll'"
-echo "==> That confirms this is the Unicron-built DLL, not base.dll - spec #58's final acceptance check."
+echo "==>   loaded game library '...chextrek.dll'"
+echo "==> naming chextrek.dll, not base.dll - that confirms this is the Unicron-built DLL (spec #58's final acceptance check)."
 if chextrek_is_linux; then
 	# Same reasoning as tools/lib-harness.sh's own Linux launch: cd into the engine's own dir first
 	# (it looks for SDL2.dll/OpenAL32.dll next to itself) then exec into wine, so this shell becomes
@@ -203,7 +219,10 @@ if chextrek_is_linux; then
 	# not a scenario run: no timeout, no console script, no Xvfb/lock/preflight (those are the
 	# harness's, for unattended scenario runs on Unicron - fetch-and-play targets the owner's own,
 	# already-logged-in Windows desktop).
-	cd "$DHEWM3_HOME" || exit 1
+	if ! cd "$DHEWM3_HOME"; then
+		echo "error: couldn't cd into ${DHEWM3_HOME}. HEAD is at ${TARGET} and chextrek.dll/chextrek.pdb are already in place; nothing was launched." >&2
+		exit 1
+	fi
 	exec wine "$DHEWM3_EXE" "${ENGINE_ARGS[@]}"
 else
 	exec "$DHEWM3_EXE" "${ENGINE_ARGS[@]}"
