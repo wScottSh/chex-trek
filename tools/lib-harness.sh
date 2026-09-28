@@ -26,6 +26,8 @@
 #   chextrek_to_engine_path     - `winepath -w` (Linux) vs `cygpath -w` (Windows) path conversion.
 #   chextrek_ensure_display_or_exit - starts this run's own Xvfb display when none is usable
 #                                 (Linux), instead of the Windows qwinsta active-session check.
+#   chextrek_lock_file / _chextrek_acquire_lock / _chextrek_release_lock - the single-run lock
+#                                 (spec #62) serializing concurrent runs on Unicron.
 # See docs/dev-setup.md's "Unicron (Linux/Wine)" section for the one-time setup this assumes
 # (Wine, the VC++ x86 redist in the prefix, Xvfb) and for the environment variables this reads
 # (DHEWM3_HOME, DOOM3_BASEPATH, DHEWM3_DOCUMENTS_DIR, WINEPREFIX) and why the mount/save-path/
@@ -243,6 +245,52 @@ chextrek_exit_no_display() {
 	exit 3
 }
 
+# chextrek_lock_file
+#
+# Path to the single-run lock file (#62). Every chextrek_run_console_script call on Unicron
+# (Linux/Wine) takes an exclusive flock on this file for its whole run - mount, save-dir wipe,
+# launch, cleanup - so two concurrent runs on this machine (two worktrees, an agent plus the
+# pipeline, whatever) serialize instead of racing on the shared DOOM3_BASEPATH/chextrek mount and
+# the shared per-mod save dir; today that's just a documented "one at a time" rule (see
+# docs/dev-setup.md), not something enforced. Defaults outside the repo and outside any worktree,
+# so every worktree on this machine shares the same lock file by default.
+# CHEXTREK_LOCK_FILE overrides it - a test that wants to prove the locking itself, without
+# colliding with a real run on the machine, sets its own private path.
+# Windows is out of scope for #62 (the Windows branch still just kills every dhewm3.exe by image
+# name on timeout, unchanged) - only the Linux/Wine call sites below take this lock.
+chextrek_lock_file() {
+	echo "${CHEXTREK_LOCK_FILE:-${TMPDIR:-/tmp}/chextrek-harness.lock}"
+}
+
+# _chextrek_acquire_lock
+#
+# Opens chextrek_lock_file on fd CHEXTREK_LOCK_FD and takes an exclusive flock on it, printing a
+# "waiting" line (#62 AC2) once if another run already holds it, then blocking until it's free.
+# flock's lock lives on the open file descriptor, not on the file's contents or a pid recorded in
+# it, so a run that dies while holding it - crash, SIGKILL, whatever - has the kernel close that fd
+# and drop the lock automatically when the process goes away; there is never a stale lock left
+# behind for a later run to clean up or get stuck behind (#62 AC3).
+_chextrek_acquire_lock() {
+	local LOCK_FILE
+	LOCK_FILE="$(chextrek_lock_file)"
+	exec {CHEXTREK_LOCK_FD}>"$LOCK_FILE"
+	if ! flock -n "$CHEXTREK_LOCK_FD"; then
+		echo "==> Waiting for the harness lock (another run holds ${LOCK_FILE}) ..."
+		flock "$CHEXTREK_LOCK_FD"
+	fi
+}
+
+# _chextrek_release_lock
+#
+# Releases the lock _chextrek_acquire_lock took and closes its fd. A no-op if no lock is currently
+# held (CHEXTREK_LOCK_FD unset or already closed).
+_chextrek_release_lock() {
+	[ -n "${CHEXTREK_LOCK_FD:-}" ] || return 0
+	flock -u "$CHEXTREK_LOCK_FD" 2>/dev/null || true
+	exec {CHEXTREK_LOCK_FD}>&- 2>/dev/null || true
+	CHEXTREK_LOCK_FD=""
+}
+
 # chextrek_run_console_script REPO_ROOT CONSOLE_SCRIPT_BODY TIMEOUT_SECS RUN_LABEL
 #
 # CONSOLE_SCRIPT_BODY is the full text written to the .cfg file dhewm3 execs (including
@@ -268,11 +316,20 @@ chextrek_exit_no_display() {
 # every return path out of the impl - without having to remember a cleanup call at each of the
 # impl's several early returns. A no-display exit (chextrek_exit_no_display) bypasses this wrapper
 # entirely (exit, not return), so it does its own Xvfb cleanup inline.
+#
+# On Unicron (Linux/Wine, #62) it also takes the single-run lock (_chextrek_acquire_lock) before
+# calling the impl and releases it (_chextrek_release_lock) on every return path, for the same
+# reason: the impl's early returns would otherwise each need to remember to release it. A
+# no-display exit skips the explicit release too, but since it terminates the whole process (not
+# just this function), the kernel closes CHEXTREK_LOCK_FD and drops the lock right along with it -
+# see _chextrek_acquire_lock.
 chextrek_run_console_script() {
 	CHEXTREK_XVFB_PID=""
+	chextrek_is_linux && _chextrek_acquire_lock
 	_chextrek_run_console_script_impl "$@"
 	local RC=$?
 	_chextrek_stop_xvfb
+	chextrek_is_linux && _chextrek_release_lock
 	return $RC
 }
 
