@@ -26,13 +26,23 @@
 # with chextrek.dll/chextrek.pdb downloaded into the checkout root and the mount pointed at it, and
 # the engine is launched with fs_basepath/fs_game/fs_gameDllPath naming this checkout; a dirty tree
 # refuses before any gh/git-remote call and leaves the tree, HEAD and any prior chextrek.dll
-# untouched (also #70's own dirty-tree acceptance criterion - #69 ships and proves the refusal,
-# #70's own job is the commit argument); no Latest release (or one missing an asset) refuses with a
-# clear message and leaves HEAD untouched; a `gh release download` failure refuses with a clear
-# message and leaves HEAD untouched (download happens before checkout); the release's target commit
-# not resolving in this checkout refuses with a clear message and leaves HEAD/the checkout root
-# untouched; no positional argument is accepted (usage error) - #70's commit argument isn't
-# implemented yet.
+# untouched (spec #58/#69's own acceptance criterion, and #70's - a dirty tree is refused whether or
+# not a commit argument is given); no Latest release (or one missing an asset) refuses with a clear
+# message and leaves HEAD untouched; a `gh release download` failure refuses with a clear message
+# and leaves HEAD untouched (download happens before checkout); the release's target commit not
+# resolving in this checkout refuses with a clear message and leaves HEAD/the checkout root
+# untouched; too many positional arguments is a usage error.
+#
+# #70's commit argument: given a commit with a green release, it's resolved to a full sha (after a
+# `git fetch origin`, so a commit only just released is locally known), the release is looked up by
+# that commit's own win-<short sha> tag (spec #66's exact scheme -
+# tools/pipeline-process-commit.sh), and its target is confirmed to match that exact sha before
+# anything downloads - then it checks out, downloads and launches exactly as the Latest path does; a
+# dirty tree refuses before any gh/git-remote call on the commit-arg path too; a commit with no
+# release refuses naming the commit, HEAD untouched; a release whose target doesn't match the
+# resolved commit refuses naming both, HEAD untouched; a commit whose own tools/fetch-and-play.sh
+# differs from the copy currently running (the checkout rewrites this very script mid-run) still
+# completes correctly - proving the main()-wrap self-rewrite guard (see fetch-and-play.sh's header).
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -66,14 +76,42 @@ for a in "$@"; do printf '%s\n' "$a" >>"${STUB_GH_ARGV_DIR}/${CALL_ID}.args"; do
 printf '%s %s %s\n' "$CALL_ID" "${1:-}" "${2:-}" >>"${STUB_GH_ARGV_LOG}"
 
 if [ "${1:-}" = "release" ] && [ "${2:-}" = "view" ]; then
-	if [ "${STUB_GH_NO_RELEASE:-0}" = "1" ]; then
-		echo "stub: no releases found" >&2
+	# $3, if present and not a flag, is an explicit tag (#70's commit-arg path: `gh release view
+	# <tag> --repo ...`). Its absence (next arg starts with "--", or there is no $3) means the
+	# no-tag/Latest form fetch-and-play.sh's own no-argument path uses.
+	TAG_ARG=""
+	case "${3:-}" in
+	"" | --*) TAG_ARG="" ;;
+	*) TAG_ARG="$3" ;;
+	esac
+	if [ -z "$TAG_ARG" ]; then
+		if [ "${STUB_GH_NO_RELEASE:-0}" = "1" ]; then
+			echo "stub: no releases found" >&2
+			exit 1
+		fi
+		# fetch-and-play.sh's own --jq expression joins tagName/targetCommitish/asset-names with a
+		# literal U+001F - this stub reproduces exactly that output rather than interpreting the
+		# expression itself, so it never needs a real jq.
+		printf '%s\x1f%s\x1f%s\n' "${STUB_GH_TAG}" "${STUB_GH_TARGET}" "${STUB_GH_ASSET_NAMES}"
+		exit 0
+	fi
+	# Explicit-tag lookup (#70's commit-arg path): STUB_GH_RELEASES holds zero or more
+	# "TAG<US>TARGET<US>ASSETS" lines (US = the same literal U+001F) - each one release a test case
+	# wants `gh release view <tag>` to find. No matching line reproduces a real `gh release view
+	# <bad-tag>` failure: no release by that name.
+	FOUND=0
+	while IFS=$'\x1f' read -r RTAG RTARGET RASSETS; do
+		[ -z "$RTAG" ] && continue
+		if [ "$RTAG" = "$TAG_ARG" ]; then
+			printf '%s\x1f%s\x1f%s\n' "$RTAG" "$RTARGET" "$RASSETS"
+			FOUND=1
+			break
+		fi
+	done <<<"${STUB_GH_RELEASES:-}"
+	if [ "$FOUND" = "0" ]; then
+		echo "stub: release not found: ${TAG_ARG}" >&2
 		exit 1
 	fi
-	# fetch-and-play.sh's own --jq expression joins tagName/targetCommitish/asset-names with a
-	# literal U+001F - this stub reproduces exactly that output rather than interpreting the
-	# expression itself, so it never needs a real jq.
-	printf '%s\x1f%s\x1f%s\n' "${STUB_GH_TAG}" "${STUB_GH_TARGET}" "${STUB_GH_ASSET_NAMES}"
 	exit 0
 fi
 if [ "${1:-}" = "release" ] && [ "${2:-}" = "download" ]; then
@@ -206,6 +244,7 @@ run_fetch_and_play() {
 		STUB_GH_ASSET_NAMES="${STUB_GH_ASSET_NAMES:-chextrek.dll,chextrek.pdb}" \
 		STUB_GH_NO_RELEASE="${STUB_GH_NO_RELEASE:-0}" \
 		STUB_GH_DOWNLOAD_FAIL="${STUB_GH_DOWNLOAD_FAIL:-0}" \
+		STUB_GH_RELEASES="${STUB_GH_RELEASES:-}" \
 		DHEWM3_HOME="${SCRATCH}/dhewm3-home" \
 		DOOM3_BASEPATH="$DOOM3_BASEPATH" \
 		bash "${CHECKOUT}/tools/fetch-and-play.sh" "$@"
@@ -338,11 +377,98 @@ if [ "$POST_BADTARGET_SHA" = "$PRE_BADTARGET_SHA" ]; then pass "HEAD unchanged w
 if [ -f "${CHECKOUT}/chextrek.dll" ] || [ -f "${CHECKOUT}/chextrek.pdb" ]; then fail "a DLL/PDB was left in the checkout root despite never checking out"; else pass "no DLL/PDB left in the checkout root - the scratch download dir, not the checkout root, held them"; fi
 
 echo
-echo "=== case 5: a positional argument is rejected (usage error) - #70's commit argument isn't implemented here ==="
-OUT5="$(run_fetch_and_play deadbeef 2>&1)"
+echo "=== case 5: too many positional arguments is a usage error ==="
+OUT5="$(run_fetch_and_play deadbeef extra-arg 2>&1)"
 CODE5=$?
-if [ $CODE5 -ne 0 ]; then pass "exits non-zero when given an argument"; else fail "exit code 0 with an argument, want non-zero"; fi
+if [ $CODE5 -ne 0 ]; then pass "exits non-zero when given two arguments"; else fail "exit code 0 with two arguments, want non-zero"; fi
 if echo "$OUT5" | grep -qi "usage"; then pass "prints a usage message"; else fail "expected a usage message"; echo "$OUT5"; fi
+
+# RELEASE_SHA's own real win-<short sha> tag (spec #66's exact scheme) - #70's commit-arg path
+# derives this same tag from the commit it's given, so these self-test releases must use it too.
+RELEASE_TAG="win-$(git -C "$SEED" rev-parse --short=10 "$RELEASE_SHA")"
+NEWER_TAG="win-$(git -C "$SEED" rev-parse --short=10 "$NEWER_SHA")"
+
+echo
+echo "=== case 6: commit argument with a green release -> resolves to a full sha, looks up that commit's own win-<short> release, lands detached on it, downloads, launches ==="
+git -C "$CHECKOUT" checkout -q main-local
+: >"${SCRATCH}/wine-invoked-count"
+rm -rf "${SCRATCH}/wine-invocations"
+mkdir -p "${SCRATCH}/wine-invocations"
+OUT6="$(STUB_GH_RELEASES="$(printf '%s\x1f%s\x1fchextrek.dll,chextrek.pdb' "$RELEASE_TAG" "$RELEASE_SHA")" \
+	run_fetch_and_play "$RELEASE_SHA" 2>&1)"
+CODE6=$?
+if [ $CODE6 -eq 0 ]; then pass "exits 0 given a commit with a green release"; else fail "exit code $CODE6, want 0"; echo "$OUT6"; fi
+CUR6_SHA="$(git -C "$CHECKOUT" rev-parse HEAD)"
+if [ "$CUR6_SHA" = "$RELEASE_SHA" ]; then pass "HEAD is at the given commit (the older release, not Latest/branch tip)"; else fail "HEAD is ${CUR6_SHA}, want ${RELEASE_SHA}"; fi
+if [ -f "${CHECKOUT}/chextrek.dll" ] && [ -f "${CHECKOUT}/chextrek.pdb" ]; then pass "chextrek.dll/chextrek.pdb were downloaded for the given commit"; else fail "chextrek.dll/chextrek.pdb missing from ${CHECKOUT}"; fi
+if [ "$(wine_call_count)" = "1" ]; then pass "the engine was launched exactly once for the given commit"; else fail "expected exactly one engine launch, found $(wine_call_count)"; fi
+rm -f "${CHECKOUT}/chextrek.dll" "${CHECKOUT}/chextrek.pdb"
+
+echo
+echo "=== case 7: a dirty tree refuses on the commit-arg path too, before any gh/git-remote call, and changes nothing ==="
+git -C "$CHECKOUT" checkout -q "$RELEASE_SHA"
+PRE_DIRTY2_SHA="$(git -C "$CHECKOUT" rev-parse HEAD)"
+PRE_DIRTY2_WINE_COUNT="$(wine_call_count)"
+echo "local uncommitted change" >"${CHECKOUT}/dirty-marker.txt"
+OUT7="$(STUB_GH_RELEASES="$(printf '%s\x1f%s\x1fchextrek.dll,chextrek.pdb' "$RELEASE_TAG" "$RELEASE_SHA")" \
+	run_fetch_and_play "$RELEASE_SHA" 2>&1)"
+CODE7=$?
+if [ $CODE7 -ne 0 ]; then pass "exits non-zero on a dirty tree with a commit argument"; else fail "exit code 0 on a dirty tree with a commit argument, want non-zero"; fi
+if echo "$OUT7" | grep -qi "uncommitted"; then pass "reports the uncommitted-changes reason clearly (commit-arg path)"; else fail "expected a clear 'uncommitted changes' message"; echo "$OUT7"; fi
+POST_DIRTY2_SHA="$(git -C "$CHECKOUT" rev-parse HEAD)"
+if [ "$POST_DIRTY2_SHA" = "$PRE_DIRTY2_SHA" ]; then pass "HEAD unchanged on a dirty tree with a commit argument"; else fail "HEAD moved from ${PRE_DIRTY2_SHA} to ${POST_DIRTY2_SHA} despite the dirty tree"; fi
+if [ -s "${SCRATCH}/gh-argv.log" ]; then fail "gh was called despite the dirty tree (commit-arg path) - the dirty check must run first"; else pass "gh was never called on the commit-arg path either - the dirty-tree check ran first"; fi
+if [ "$(wine_call_count)" = "$PRE_DIRTY2_WINE_COUNT" ]; then pass "the engine was never launched on a dirty tree (commit-arg path)"; else fail "the engine was launched despite the dirty tree"; fi
+rm -f "${CHECKOUT}/dirty-marker.txt"
+
+echo
+echo "=== case 8: a commit with no release -> exits non-zero naming the commit, HEAD unchanged ==="
+git -C "$CHECKOUT" checkout -q main-local
+PRE_NOREL2_SHA="$(git -C "$CHECKOUT" rev-parse HEAD)"
+OUT8="$(STUB_GH_RELEASES="" run_fetch_and_play "$NEWER_SHA" 2>&1)"
+CODE8=$?
+if [ $CODE8 -ne 0 ]; then pass "exits non-zero for a commit with no release"; else fail "exit code 0, want non-zero"; fi
+if echo "$OUT8" | grep -qF "$NEWER_SHA"; then pass "names the commit in the error message"; else fail "expected the error to name ${NEWER_SHA}"; echo "$OUT8"; fi
+POST_NOREL2_SHA="$(git -C "$CHECKOUT" rev-parse HEAD)"
+if [ "$POST_NOREL2_SHA" = "$PRE_NOREL2_SHA" ]; then pass "HEAD unchanged for a commit with no release"; else fail "HEAD moved despite no release for the commit"; fi
+
+echo
+echo "=== case 9: a release found by the commit's own tag but targeting a different commit -> refuses (never trusts the tag alone), HEAD unchanged ==="
+PRE_MISMATCH_SHA="$(git -C "$CHECKOUT" rev-parse HEAD)"
+OUT9="$(STUB_GH_RELEASES="$(printf '%s\x1f%s\x1fchextrek.dll,chextrek.pdb' "$RELEASE_TAG" "$NEWER_SHA")" \
+	run_fetch_and_play "$RELEASE_SHA" 2>&1)"
+CODE9=$?
+if [ $CODE9 -ne 0 ]; then pass "exits non-zero when the release's target doesn't match the resolved commit"; else fail "exit code 0, want non-zero"; fi
+if echo "$OUT9" | grep -qF "$RELEASE_SHA" && echo "$OUT9" | grep -qF "$NEWER_SHA"; then pass "names both the resolved commit and the release's actual target"; else fail "expected the message to name both ${RELEASE_SHA} and ${NEWER_SHA}"; echo "$OUT9"; fi
+POST_MISMATCH_SHA="$(git -C "$CHECKOUT" rev-parse HEAD)"
+if [ "$POST_MISMATCH_SHA" = "$PRE_MISMATCH_SHA" ]; then pass "HEAD unchanged when the release's target doesn't match"; else fail "HEAD moved despite the target mismatch"; fi
+
+echo
+echo "=== case 10: self-rewriting checkout - the given commit's tools/fetch-and-play.sh differs from the copy currently running; the run still completes (main()-wrap guard, see fetch-and-play.sh's header) ==="
+printf '%s\n# case-10 marker: this commit'"'"'s tools/fetch-and-play.sh differs from the copy that ran it\n' "$(cat "${SCRIPT_DIR}/fetch-and-play.sh")" >"${SEED}/tools/fetch-and-play.sh"
+git -C "$SEED" add tools/fetch-and-play.sh
+git -C "$SEED" commit -q -m "case 10: a differing tools/fetch-and-play.sh"
+REWRITE_SHA="$(git -C "$SEED" rev-parse HEAD)"
+git -C "$SEED" push -q origin main
+REWRITE_TAG="win-$(git -C "$SEED" rev-parse --short=10 "$REWRITE_SHA")"
+# Restore the seed's tools/fetch-and-play.sh to the unmodified copy for any case after this one.
+cp "${SCRIPT_DIR}/fetch-and-play.sh" "${SEED}/tools/fetch-and-play.sh"
+git -C "$SEED" add tools/fetch-and-play.sh
+git -C "$SEED" commit -q -m "case 10: restore tools/fetch-and-play.sh"
+git -C "$SEED" push -q origin main
+
+git -C "$CHECKOUT" checkout -q main-local
+: >"${SCRATCH}/wine-invoked-count"
+rm -rf "${SCRATCH}/wine-invocations"
+mkdir -p "${SCRATCH}/wine-invocations"
+OUT10="$(STUB_GH_RELEASES="$(printf '%s\x1f%s\x1fchextrek.dll,chextrek.pdb' "$REWRITE_TAG" "$REWRITE_SHA")" \
+	run_fetch_and_play "$REWRITE_SHA" 2>&1)"
+CODE10=$?
+if [ $CODE10 -eq 0 ]; then pass "the run completes even though its own checkout rewrites tools/fetch-and-play.sh mid-run"; else fail "exit code $CODE10, want 0"; echo "$OUT10"; fi
+CUR10_SHA="$(git -C "$CHECKOUT" rev-parse HEAD)"
+if [ "$CUR10_SHA" = "$REWRITE_SHA" ]; then pass "HEAD landed on the differing commit"; else fail "HEAD is ${CUR10_SHA}, want ${REWRITE_SHA}"; fi
+if grep -q "case-10 marker" "${CHECKOUT}/tools/fetch-and-play.sh" 2>/dev/null; then pass "the on-disk script was actually rewritten by this run's own checkout (the hazard was real, not just theoretical)"; else fail "expected ${CHECKOUT}/tools/fetch-and-play.sh to contain the case-10 marker after checkout"; fi
+if [ "$(wine_call_count)" = "1" ]; then pass "the engine was still launched exactly once despite the rewrite"; else fail "expected exactly one engine launch, found $(wine_call_count)"; fi
 
 echo
 if [ $FAIL -eq 0 ]; then
