@@ -320,31 +320,37 @@ closing comment's release link is a dry-run URL, not a real one. That verificati
 spelling out exactly what was real vs. simulated, once the verification finished (not the same
 issue as this spec ticket, #67).
 
-### Playing the latest green build (Windows, spec #58/#69)
+### Playing the latest green build (Windows, spec #58/#69/#70)
 
 On the Windows PC, in Git Bash, from the checkout the `Doom 3\chextrek` symlink points at:
 
 ```
-bash tools/fetch-and-play.sh
+bash tools/fetch-and-play.sh [COMMIT]
 ```
 
-This is spec #58's final piece - the owner's one command to play the latest Unicron-built,
-harness-proven `chextrek.dll`. It:
+This is spec #58's final piece - the owner's one command to play a Unicron-built, harness-proven
+`chextrek.dll` - the latest one by default, or (#70) an older one, to play or bisect a specific
+release. It:
 
 1. **Refuses on a dirty working tree** (uncommitted changes) before touching anything else - it
-   never discards local work. This is also #70's own acceptance criterion; #69 ships it and proves
-   it here (`tools/test-fetch-and-play.sh`'s dirty-tree case) rather than leaving it for #70, since
-   shipping this command without it in the meantime would mean every play session silently threw
-   away whatever the owner had checked out and hadn't committed - not a missing feature, an active
-   hazard. #70's own job on top of this is the commit argument (play/bisect a specific release, not
-   just Latest), not implemented here.
-2. Resolves the release marked Latest (`gh release view`, no tag) and checks both `chextrek.dll`
-   and `chextrek.pdb` are attached to it, and that `dhewm3.exe` is actually installed - all before
-   touching `HEAD`.
+   never discards local work, whether or not `COMMIT` is given. This is also #70's own acceptance
+   criterion; #69 ships it and proves it here (`tools/test-fetch-and-play.sh`'s dirty-tree cases),
+   since shipping this command without it in the meantime would mean every play session silently
+   threw away whatever the owner had checked out and hadn't committed - not a missing feature, an
+   active hazard.
+2. Resolves which release to play, and checks both `chextrek.dll` and `chextrek.pdb` are attached
+   to it, and that `dhewm3.exe` is actually installed - all before touching `HEAD`:
+   - no `COMMIT`: the release marked Latest (`gh release view`, no tag).
+   - `COMMIT` given (#70): fetches `origin` (so a commit only just released is locally known),
+     resolves `COMMIT` to a full 40-hex sha (`git rev-parse --verify <COMMIT>^{commit}`), derives
+     that commit's own release tag - `win-<10-char short sha>`, the exact scheme spec #66's
+     pipeline uses (`tools/pipeline-process-commit.sh`) - looks that release up by tag, and
+     confirms its target is exactly the resolved sha (never trusts the tag alone). No release for
+     that commit refuses with a clear message naming the commit; `HEAD` is left unchanged.
 3. Downloads `chextrek.dll` + `chextrek.pdb` from that release into a scratch directory (not the
    checkout root yet) - so a download failure still leaves `HEAD` and the checkout untouched.
-4. Fetches and checks out that release's target commit, detached, so mod data (maps/scripts/defs)
-   matches the DLL about to be played.
+4. Checks out that release's target commit, detached, so mod data (maps/scripts/defs) matches the
+   DLL about to be played.
 5. Moves the already-downloaded DLL/PDB into the checkout root (the same gitignored place
    `tools/build-chextrek.sh` writes to), points the `chextrek` mount at this checkout
    (`tools/lib-harness.sh`'s `chextrek_ensure_mount` - the same mount every harness run uses,
@@ -353,15 +359,32 @@ harness-proven `chextrek.dll`. It:
    at this checkout, the same engine conventions as `tools/run-harness.sh` - but interactively: no
    console script, no timeout. The owner plays until they quit.
 
+**Self-rewriting checkout (#70):** step 4's checkout can rewrite `tools/fetch-and-play.sh` itself
+on disk while it's still running (any commit whose copy differs from the one currently executing
+does this, not just occasionally) - bash can then resume reading mid-file into the new content and
+execute garbage. The whole script body is wrapped in one `main() { ...; }` function, called only at
+the very end, so bash has already fully parsed it - including everything after the checkout -
+before `git checkout` ever runs; nothing later in the file is read from disk again. This is
+mutation-tested, not just plausible: `tools/test-fetch-and-play.sh`'s "self-rewriting checkout" case
+injects a divergent instruction into the not-yet-read remainder of the on-disk file at the moment of
+checkout, and with the `main()` wrap removed, that same case genuinely fails - confirmed directly
+while building this fix. Separately, Git for Windows is reported to sometimes fail the file replace
+outright ("Unlink of file ... failed") rather than completing it with new content; that's a git/
+filesystem-level failure this wrap doesn't touch (a failed `git checkout` is still always checked
+and refused cleanly here, never assumed to have succeeded) and is unverified on real Windows. See
+the script's own header comment for the full reasoning.
+
 **Exit status:** `0` once `dhewm3` has been launched - the script's own exit status then becomes
 whatever `dhewm3` itself exits with (a real, interactive process, not a pass/fail check), not
 necessarily `0`. `1` on any refusal before ever launching anything. In every refusal case except
 one, the working tree, `HEAD`, and `chextrek.dll`/`chextrek.pdb` are all left exactly as they were:
-a dirty working tree, no Latest release (or one missing an asset), a missing `gh`/`dhewm3.exe`, a
-git/gh failure, or the checkout itself failing. The one exception: once `HEAD` has moved to the
-release's target commit, a failure moving the already-downloaded DLL/PDB into the checkout root, or
-pointing the mount, can leave `HEAD` at that commit with the DLL/PDB only partially in place - the
-error message names exactly what state each file and `HEAD` is in whenever this happens.
+a dirty working tree, `COMMIT` not resolving to a commit, no release for `COMMIT` (or no Latest
+release), a release whose target doesn't match the resolved commit, one missing an asset, a missing
+`gh`/`dhewm3.exe`, a git/gh failure, or the checkout itself failing. The one exception: once `HEAD`
+has moved to the release's target commit, a failure moving the already-downloaded DLL/PDB into the
+checkout root, or pointing the mount, can leave `HEAD` at that commit with the DLL/PDB only
+partially in place - the error message names exactly what state each file and `HEAD` is in whenever
+this happens.
 
 Also injectable, mainly for `tools/test-fetch-and-play.sh` (never point this at the real
 repo/a real `gh` outside that self-test):
@@ -373,15 +396,17 @@ repo/a real `gh` outside that self-test):
 **What's proven where:** `tools/test-fetch-and-play.sh` runs on Unicron against a local bare git
 repo standing in for the real GitHub remote, a stubbed `gh`, and stubbed `wine`/`winepath`/
 `dhewm3.exe` that record the engine invocation instead of launching anything - it proves the dirty-
-tree refusal, the release/asset resolution, the detached checkout landing on the release's exact
-commit (not just the branch tip), the download, the mount, and the exact engine launch arguments
-(`fs_basepath`/`fs_game`/`fs_gameDllPath`), all without a display, a real engine, or a real repo.
-It cannot prove the two things only the owner, on real Windows, can: that the engine log shows
-`chextrek.dll` loaded, and that the game is actually playable. Those are spec #58's own final
-acceptance checks: run `bash tools/fetch-and-play.sh`, then check `dhewm3log.txt` (under the
-save/config path in the table above - `Documents\My Games\dhewm3\chextrek\` by default) for a line
-like `loaded game library '...chextrek.dll'` - not `base.dll`. `tools/fetch-and-play.sh` itself
-prints this same reminder once it launches the engine.
+tree refusal (with and without a `COMMIT` argument), the release/asset resolution (Latest and by
+commit), the detached checkout landing on the release's exact commit (not just the branch tip), the
+download, the mount, the exact engine launch arguments (`fs_basepath`/`fs_game`/`fs_gameDllPath`),
+a `COMMIT` with no release refusing and naming it, a release whose target doesn't match the resolved
+commit refusing, and the self-rewriting-checkout case above - all without a display, a real engine,
+or a real repo. It cannot prove the two things only the owner, on real Windows, can: that the engine
+log shows `chextrek.dll` loaded, and that the game is actually playable. Those are spec #58's own
+final acceptance checks: run `bash tools/fetch-and-play.sh [COMMIT]`, then check `dhewm3log.txt`
+(under the save/config path in the table above - `Documents\My Games\dhewm3\chextrek\` by default)
+for a line like `loaded game library '...chextrek.dll'` - not `base.dll`. `tools/fetch-and-play.sh`
+itself prints this same reminder once it launches the engine.
 
 ## Building
 
