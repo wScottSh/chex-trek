@@ -4,7 +4,7 @@
 # onward) that need to drive the game with map/spawn/script/wait commands beyond the fixed
 # smoke-check script tools/run-harness.sh runs. See docs/dev-setup.md.
 #
-# Usage: tools/run-scenario.sh <scenario-name> <console-script-file> [timeout-seconds]
+# Usage: bash tools/run-scenario.sh <scenario-name> <console-script-file> [timeout-seconds]
 #
 # <console-script-file> must be the *complete* console script (including "developer 1" and a
 # trailing "quit") - see tools/lib-harness.sh's chextrek_run_console_script.

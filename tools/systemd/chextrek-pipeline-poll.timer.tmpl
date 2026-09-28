@@ -1,0 +1,25 @@
+[Unit]
+Description=chex-trek pipeline: timer for the AFK-trigger poll service (spec #58/#68)
+
+[Timer]
+# Runs once shortly after boot/lingering-start (covers the nobody-logged-in case - spec #58's
+# whole point: this alone is what makes a boot with Unicron never logged into still eventually
+# catch up), then again every @@INTERVAL@@ after the *previous run started* (OnUnitActiveSec
+# counts from the last activation, not from completion - systemd.timer(5)). A run that overruns
+# one interval (e.g. a backlog of several commits, each a full suite run) doesn't cause two
+# concurrent runs to pile up: systemd refuses to start a second instance of the same
+# already-active service unit, and tools/pipeline-poll.sh's own non-blocking lock is a second,
+# independent guard - see docs/dev-setup.md's "AFK trigger" section for the full argument. It does
+# mean the *next* tick after a long run can fire again almost immediately once that run finishes,
+# rather than waiting out the rest of the interval - harmless (that tick just finds "up to date"
+# and exits at once if there's nothing new), and preferred over the alternative here.
+OnBootSec=5min
+OnUnitActiveSec=@@INTERVAL@@
+# No Persistent=: it only affects OnCalendar= timers (systemd.timer(5)). Reboot survival for this
+# timer comes from OnBootSec itself: a boot-relative trigger fires again after every boot, however
+# long Unicron was off, as long as the timer is enabled (WantedBy=timers.target, below) and
+# lingering is on for this user (already enabled - see docs/dev-setup.md, untouched by spec
+# #58/#68).
+
+[Install]
+WantedBy=timers.target
