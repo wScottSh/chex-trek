@@ -257,9 +257,68 @@ repo/a real `gh` outside that self-test):
 - `CHEXTREK_PIPELINE_SUITE_CMD` - the build+test command run inside the scratch worktree. Defaults
   to `bash tools/run-all-tests.sh`.
 - `CHEXTREK_PIPELINE_TAG_PREFIX` - release tag prefix. Defaults to `win-`.
+- `CHEXTREK_PIPELINE_RED_LABEL` - label on the single red-tracking issue. Defaults to
+  `pipeline:red`.
+- `CHEXTREK_PIPELINE_RED_TITLE` - fixed title of that issue. Defaults to `Pipeline: chex-trek build
+  is red`.
 
 The DLL is still never committed (same as always - see "Why none of this lives in the repo"); the
 release is the only place a built `chextrek.dll` is ever published.
+
+### Red/green issue tracking (spec #58/#67)
+
+A red run (exit `1`) or an environment blocker (exit `3`) opens or updates a single tracking issue;
+the next green run closes it. This is the seam that turns a red or blocked commit into a GitHub
+notification, without ever spamming a second issue for the same ongoing problem:
+
+- **Red or blocked, no issue currently open**: `tools/pipeline-process-commit.sh` creates the
+  `pipeline:red` label if it doesn't already exist (`gh label create ... --force`, safe to re-run),
+  then opens one issue with a fixed title (`Pipeline: chex-trek build is red`) and that label. The
+  body names the commit and either the failing scenarios (red - parsed from the suite's own `FAIL:`
+  lines) or the `ENVIRONMENT:` line (blocker) - worded distinctly so a broken Unicron is never
+  mistaken for a real game bug - plus this run's own archive log path (see the table above).
+- **Red or blocked, an issue is already open**: comments on that same issue instead of opening a
+  second one. Found by `gh issue list --label pipeline:red --state open` - this pipeline is the
+  only thing that ever applies that label, so at most one is ever open at a time.
+- **Green**: if an issue is open, it's closed (`gh issue close ... --comment`) with a comment naming
+  the now-green commit and linking the release that was just published. This only runs after a run
+  whose own suite just genuinely passed for this exact commit (a fresh publish, or losing a
+  same-commit publish race but confirming the release exists) - **not** on the idempotent
+  (already-published) fast path, since that path can be hit by re-processing any old,
+  already-published commit while a *later* commit is the one that's actually still red; closing the
+  issue there would be a false all-clear.
+- A pipeline-level error (exit `2`) never touches the issue - it isn't a game result either way, and
+  filing it as "red" would misreport a pipeline/environment problem as a game bug. Likewise, if the
+  `gh issue list` lookup itself fails (auth/network/rate-limit), the run does nothing to the issue
+  tracker rather than risk a duplicate open or a wrongly-skipped close - the failure is logged as a
+  WARNING in that run's own archive log, and a still-open issue waits for a later run.
+
+This all assumes commits are processed in order, one at a time - true for a by-hand run today, and
+for #68's poller (one commit fully processed before the next is picked up). It isn't proven safe
+against two *different* commits being processed concurrently: e.g. two red commits racing could
+both see no issue open and both create one, or a fresh green publish of an old, out-of-order commit
+could close an issue a genuinely later, still-red commit opened. The per-commit lock above only
+serializes two runs of the *same* commit.
+
+`tools/test-pipeline-process-commit.sh` covers the label/issue create-vs-comment-vs-close logic end
+to end against a stubbed `gh` (never the real repo), including the `gh issue list` failure case and
+the idempotent-path-doesn't-falsely-close case above. **Live-verified** against the real
+`wScottSh/chex-trek` repo and a real `gh`: opening a real `pipeline:red` issue from a throwaway
+branch commit, commenting on it instead of duplicating for a second red run (another throwaway
+commit), commenting on it again worded as an environment blocker, and finally closing it with a
+comment - that last run against `a39130d` itself (already known-green, not a throwaway commit).
+All four `gh label`/`gh issue` calls (create, comment x2, close) were real, against the real repo.
+Two things stayed simulated/dry-run rather than real, for this verification specifically, so it
+didn't wait on a full ~25-minute suite run four times over: the suite outcome itself (red/blocked/
+green) was chosen via `CHEXTREK_PIPELINE_SUITE_CMD` for all four runs, not by actually building and
+testing each commit - `bash tools/run-all-tests.sh` was separately run directly (not through this
+pipeline script) on this same branch during development and passed 24/24, proving the real
+build+test path independent of this issue-tracking verification; and release publishing stayed
+stubbed/dry-run (no real release/tag is allowed yet - see "Publishing pipeline" above), so the
+closing comment's release link is a dry-run URL, not a real one. That verification issue was
+`wScottSh/chex-trek#72` - left closed, with a summary comment identifying it as this run and
+spelling out exactly what was real vs. simulated, once the verification finished (not the same
+issue as this spec ticket, #67).
 
 ### Playing the latest green build (Windows, spec #58/#69)
 
