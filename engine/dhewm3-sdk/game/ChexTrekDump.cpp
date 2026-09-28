@@ -94,6 +94,7 @@ idCVar chextrek_test_str14( "chextrek_test_str14", "\"chextrek_test_ai_monster\"
 // command (the same technique tools/test-door-open.sh uses for g_doorTraceDist) rather than
 // hardcoding one vector per scenario.
 idCVar chextrek_test_str15( "chextrek_test_str15", "'-256 184 64'", CVAR_GAME, "chextrek: test-only vector-literal holder for AFK harness scenarios (spec #42) - see ChexTrekDump.cpp" );
+idCVar chextrek_test_str16( "chextrek_test_str16", "\"flemriser\"", CVAR_GAME, "chextrek: test-only string-literal holder for AFK harness scenarios (bug #49) - see ChexTrekDump.cpp" );
 
 /*
 ==================
@@ -387,6 +388,15 @@ void ChexTrek_Dump_f( const idCmdArgs &args ) {
 	gameLocal.Printf( "ai_opendoor_last: %s\n", chextrekAIOpenDoorCount > 0 ? chextrekAIOpenDoorLast.c_str() : "none" );
 	gameLocal.Printf( "ai_blocked_last: %s\n", chextrekAIBlockedLast.c_str() );
 
+	// chextrek: bug #49. The projectile the player's current weapon fires - script/
+	// map_storage_facility.script's weap_disable() swaps it to a "_nodamage" def via setProj until
+	// weap_enable() runs.
+	if ( !player || !player->weapon.GetEntity() ) {
+		gameLocal.Printf( "weapon_projectile: none\n" );
+	} else {
+		gameLocal.Printf( "weapon_projectile: %s\n", player->weapon.GetEntity()->ChexTrek_GetProjectileDict().GetString( "classname", "none" ) );
+	}
+
 	// chextrek: spec #41 (decomp-so/reference/door-opening.md). idPlayer::tryOpen's locked-door
 	// branches call the already-stock idPlayer::ShowTip, which only sets HUD gui state - read
 	// directly here instead of adding a new hook, see the ChexTrek_Dump_f header comment above.
@@ -556,6 +566,71 @@ void ChexTrek_TestImpulse_f( const idCmdArgs &args ) {
 	int impulse = atoi( args.Argv( 1 ) );
 	player->PerformImpulse( impulse );
 	gameLocal.Printf( "chextrek_test_impulse: sent impulse %d\n", impulse );
+}
+
+/*
+==================
+ChexTrek_TestProbe_f
+
+Test-only, bug #49. Prints one line: game time (ms), the named entity's health, whether it takes
+damage (fl.takedamage) and whether it's hidden. Read-only. Scenario timing under Wine can't rely on
+the console's frame-counted `wait` mapping to a fixed amount of game time (see
+tools/test-flemriser-rise.sh), so scenarios stamp each probe with gameLocal.time instead.
+==================
+*/
+void ChexTrek_TestProbe_f( const idCmdArgs &args ) {
+	if ( args.Argc() != 2 ) {
+		gameLocal.Printf( "usage: chextrek_test_probe <entity>\n" );
+		return;
+	}
+	idEntity *ent = gameLocal.FindEntity( args.Argv( 1 ) );
+	if ( !ent ) {
+		gameLocal.Printf( "chextrek_test_probe: time=%d entity=%s missing\n", gameLocal.time, args.Argv( 1 ) );
+		return;
+	}
+	gameLocal.Printf( "chextrek_test_probe: time=%d entity=%s health=%d takedamage=%d hidden=%d\n", gameLocal.time, ent->name.c_str(), ent->health, ent->fl.takedamage ? 1 : 0, ent->IsHidden() ? 1 : 0 );
+}
+
+/*
+==================
+ChexTrek_TestProjectileHit_f
+
+Test-only, bug #49. Damages the named entity exactly the way the local player's current weapon
+projectile does on impact: idProjectile::Collide's ent->Damage( ..., def_damage, 1.0, ... ), with
+the def_damage of the projectile def idWeapon::Event_SetProj last swapped in (so a
+"_nodamage" swap is honored). Stands in for aiming and firing the zorcher at a target, which the
+console-only harness can't do (setviewpos has no pitch). Prints game time, projectile, def_damage
+and the target's health before/after.
+==================
+*/
+void ChexTrek_TestProjectileHit_f( const idCmdArgs &args ) {
+	if ( !gameLocal.CheatsOk( false ) ) {
+		return;
+	}
+	if ( args.Argc() != 2 ) {
+		gameLocal.Printf( "usage: chextrek_test_projectile_hit <entity>\n" );
+		return;
+	}
+	idPlayer *player = gameLocal.GetLocalPlayer();
+	if ( !player || !player->weapon.GetEntity() ) {
+		gameLocal.Printf( "chextrek_test_projectile_hit: no local player weapon\n" );
+		return;
+	}
+	idEntity *ent = gameLocal.FindEntity( args.Argv( 1 ) );
+	if ( !ent ) {
+		gameLocal.Printf( "chextrek_test_projectile_hit: time=%d entity=%s missing\n", gameLocal.time, args.Argv( 1 ) );
+		return;
+	}
+	const idDict &projDict = player->weapon.GetEntity()->ChexTrek_GetProjectileDict();
+	const char *projName = projDict.GetString( "classname", "none" );
+	const char *defDamage = projDict.GetString( "def_damage", "" );
+	int before = ent->health;
+	if ( defDamage[0] != '\0' ) {
+		idVec3 dir = ent->GetPhysics()->GetOrigin() - player->GetPhysics()->GetOrigin();
+		dir.Normalize();
+		ent->Damage( player, player, dir, defDamage, 1.0f, INVALID_JOINT );
+	}
+	gameLocal.Printf( "chextrek_test_projectile_hit: time=%d projectile=%s def_damage=%s health=%d->%d\n", gameLocal.time, projName, defDamage[0] ? defDamage : "none", before, ent->health );
 }
 
 /*

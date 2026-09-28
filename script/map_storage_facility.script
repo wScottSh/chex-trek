@@ -134,7 +134,11 @@ namespace map_storage_facility {
 	}
 	
 	void weap_enable() {
+		entity weap;
 		weapDamage = true;
+		//don't wait for weap_disable's next 1 sec tick
+		weap = $player1.getWeaponEntity();
+		weap.setProj( weap.getKey( "def_projectile" ) );
 	}
 	
 	void riseflem() {
@@ -148,6 +152,8 @@ namespace map_storage_facility {
 		boolean cameraended = false;
 		float starttime = sys.getTime();
 		while( 1 ) {
+			//can't die while rising - every frame, since its own show() turns damage back on
+			$flemriser.ignoreDamage();
 			flempostemp_z = 80*(((sys.getTime() - starttime)/risetime)-1);
 		//	sys.println( flempostemp );
 			$flemriser.setJointPos( flem, JOINTMOD_WORLD_OVERRIDE, flempostemp );
@@ -162,6 +168,9 @@ namespace map_storage_facility {
 			sys.waitFrame();
 		}
 		$flemriser.clearAllJoints();
+		//out of the puddle: killable, and by zorcher too
+		$flemriser.allowDamage();
+		weap_enable();
 	}
 	
 	void shipTakeOff() {

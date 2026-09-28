@@ -94,6 +94,13 @@ void ChexTrek_TestGuiCompletion_f( const idCmdArgs &args );
 // blocks) is the real, already-ported game code, unchanged.
 void ChexTrek_TestImpulse_f( const idCmdArgs &args );
 
+// chextrek: bug #49, test-only. "chextrek_test_probe <entity>" prints game time + the entity's
+// health/takedamage/hidden; "chextrek_test_projectile_hit <entity>" applies the local player's
+// current weapon projectile's def_damage to it the way idProjectile::Collide does. See
+// ChexTrekDump.cpp and tools/test-flemriser-rise.sh.
+void ChexTrek_TestProbe_f( const idCmdArgs &args );
+void ChexTrek_TestProjectileHit_f( const idCmdArgs &args );
+
 // chextrek: spec #37, test-only. Registered as the "chextrek_test_map_cmd" console command by
 // idGameLocal::InitConsoleCommands. AC ("each map_* command changes the map scale/position shown
 // in the dump as expected") needs the PDA map's GUI commands (map_zoom_in/out, map_scroll_up/

@@ -85,6 +85,8 @@ public:
 	void					GetWeaponDef( const char *objectname, int ammoinclip );
 	bool					IsLinked( void );
 	bool					IsWorldModelReady( void );
+	// chextrek: bug #49. Read-only view of the projectile Event_SetProj last swapped in, for chextrek_dump.
+	const idDict &			ChexTrek_GetProjectileDict( void ) const { return projectileDict; }
 
 	// GUIs
 	const char *			Icon( void ) const;

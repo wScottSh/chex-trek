@@ -2313,6 +2313,8 @@ void idGameLocal::InitConsoleCommands( void ) {
 	cmdSystem->AddCommand( "chextrek_test_customui_cmd", ChexTrek_CustomUICmd_f,	CMD_FL_GAME|CMD_FL_CHEAT,	"chextrek: sends a command to the local player's registered idCustomUI (test harness only)" );
 	cmdSystem->AddCommand( "chextrek_test_gui_completion", ChexTrek_TestGuiCompletion_f, CMD_FL_GAME, "chextrek: dumps g_PDA's value-completion results (test harness only)" );
 	cmdSystem->AddCommand( "chextrek_test_impulse",	ChexTrek_TestImpulse_f,		CMD_FL_GAME|CMD_FL_CHEAT,	"chextrek: sends an impulse to the local player (test harness only)" );
+	cmdSystem->AddCommand( "chextrek_test_probe",	ChexTrek_TestProbe_f,		CMD_FL_GAME,				"chextrek: prints game time + an entity's health/takedamage/hidden (test harness only)" );
+	cmdSystem->AddCommand( "chextrek_test_projectile_hit", ChexTrek_TestProjectileHit_f, CMD_FL_GAME|CMD_FL_CHEAT, "chextrek: damages an entity as the player's current weapon projectile would on impact (test harness only)" );
 	cmdSystem->AddCommand( "chextrek_test_map_cmd",	ChexTrek_TestMapCmd_f,		CMD_FL_GAME|CMD_FL_CHEAT,	"chextrek: sends a PDA map_* GUI command to the local player (test harness only)" );
 	cmdSystem->AddCommand( "chextrek_test_pda_map_open", ChexTrek_TestPdaMapOpen_f, CMD_FL_GAME|CMD_FL_CHEAT, "chextrek: sets the PDA gui's own HudMap state flag directly (test harness only)" );
 	cmdSystem->AddCommand( "listTypeInfo",			ListTypeInfo_f,				CMD_FL_GAME,				"list type info" );
