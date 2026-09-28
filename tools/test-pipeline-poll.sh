@@ -14,7 +14,8 @@
 # failing commit, and a later poll retries exactly that commit first; red/environment-blocked
 # results (exit 1/3) still count as "processed" and advance the baseline; two overlapping poll
 # ticks never both process the same commit (the poll lock); history divergence (a force-push past
-# the last-processed commit) resets the baseline without processing and is reported distinctly.
+# the last-processed commit) resets the baseline without processing and is reported distinctly; a
+# missing or broken flock is a poll-level error, never mistaken for "another tick holds the lock".
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -324,6 +325,36 @@ else
 	fail "merge-base-error handling: exit=$CODE calls=$(wc -l <"$STUB_PROCESS_CALLS") state='$(cat "$STATE_FILE")' expected_unchanged='${BOGUS_SHA}'"
 fi
 mv "${STATE_FILE}.bak" "$STATE_FILE"
+
+# === 12. a flock that can't take the lock for any reason other than "already held" (missing from
+# PATH - bash's exit 127 - or a broken one, e.g. MSYS2's flock.exe run from Git Bash, which exits 65
+# "Bad file descriptor") is a poll-level error (exit 2), never mistaken for "another poll tick is
+# running" (exit 0) - that would silently skip every tick forever ===
+for BROKEN_RC in 127 65; do
+	reset_calls
+	push_commit "commit during broken flock (${BROKEN_RC})" >/dev/null
+	BROKEN_BIN="${SCRATCH}/broken-flock-${BROKEN_RC}"
+	mkdir -p "$BROKEN_BIN"
+	printf '#!/usr/bin/env bash\nexit %s\n' "$BROKEN_RC" >"${BROKEN_BIN}/flock"
+	chmod +x "${BROKEN_BIN}/flock"
+	BEFORE_STATE="$(cat "$STATE_FILE")"
+	OUT="$(cd "$REPO" && PATH="${BROKEN_BIN}:${PATH}" bash tools/pipeline-poll.sh)"
+	CODE=$?
+	if [ "$CODE" = "2" ] && [ "$(wc -l <"$STUB_PROCESS_CALLS")" = "0" ] && [ "$(cat "$STATE_FILE")" = "$BEFORE_STATE" ] && printf '%s' "$OUT" | grep -q "flock"; then
+		pass "broken flock (exit ${BROKEN_RC}): poll-level error (exit 2) naming flock, nothing processed, baseline untouched"
+	else
+		fail "broken flock (exit ${BROKEN_RC}): exit=$CODE calls=$(wc -l <"$STUB_PROCESS_CALLS") state='$(cat "$STATE_FILE")' expected_unchanged='${BEFORE_STATE}' out='${OUT}'"
+	fi
+done
+# The backlog left by the broken-flock ticks is picked up once flock works again.
+reset_calls
+OUT="$(poll)"
+CODE=$?
+if [ "$CODE" = "0" ] && [ "$(wc -l <"$STUB_PROCESS_CALLS")" = "2" ]; then
+	pass "broken flock follow-up: the commits skipped while flock was broken are processed on the next working tick"
+else
+	fail "broken flock follow-up: exit=$CODE calls=$(wc -l <"$STUB_PROCESS_CALLS")"
+fi
 
 echo
 if [ "$FAIL" = "0" ]; then

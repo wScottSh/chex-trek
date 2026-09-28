@@ -55,7 +55,8 @@
 #       red or environment-blocked - that's an expected, already-reported (via #67's issue tracker)
 #       outcome of processing a commit, not a poll-level failure.
 #   2 - a poll-level error: couldn't fetch, couldn't resolve the polled ref, history diverged (see
-#       above), the state file couldn't be read/written, or pipeline-process-commit.sh itself
+#       above), the poll lock couldn't be taken for any reason other than "already held" (e.g.
+#       flock missing from PATH - never mistaken for another tick running), the state file couldn't be read/written, or pipeline-process-commit.sh itself
 #       exited something other than 0/1/3 for one of the commits (its own "not a reliable result"
 #       exit 2, or a signal). Processing stops at the first such commit - the state file is left
 #       pointing at the last commit that *did* fully process, so the next poll tick retries the
@@ -115,9 +116,17 @@ log "=== pipeline-poll: $(date -u +%Y-%m-%dT%H:%M:%SZ) - polling origin/${BRANCH
 # I'll process it" for the same commit) ---
 POLL_LOCK_FILE="${LOCK_DIR}/poll.lock"
 exec 8>"$POLL_LOCK_FILE"
-if ! flock -n 8; then
+# Only flock's own "already held" exit (1) means another tick is running. Anything else - 127 (flock
+# not on PATH) or a flock that can't lock this shell's fd at all (e.g. MSYS2's flock.exe under Git
+# Bash exits 65) - is a poll-level error: treating it as "held" would silently skip every tick.
+flock -n 8
+FLOCK_RC=$?
+if [ $FLOCK_RC -eq 1 ]; then
 	log "==> another poll tick is already running (lock: ${POLL_LOCK_FILE}) - skipping this tick, the backlog (if any) will be picked up next time"
 	exit 0
+elif [ $FLOCK_RC -ne 0 ]; then
+	log "==> error: couldn't take the poll lock at ${POLL_LOCK_FILE} - flock exited ${FLOCK_RC} (127: flock not on PATH - see docs/dev-setup.md)"
+	exit 2
 fi
 
 # --- fetch: updates the local origin/<branch> remote-tracking ref only - never touches this

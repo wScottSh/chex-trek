@@ -19,6 +19,8 @@ internals differ.
 | `chextrek` mount | `C:\Program Files (x86)\Steam\steamapps\common\Doom 3\chextrek` | A **real NTFS symlink** (not a junction, not a copy) to whichever checkout of this repo you're currently testing. The harness (`tools/lib-harness.sh`) creates/repoints it automatically. |
 | Save/config/screenshot path | `%USERPROFILE%\Documents\My Games\dhewm3\chextrek\` | dhewm3 hardcodes this on Windows; see "Why none of this lives in the repo". |
 | Windows Smart App Control | **Off** | With it on, unsigned game DLLs - including dhewm3's own `base.dll` - are blocked (`LoadLibrary` fails with `0x11C7`, "An Application Control policy has blocked this file"). Must be off for `dhewm3.exe`, `base.dll`, and our own unsigned `chextrek.dll` to load at all. |
+| Developer Mode | Settings > System > Advanced (older builds: Privacy & Security > For developers) | **On.** Lets a non-admin Git Bash create the real NTFS symlink the `chextrek` mount needs. Without it every scenario test fails with `couldn't create a real symlink ... (no symlink privilege?)`. |
+| `flock` (Git Bash) | `C:\Users\Scott\bin\flock.exe` (+ `msys-intl-8.dll`, `msys-iconv-2.dll`) | Git for Windows doesn't ship it, but `tools/test-pipeline-poll.sh` and `tools/test-pipeline-process-commit.sh` (both run by `tools/run-all-tests.sh`) need it. Copy those three files from an MSYS2 install's `usr\bin` into a directory on Git Bash's `PATH` that does **not** also hold MSYS2's `msys-2.0.dll`, so `flock.exe` loads Git Bash's own runtime - run straight from `C:\msys64\usr\bin` it can't see Git Bash's file descriptors (`flock: 8: Bad file descriptor`). Check: `ldd "$(command -v flock)"` shows `msys-2.0.dll => /usr/bin/msys-2.0.dll`. |
 
 Environment variables the scripts read (all optional, default to the table above):
 
@@ -754,8 +756,9 @@ depend on it.
   get symlink privilege, instead of failing loudly. A copy would make the harness silently test
   stale content. `tools/lib-harness.sh` forces a real symlink with
   `MSYS=winsymlinks:nativestrict` and verifies it with `readlink` before trusting it. If your
-  account can't create symlinks, turn on Developer Mode (Settings > Privacy & Security > For
-  developers) rather than loosening this.
+  account can't create symlinks, turn on Developer Mode (Settings > System > Advanced on current
+  Windows 11; Settings > Privacy & Security > For developers on older builds) rather than
+  loosening this.
 - **`fs_savepath` can't be redirected via `+set` on this engine build.** dhewm3 resolves its
   Windows save path (`Documents\My Games\dhewm3\<mod>\`) before command-line `+set` overrides are
   applied, so logs/configs/screenshots always land there regardless of what you pass. That's fine:
