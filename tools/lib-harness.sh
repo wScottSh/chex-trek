@@ -380,7 +380,7 @@ _chextrek_run_console_script_impl() {
 		# qwinsta marks this process's own session with ">"; anything but Active means no display.
 		# Windows behavior here is unchanged by #63 (its AC): a missing dhewm3.exe still falls
 		# through to the ordinary FAIL/exit-1 check just below, not the Linux-only ENVIRONMENT/
-		# exit-3 treatment _chextrek_linux_preflight_or_exit gives it above.
+		# exit-3 treatment _chextrek_check_engine_or_exit gives it above.
 		if command -v qwinsta >/dev/null 2>&1 && ! qwinsta 2>/dev/null | grep -E '^>' | grep -qw Active; then
 			chextrek_exit_no_display
 		fi

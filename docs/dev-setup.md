@@ -109,7 +109,9 @@ tools/run-harness.sh [timeout-seconds]   # just the main-menu smoke run (default
 
 `tools/run-all-tests.sh` is the one command for the whole suite (spec #28 story 38): it builds
 `chextrek.dll`, then runs the harness self-test, the main-menu smoke test and every feature scenario
-in turn, and prints a pass/fail summary. It exits 0 if all pass, 1 if any fail, 3 on no display.
+in turn, and prints a pass/fail summary. It exits 0 if all pass, 1 if any fail, 3 on a broken-
+environment blocker (no display, or, Linux-only, #63: missing Wine/winepath, an uninitialized
+Wine prefix, missing Doom 3 data, or a missing dhewm3 engine).
 `docs/harness-coverage.md` lists which scenario covers which feature. Each `tools/test-*.sh` also
 runs on its own (it builds first unless `CHEXTREK_SKIP_BUILD=1`).
 
@@ -154,15 +156,17 @@ the harness brings its own display (Xvfb) instead of treating "no display" as th
 stop - see "Unicron (Linux/Wine)" above; exit 3 there means Xvfb itself couldn't be started at all.
 `tools/test-harness-no-display.sh` covers both without needing a display itself.
 
-**Every other broken-Unicron-environment case stops the same way (#63).** Before ever touching a
-display, on Linux the harness checks that `wine` and `winepath` are on `PATH`, that `$WINEPREFIX`
-looks initialized (`system.reg` present) and that the classic Doom 3 data is at `$DOOM3_BASEPATH`
-(`base/pak000.pk4` present); on either platform it then checks that the dhewm3 engine itself is at
+**Every other broken-Unicron-environment case stops the same way (#63), Linux-only.** Before ever
+touching a display, on Linux the harness checks that `wine` and `winepath` are on `PATH`, that
+`$WINEPREFIX` looks initialized (`system.reg` present), that the classic Doom 3 data is at
+`$DOOM3_BASEPATH` (`base/pak000.pk4` present), and that the dhewm3 engine itself is at
 `$DHEWM3_HOME`. Any of these missing prints one `ENVIRONMENT: ...` line naming the missing piece
 and exits the whole script with code 3, the same contract as the no-display case above - never an
 ordinary FAIL, and never a bare "command not found" from a missing `wine`/`winepath` silently
-swallowed by a path-conversion call. `tools/test-harness-broken-environment.sh` covers each of
-these in isolation (Linux-only; a no-op on Windows), without needing any of the real installs
+swallowed by a path-conversion call. On Windows a missing dhewm3 engine is unchanged by #63: still
+an ordinary FAIL/exit-1 next to chextrek.dll's own missing-build check, not this ENVIRONMENT/exit-3
+treatment. `tools/test-harness-broken-environment.sh` covers each of the Linux-only cases in
+isolation (a no-op on Windows), without needing any of the real installs
 itself.
 
 ## Writing a feature scenario

@@ -5,7 +5,9 @@ story 39). `decomp-so/reference/coverage.md` is a different record: spec #16's d
 functions against the reference files.
 
 - **Run everything:** `tools/run-all-tests.sh` builds `chextrek.dll` once, then runs every
-  `tools/test-*.sh` and prints a pass/fail summary (exit 0 all pass, 1 any fail, 3 no display).
+  `tools/test-*.sh` and prints a pass/fail summary (exit 0 all pass, 1 any fail, 3 on a broken-
+  environment blocker - no display, or, Linux-only, #63: missing Wine/winepath, an uninitialized
+  Wine prefix, missing Doom 3 data, or a missing dhewm3 engine).
 - **Run one feature:** `tools/test-<feature>.sh` (game scenarios build first unless
   `CHEXTREK_SKIP_BUILD=1`).
   Setup and environment variables: `docs/dev-setup.md`.
