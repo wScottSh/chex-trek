@@ -428,7 +428,13 @@ several commits (each a full suite run, tens of minutes - see "Measured build ti
 the newest commit's own result until every older one in the backlog has been processed, in favor
 of never producing a wrong answer. A poll-level error partway through a backlog (exit 2 - see
 `tools/pipeline-poll.sh`'s own header) stops that tick at the failing commit without advancing past
-it, so the next tick retries it first rather than skipping ahead.
+it, so the next tick retries it first rather than skipping ahead. If a commit's error is
+persistent rather than transient (e.g. `tools/pipeline-process-commit.sh` reliably exits 2 for that
+exact commit - a bad worktree state it can't recover from, say), the poller retries it forever by
+design rather than silently giving up; unsticking it is a manual step: investigate
+`CHEXTREK_PIPELINE_STATE_DIR/logs/` for that commit's own run archive, and once the cause is
+understood, either fix it and let the next tick retry normally, or deliberately skip past that one
+commit by writing its SHA directly into `CHEXTREK_PIPELINE_STATE_DIR/poller-last-processed`.
 
 **First run ever** (no state file yet) bootstraps the baseline to the current `origin/<branch>` tip
 without processing anything - otherwise the very first poll tick would try to process this repo's
@@ -444,14 +450,17 @@ tip without processing anything, a WARNING is logged, and the poll tick exits 2 
 
 1. **systemd's own singleton semantics for the oneshot service** - the primary guarantee, and a
    general systemd unit-activation invariant, not something specific to timers: starting a unit
-   that's already active is a no-op job (it returns at once; it does not queue up a second
-   execution once the first finishes), whether the `start` comes from the timer's own elapse or
-   from a human running `systemctl --user start` by hand while a run is in progress. Live-verified
-   directly (`tools/test-pipeline-poll-systemd.sh`, phase D) via an explicit concurrent
+   that's already active *merges into the in-flight job* rather than launching a second execution -
+   whether the `start` comes from the timer's own elapse or from a human running
+   `systemctl --user start` by hand while a run is in progress. That merge means the second `start`
+   call itself **blocks until the running instance finishes** (confirmed live - it does not return
+   early), not "fire and forget"; either way, the suite command is never invoked twice at once.
+   Live-verified (`tools/test-pipeline-poll-systemd.sh`, phase D) via an explicit concurrent
    `systemctl --user start` against a deliberately slow run - not by waiting for the real timer to
    happen to re-elapse during the busy window, which turned out (probed live against this same
-   systemd) to be too timing-dependent to assert reliably in a bounded self-test; the underlying
-   job-control guarantee is identical either way.
+   systemd) to be too timing-dependent to assert reliably in a bounded self-test. That phase proves
+   the deployed system as a whole (this layer plus layer 2 below) never runs the suite command
+   twice at once; it doesn't, on its own, isolate which layer stopped any one particular attempt.
 2. **`tools/pipeline-poll.sh`'s own non-blocking flock** (`STATE_DIR/locks/poll.lock`, separate
    from `pipeline-process-commit.sh`'s own per-tag lock) - defense in depth against anything
    invoking the poll script outside systemd entirely (e.g. a human running it directly by hand,

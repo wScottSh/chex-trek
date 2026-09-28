@@ -144,11 +144,11 @@ STATE_FILE="${STATE_DIR}/poller-last-processed"
 wait_for_service_idle() {
 	# Bounded wait (never unbounded) for the oneshot service to leave "activating"/"reloading" -
 	# i.e. this run of it has finished, one way or another. NOT `systemctl is-active --quiet`: for
-	# a oneshot service, `is-active` already returns *non-zero* while the unit is "activating" (its
-	# main process is still running) - only "active"/"activating" alike is what `--quiet` treats as
-	# success, and a oneshot's steady state once its process exits is "inactive", not "active". A
-	# `while is-active --quiet; do ...; done` loop is therefore a no-op: it never actually waits.
-	# `ActiveState` read directly is unambiguous instead.
+	# a oneshot service, `--quiet` only treats "active" as success - but a oneshot's *entire* run
+	# (main process still running) is reported as "activating", not "active", and its steady state
+	# once the process exits is "inactive". So `is-active --quiet` is already false for the whole
+	# duration of a run - a `while is-active --quiet; do ...; done` loop is therefore a no-op: it
+	# never actually waits. `ActiveState` read directly is unambiguous instead.
 	timeout 30 bash -c "
 		while true; do
 			state=\$(systemctl --user show -p ActiveState --value '${SERVICE_UNIT}' 2>/dev/null)
@@ -200,11 +200,17 @@ fi
 # reliably produce a second observable trigger attempt within any bounded, test-friendly window -
 # systemd defers/coalesces it rather than firing on a fixed schedule regardless of unit state, so
 # asserting "the timer fires again during the busy window" would be a flaky, environment-timing-
-# dependent test. `systemctl start` on an already-active unit is instead a well-documented,
-# deterministic systemd unit-activation invariant (starting an active unit is a no-op job, not a
-# second execution) - the *same* job-control machinery a timer's own elapse goes through to start
-# its target service, so proving it here is equally strong evidence for the timer's own
-# no-overlap safety, without depending on exactly when a timer elapse happens to land. ===
+# dependent test. `systemctl start` on an already-active unit instead goes through the same
+# general systemd job-control machinery a timer's own elapse would use to start its target service
+# (starting an active unit merges into the in-flight job rather than launching a second execution -
+# see the second-start check below for exactly what that means operationally). What this phase
+# actually proves is that the *deployed system as a whole* (the unit plus
+# tools/pipeline-poll.sh's own non-blocking flock) never lets the suite command run twice at once -
+# it does not, on its own, isolate which of those two layers is the one stopping any particular
+# concurrent attempt (the poll script's own flock would just as well stop a second poll tick before
+# it ever reached the suite command, even if systemd itself allowed a second execution through).
+# Both layers are part of the documented no-overlap design (see docs/dev-setup.md's "AFK trigger"
+# section), so proving the combined guarantee holds is what matters operationally. ===
 OVERLAP_MARKER="${SCRATCH}/slow-run.marker"
 OVERLAP_SENTINEL="${SCRATCH}/overlap-detected.sentinel"
 CALL_LOG="${SCRATCH}/slow-call.log"
@@ -241,16 +247,20 @@ if ! timeout 10 bash -c "until [ -f '${OVERLAP_MARKER}' ]; do sleep 0.1; done"; 
 	fail "no-overlap setup: the slow run never signaled it had started"
 else
 	CALLS_BEFORE_SECOND_START="$(wc -l <"$CALL_LOG")"
-	# Bounded: a `start` against an active unit is documented to return at once (job merge, not a
-	# wait for the running instance) - if that were ever untrue here, this would hang instead of
-	# silently passing.
-	timeout 5 systemctl --user start "$SERVICE_UNIT" >/dev/null 2>&1
+	# `systemctl start` against an already-active unit merges into the in-flight job rather than
+	# queuing a second execution - but that merge means this call *blocks* until the running
+	# instance finishes (confirmed live: it does not return early), not "returns at once" as an
+	# earlier version of this comment wrongly claimed. The timeout here is generous (well past the
+	# stub's own `sleep 4`) precisely because this call is expected to legitimately take nearly
+	# that long - a short timeout here would be a false FAIL on a loaded machine, not a hang caused
+	# by a real bug.
+	timeout 20 systemctl --user start "$SERVICE_UNIT" >/dev/null 2>&1
 	SECOND_START_STATUS=$?
 	CALLS_AFTER_SECOND_START="$(wc -l <"$CALL_LOG")"
 	if [ "$SECOND_START_STATUS" = "0" ] && [ "$CALLS_AFTER_SECOND_START" = "$CALLS_BEFORE_SECOND_START" ]; then
-		pass "no-overlap: an explicit second start while the first run is still in progress returns at once and never re-invokes the suite command"
+		pass "no-overlap: an explicit second start while the first run is still in progress merges into it (blocks until it finishes) and never re-invokes the suite command"
 	else
-		fail "no-overlap: second start status=${SECOND_START_STATUS} (expected 0/prompt return), calls before=${CALLS_BEFORE_SECOND_START} after=${CALLS_AFTER_SECOND_START} (expected unchanged)"
+		fail "no-overlap: second start status=${SECOND_START_STATUS} (expected 0), calls before=${CALLS_BEFORE_SECOND_START} after=${CALLS_AFTER_SECOND_START} (expected unchanged)"
 	fi
 	wait_for_service_idle
 	if [ -f "$OVERLAP_SENTINEL" ] || [ "$(cat "$CALL_LOG" | wc -l)" != "1" ]; then

@@ -167,10 +167,11 @@ fi
 # --- divergence check: LAST must still be an ancestor of TIP, or origin/<branch> was rewritten
 # (force-push) past a commit this poller already handed off - see header. `--is-ancestor`'s exit
 # status is 3-way, not boolean: 0 = is an ancestor, 1 = confirmed *not* an ancestor (the real
-# divergence case), anything else (2, or a signal) = git itself couldn't answer the question at
-# all (a corrupt/incomplete object, transient repo error) - that's a poll-level error, not a
-# divergence finding, and must never be treated as one: doing so would permanently reset the
-# baseline past commits that were never actually processed, silently skipping them for good. ---
+# divergence case), anything else (128 for an unresolvable/bad object - e.g. a corrupted or
+# manually-edited state file - or a signal) = git itself couldn't answer the question at all - that's
+# a poll-level error, not a divergence finding, and must never be treated as one: doing so would
+# permanently reset the baseline past commits that were never actually processed, silently skipping
+# them for good. ---
 git -C "$REPO_ROOT" merge-base --is-ancestor "$LAST" "$TIP" 2>/dev/null
 ANCESTOR_STATUS=$?
 if [ "$ANCESTOR_STATUS" = "1" ]; then
