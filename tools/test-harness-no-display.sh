@@ -17,10 +17,35 @@ trap 'rm -rf "$SCRATCH"' EXIT
 FAIL=0
 
 if chextrek_is_linux; then
-	# --- case 1: no DISPLAY and no Xvfb to start one -> exit 3 before launching dhewm3 (#60) ---
-	# Stub `Xvfb` shadows the real one (first on PATH) and always fails to start, standing in for
-	# "Xvfb isn't installed" without also hiding the ordinary tools (date, uname, ...) the test
-	# itself and chextrek_is_linux need.
+	# A curated PATH with only the ordinary tools the test itself, chextrek_is_linux and the
+	# harness's early checks need (symlinked from wherever they really live) - and deliberately no
+	# `Xvfb` - so "Xvfb isn't installed" (case 1a) is the real `command -v Xvfb` miss, not a stand-in.
+	mkdir -p "${SCRATCH}/no-xvfb-bin"
+	for TOOL in bash uname date cat mkdir rm printf sed grep id readlink basename dirname cp \
+		mktemp kill sleep seq ln tr chmod true env; do
+		T="$(command -v "$TOOL" 2>/dev/null)" && ln -sf "$T" "${SCRATCH}/no-xvfb-bin/${TOOL}"
+	done
+
+	# --- case 1a: Xvfb genuinely isn't on PATH -> exit 3 before launching dhewm3 (#60) ---
+	START=$(date +%s)
+	OUT="$(PATH="${SCRATCH}/no-xvfb-bin" bash -c '
+		unset DISPLAY
+		source "$1/tools/lib-harness.sh"
+		chextrek_run_console_script "$1" "quit" 60 chextrek_no_display_selftest
+		echo "UNREACHED: harness returned instead of exiting"
+	' _ "$REPO_ROOT" 2>&1)"
+	CODE=$?
+	ELAPSED=$(( $(date +%s) - START ))
+
+	if [ $CODE -eq 3 ]; then echo "PASS: Xvfb not on PATH exits 3"; else echo "FAIL: Xvfb not on PATH exit code $CODE, want 3"; FAIL=1; fi
+	if echo "$OUT" | grep -q "^ENVIRONMENT: no display"; then echo "PASS: ENVIRONMENT line printed"; else echo "FAIL: no 'ENVIRONMENT: no display' line"; FAIL=1; fi
+	if echo "$OUT" | grep -q "Launching dhewm3"; then echo "FAIL: dhewm3 was launched anyway"; FAIL=1; else echo "PASS: dhewm3 not launched"; fi
+	if [ $ELAPSED -le 5 ]; then echo "PASS: stopped in ${ELAPSED}s"; else echo "FAIL: took ${ELAPSED}s to stop"; FAIL=1; fi
+	if echo "$OUT" | grep -qi "isn't installed"; then echo "PASS: mentions Xvfb isn't installed"; else echo "FAIL: expected the ENVIRONMENT line to say Xvfb isn't installed"; FAIL=1; fi
+
+	# --- case 1b: Xvfb is on PATH but every attempt to start it fails -> exit 3 the same way ---
+	# A stub `Xvfb` (first on the real PATH) that always exits immediately, standing in for a
+	# broken install (missing library, no permission, ...) rather than a missing binary.
 	mkdir -p "${SCRATCH}/bin"
 	cat > "${SCRATCH}/bin/Xvfb" <<'EOF'
 #!/usr/bin/env bash
@@ -37,11 +62,11 @@ EOF
 	CODE=$?
 	ELAPSED=$(( $(date +%s) - START ))
 
-	if [ $CODE -eq 3 ]; then echo "PASS: no DISPLAY and no Xvfb exits 3"; else echo "FAIL: no DISPLAY and no Xvfb exit code $CODE, want 3"; FAIL=1; fi
+	if [ $CODE -eq 3 ]; then echo "PASS: Xvfb failing to start exits 3"; else echo "FAIL: Xvfb failing to start exit code $CODE, want 3"; FAIL=1; fi
 	if echo "$OUT" | grep -q "^ENVIRONMENT: no display"; then echo "PASS: ENVIRONMENT line printed"; else echo "FAIL: no 'ENVIRONMENT: no display' line"; FAIL=1; fi
 	if echo "$OUT" | grep -q "Launching dhewm3"; then echo "FAIL: dhewm3 was launched anyway"; FAIL=1; else echo "PASS: dhewm3 not launched"; fi
 	if [ $ELAPSED -le 5 ]; then echo "PASS: stopped in ${ELAPSED}s"; else echo "FAIL: took ${ELAPSED}s to stop"; FAIL=1; fi
-	if echo "$OUT" | grep -qi "Xvfb"; then echo "PASS: mentions Xvfb (the actual blocker)"; else echo "FAIL: expected the ENVIRONMENT line to mention Xvfb"; FAIL=1; fi
+	if echo "$OUT" | grep -qi "couldn't start Xvfb"; then echo "PASS: mentions Xvfb couldn't be started"; else echo "FAIL: expected the ENVIRONMENT line to say Xvfb couldn't be started"; FAIL=1; fi
 
 	# --- case 2: no DISPLAY but Xvfb is available -> the harness starts its own and gets past the
 	# display check (SSH with no DISPLAY set, #60 AC2). It still won't reach dhewm3 (this checkout

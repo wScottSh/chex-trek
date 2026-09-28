@@ -146,10 +146,27 @@ chextrek_is_linux() {
 # `winepath -w`, resolved against $WINEPREFIX the same way the run itself is.
 chextrek_to_engine_path() {
 	if chextrek_is_linux; then
-		winepath -w "$1" 2>/dev/null
+		winepath -w "$1"
 	else
 		cygpath -w "$1"
 	fi
+}
+
+# _chextrek_stop_xvfb
+#
+# Stops and reaps the Xvfb this call started, if any (CHEXTREK_XVFB_PID), removes its scratch log
+# (CHEXTREK_XVFB_LOG), and clears both. A no-op when there's no PID (nothing to stop, or
+# `chextrek_ensure_display_or_exit` reused an existing display rather than starting one) - shared
+# by every place that needs to make sure this call's own Xvfb doesn't leak: a failed candidate
+# display, a mid-run display loss (chextrek_exit_no_display), and the normal end of a run
+# (chextrek_run_console_script).
+_chextrek_stop_xvfb() {
+	[ -n "${CHEXTREK_XVFB_PID:-}" ] || return 0
+	kill "$CHEXTREK_XVFB_PID" 2>/dev/null
+	wait "$CHEXTREK_XVFB_PID" 2>/dev/null
+	CHEXTREK_XVFB_PID=""
+	[ -n "${CHEXTREK_XVFB_LOG:-}" ] && rm -f "$CHEXTREK_XVFB_LOG"
+	CHEXTREK_XVFB_LOG=""
 }
 
 # chextrek_ensure_display_or_exit
@@ -159,15 +176,19 @@ chextrek_to_engine_path() {
 #
 # Unicron (Linux/Wine, #60): dhewm3 still needs *some* X display to open a window on, but nobody
 # is ever logged in to Unicron, so "no display" here is the normal case, not a rare disconnect -
-# the harness brings its own. If $DISPLAY already names a live X server (a previous call's Xvfb,
-# or a real X session), reuse it. Otherwise start a fresh Xvfb on the first free display number
-# and export DISPLAY for this run; CHEXTREK_XVFB_PID is set so the caller can stop it again once
-# the run finishes (see chextrek_run_console_script). Xvfb itself being unavailable or refusing to
-# start on every candidate display is the actual environment stop (exit 3) - the same class of
-# blocker the Windows branch reports for a disconnected session, just with a different cause.
+# the harness brings its own. If $DISPLAY already names a live X server (e.g. a wrapping script
+# exported one for several calls, or a real X session), reuse it - checked by its own lock file
+# rather than a tool like `xdpyinfo`, which isn't part of the one-time Unicron setup. Otherwise
+# start a fresh Xvfb on the first free display number and export DISPLAY for this run;
+# CHEXTREK_XVFB_PID is set so the caller can stop it again once the run finishes (see
+# chextrek_run_console_script). Xvfb itself being unavailable or refusing to start is the actual
+# environment stop (exit 3) - the same class of blocker the Windows branch reports for a
+# disconnected session, just with a different cause.
 chextrek_ensure_display_or_exit() {
 	CHEXTREK_XVFB_PID=""
-	if [ -n "${DISPLAY:-}" ] && command -v xdpyinfo >/dev/null 2>&1 && xdpyinfo >/dev/null 2>&1; then
+	local CUR_NUM="${DISPLAY-}"
+	CUR_NUM="${CUR_NUM#:}"
+	if [ -n "${DISPLAY-}" ] && [[ "$CUR_NUM" =~ ^[0-9]+$ ]] && [ -e "/tmp/.X${CUR_NUM}-lock" ]; then
 		return 0
 	fi
 	if ! command -v Xvfb >/dev/null 2>&1; then
@@ -175,19 +196,15 @@ chextrek_ensure_display_or_exit() {
 		echo "ENVIRONMENT: this is not a test failure. Install Xvfb on this host; do not wait or retry."
 		exit 3
 	fi
-	# Only the free-display-number search (below) needs to scan a wide range - contention on one
-	# particular number (another run's Xvfb already holding it) is the expected reason a candidate
-	# is skipped. An actual failure to spawn Xvfb at all (missing library, no permission, ...)
-	# fails identically whichever number is tried, so cap real spawn *attempts* separately and
-	# small: retrying that 100+ times would just make a real failure minutes slower to report,
-	# never more likely to succeed. `kill -0` can't tell a zombie (already-exited, not yet reaped)
-	# from a live process, so bound each attempt purely by wall time and always reap with `wait`
-	# before moving on, rather than polling liveness.
+	# The free-display-number search can skip many candidates cheaply (another run's Xvfb already
+	# holding that number), but an actual spawn failure (missing library, no permission, ...) fails
+	# the same way on every number, so real spawn *attempts* are capped separately and small.
 	local N ATTEMPTS=0
 	for N in $(seq 90 199); do
 		[ -e "/tmp/.X${N}-lock" ] && continue
 		ATTEMPTS=$((ATTEMPTS + 1))
-		Xvfb ":${N}" -screen 0 1280x1024x24 -nolisten tcp >"/tmp/chextrek-xvfb-${N}.log" 2>&1 &
+		CHEXTREK_XVFB_LOG="/tmp/chextrek-xvfb-${N}.log"
+		Xvfb ":${N}" -screen 0 1280x1024x24 -nolisten tcp >"$CHEXTREK_XVFB_LOG" 2>&1 &
 		CHEXTREK_XVFB_PID=$!
 		local WAITED=0
 		while [ $WAITED -lt 10 ] && [ ! -e "/tmp/.X${N}-lock" ]; do
@@ -198,9 +215,7 @@ chextrek_ensure_display_or_exit() {
 			export DISPLAY=":${N}"
 			return 0
 		fi
-		kill "$CHEXTREK_XVFB_PID" 2>/dev/null
-		wait "$CHEXTREK_XVFB_PID" 2>/dev/null
-		CHEXTREK_XVFB_PID=""
+		_chextrek_stop_xvfb
 		[ $ATTEMPTS -ge 3 ] && break
 	done
 	echo "ENVIRONMENT: no display - couldn't start Xvfb (tried ${ATTEMPTS} free display number(s))."
@@ -217,10 +232,7 @@ chextrek_ensure_display_or_exit() {
 # a normal FAIL that reads like a code bug. Also stops this call's own Xvfb (#60), if it started
 # one, so a display dying mid-run never leaks it.
 chextrek_exit_no_display() {
-	if [ -n "${CHEXTREK_XVFB_PID:-}" ]; then
-		kill "$CHEXTREK_XVFB_PID" 2>/dev/null
-		wait "$CHEXTREK_XVFB_PID" 2>/dev/null
-	fi
+	_chextrek_stop_xvfb
 	if chextrek_is_linux; then
 		echo "ENVIRONMENT: no display - the X display this run started or was given died before dhewm3 could open a window."
 		echo "ENVIRONMENT: this is not a test failure. Fix Xvfb/Wine on this host; do not wait or retry."
@@ -260,10 +272,7 @@ chextrek_run_console_script() {
 	CHEXTREK_XVFB_PID=""
 	_chextrek_run_console_script_impl "$@"
 	local RC=$?
-	if [ -n "$CHEXTREK_XVFB_PID" ]; then
-		kill "$CHEXTREK_XVFB_PID" 2>/dev/null
-		wait "$CHEXTREK_XVFB_PID" 2>/dev/null
-	fi
+	_chextrek_stop_xvfb
 	return $RC
 }
 
@@ -417,6 +426,17 @@ _chextrek_run_console_script_impl() {
 		timeout "$TIMEOUT_SECS" "$DHEWM3_EXE" "${ENGINE_ARGS[@]}"
 	fi
 	RUN_EXIT=$?
+
+	# wineserver and the winedevice.exe helpers it starts daemonize without closing the fds they
+	# inherited from this wine invocation - including this function's own stdout/stderr - so a
+	# fresh wineserver left running after dhewm3 exits can hold a caller's `$(...)` capture open
+	# indefinitely, well past this run actually finishing (spike #59 finding 4). `-k` (not `-w`:
+	# the spike saw *that* hang instead, when winedevice.exe outlives its display) stops this run's
+	# own $WINEPREFIX server so those fds close; it's scoped to this one prefix, so it can't touch
+	# a concurrent run's wine processes in a different prefix.
+	if chextrek_is_linux && command -v wineserver >/dev/null 2>&1; then
+		wineserver -k >/dev/null 2>&1 || true
+	fi
 
 	local TIMED_OUT=0
 	if [ $RUN_EXIT -eq 124 ] || [ $RUN_EXIT -eq 137 ]; then

@@ -2,9 +2,10 @@
 
 Spec #28/#29 (Windows dev machine), extended by spec #58/#60 (Unicron, Linux/Wine). This is the
 one-time, per-machine setup the build and harness scripts assume. Everything here is outside this
-repo on purpose - see "Why none of this lives in the repo" below. The harness's *interface* -
-`tools/build-chextrek.sh`, `tools/run-harness.sh`, `tools/run-all-tests.sh`, every `tools/test-*.sh`
-- is identical on both machines; only the one-time setup and a few internals differ.
+repo on purpose - see "Why none of this lives in the repo" below. The harness's *interface*
+(`tools/build-chextrek.sh`, `tools/run-harness.sh`, `tools/run-all-tests.sh`, every
+`tools/test-*.sh`) is identical on both machines; only the one-time setup and a few internals
+differ.
 
 ## Windows dev machine
 
@@ -29,7 +30,11 @@ Spec #58/#60. Unicron builds and runs the harness unattended, with nobody ever l
 desktop; the platform layer this needs lives in `tools/lib-harness.sh` behind `chextrek_is_linux`.
 Building `chextrek.dll` itself on Linux is a later sub-issue - #60 only covers running the harness
 against a prebuilt DLL (built on the Windows dev machine and copied over, or produced by that later
-Linux build step once it exists).
+Linux build step once it exists). Until that build step exists, `tools/build-chextrek.sh` (which
+`tools/run-all-tests.sh` and every `tools/test-*.sh` call before running) only knows how to build on
+Windows, so on Unicron: copy a Windows-built `chextrek.dll` (+ `.pdb`) to the repo root yourself,
+same gitignored place the Windows build writes to, and set `CHEXTREK_SKIP_BUILD=1` so the scripts
+skip the build step and use it as-is.
 
 | Thing | Location | Notes |
 |---|---|---|
@@ -65,13 +70,20 @@ What the Linux platform layer does differently (same `chextrek_run_console_scrip
   `grep` on Windows tolerates the trailing CR; Linux's doesn't, so every `...$`-anchored always-on
   check would silently fail even though the value is right there (spike #59 finding). The Linux
   branch strips it (`sed -i 's/\r$//'`) before anything greps the log.
+- **Wine process cleanup:** `wineserver`/`winedevice.exe` daemonize without closing the fds they
+  inherited from the wine invocation that started them - including this call's own stdout/stderr -
+  so a freshly-spawned one left running after dhewm3 exits can hold a caller's `$(...)` capture
+  (e.g. `tools/run-harness.sh`'s own output, or `chextrek_run_scenario`'s) open indefinitely, well
+  past the run actually finishing (spike #59 finding 4). Right after each run, the harness stops
+  this run's own `$WINEPREFIX` server with `wineserver -k` (not `-w` - the spike saw *that* hang
+  instead, when `winedevice.exe` outlives its display) so those fds close; scoped to one prefix, it
+  can't touch a concurrent run's wine processes in a different prefix.
 
 **Not handled by #60** (left for later sub-issues, not asserted by anything here): building
-`chextrek.dll` itself on Linux; a single-run lock across concurrent worktrees (Wine leaves a
-`wineserver`/`winedevice.exe` pair running per prefix after a normal exit - harmless for one run at
-a time, but two concurrent runs against the same default `$WINEPREFIX` can still race on it, same
-as the existing "one run at a time" note below already says for the shared mount and save dir); the
-two scenarios spike #59 found Wine-only-red (`test-end-level-nextmap.sh`, `test-objectives.sh`).
+`chextrek.dll` itself on Linux; a single-run lock across concurrent worktrees (two concurrent runs
+against the same default `$WINEPREFIX` can still race on each other's wine processes, same as the
+existing "one run at a time" note below already says for the shared mount and save dir); the two
+scenarios spike #59 found Wine-only-red (`test-end-level-nextmap.sh`, `test-objectives.sh`).
 
 ## Building
 
