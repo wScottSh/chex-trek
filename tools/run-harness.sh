@@ -8,7 +8,7 @@
 # onward) are separate tools/test-*.sh scripts built on the same tools/lib-harness.sh plumbing -
 # see docs/harness-coverage.md for which scenario covers which feature.
 #
-# Usage: tools/run-harness.sh [timeout-seconds]
+# Usage: bash tools/run-harness.sh [timeout-seconds]
 #
 # Environment overrides (see docs/dev-setup.md for the documented dev-machine defaults):
 #   DHEWM3_HOME     - the dhewm3 1.5.5 win32 engine's install dir (has dhewm3.exe in it).
