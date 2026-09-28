@@ -143,6 +143,13 @@ STATE_DIR="${SCRATCH}/state"
 
 run_pipeline() {
 	# run_pipeline SHA SUITE_SCRIPT [REPO_OVERRIDE]
+	#
+	# The empty-REPO_OVERRIDE branch (case 5) proves default --repo parsing, which only works if
+	# CHEXTREK_PIPELINE_REPO is actually unset for that call - `env -u` guarantees that regardless
+	# of what the ambient shell already has exported (this self-test is itself one of
+	# tools/run-all-tests.sh's own tools/test-*.sh scripts, run under a caller that may well have
+	# CHEXTREK_PIPELINE_REPO exported for its own outer pipeline run - a plain unset here would
+	# silently inherit that and this case would test nothing).
 	local SHA="$1" SUITE="$2" REPO_OVERRIDE="${3-stub/testrepo}"
 	if [ -n "$REPO_OVERRIDE" ]; then
 		CHEXTREK_PIPELINE_REPO="$REPO_OVERRIDE" \
@@ -150,7 +157,8 @@ run_pipeline() {
 			CHEXTREK_PIPELINE_SUITE_CMD="bash \"$SUITE\"" \
 			bash "${REPO}/tools/pipeline-process-commit.sh" "$SHA"
 	else
-		CHEXTREK_PIPELINE_STATE_DIR="$STATE_DIR" \
+		env -u CHEXTREK_PIPELINE_REPO \
+			CHEXTREK_PIPELINE_STATE_DIR="$STATE_DIR" \
 			CHEXTREK_PIPELINE_SUITE_CMD="bash \"$SUITE\"" \
 			bash "${REPO}/tools/pipeline-process-commit.sh" "$SHA"
 	fi
