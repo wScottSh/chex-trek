@@ -10,11 +10,15 @@
 #   chextrek_log_has_no_display / chextrek_exit_no_display - the no-display environment stop
 #     (exit 3) the run makes when there's no way to open a window (Windows: this session has no
 #     active desktop; Linux/Wine: the display this run had died mid-run).
+#   _chextrek_check_engine_or_exit / _chextrek_linux_preflight_or_exit - the other broken-
+#     environment stops (exit 3, one ENVIRONMENT line), Linux/Wine-only (#63): a missing dhewm3
+#     engine, missing Wine/winepath on PATH, an uninitialized Wine prefix, or missing Doom 3 data.
+#     Windows keeps its pre-#63 behavior for all of these unchanged.
 #
 # Scenario-script helpers (tools/test-*.sh):
 #   chextrek_build_or_exit      - builds chextrek.dll once (skipped under CHEXTREK_SKIP_BUILD=1).
 #   chextrek_run_scenario       - runs one console script via tools/run-scenario.sh and finds its
-#                                 archived log; propagates the no-display exit 3.
+#                                 archived log; propagates any environment-blocker exit 3.
 #   chextrek_assert_map_loaded  - the always-on "map finishes loading" check.
 #   chextrek_line_field_values  - values of a `<field>: <rest of line>` chextrek_dump line.
 #   chextrek_hud_map_*_values   - fields of the dump's `hud_map:` line.
@@ -53,9 +57,10 @@ chextrek_build_or_exit() {
 #   CHEXTREK_SCENARIO_EXIT  - its exit status (0 = always-on checks passed);
 #   CHEXTREK_SCENARIO_LOG   - the archived engine log's path, or "" if the run produced none;
 #   CHEXTREK_SCENARIO_SAVE_DIR - the scratch save dir (see chextrek_run_console_script).
-# Prints a FAIL line when the always-on checks failed. If the run stopped because there is no
-# display (exit 3), exits the calling script with 3 too, so that environment blocker is never
-# reported as an ordinary test FAIL. Returns CHEXTREK_SCENARIO_EXIT.
+# Prints a FAIL line when the always-on checks failed. If the run stopped on an environment
+# blocker (exit 3 - no display, or, Linux only, missing Wine/winepath, an uninitialized Wine
+# prefix, missing Doom 3 data or a missing dhewm3 engine, #63), exits the calling script with 3
+# too, so that blocker is never reported as an ordinary test FAIL. Returns CHEXTREK_SCENARIO_EXIT.
 chextrek_run_scenario() {
 	local LIB_DIR
 	LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -232,15 +237,86 @@ chextrek_ensure_display_or_exit() {
 # a normal FAIL that reads like a code bug. Also stops this call's own Xvfb (#60), if it started
 # one, so a display dying mid-run never leaks it.
 chextrek_exit_no_display() {
-	_chextrek_stop_xvfb
 	if chextrek_is_linux; then
-		echo "ENVIRONMENT: no display - the X display this run started or was given died before dhewm3 could open a window."
-		echo "ENVIRONMENT: this is not a test failure. Fix Xvfb/Wine on this host; do not wait or retry."
+		_chextrek_exit_environment \
+			"ENVIRONMENT: no display - the X display this run started or was given died before dhewm3 could open a window." \
+			"ENVIRONMENT: this is not a test failure. Fix Xvfb/Wine on this host; do not wait or retry."
 	else
-		echo "ENVIRONMENT: no display - this Windows session is not the active console session, so dhewm3 can't open a window."
-		echo "ENVIRONMENT: this is not a test failure. Stop and tell the human to reconnect to this session; do not wait or retry."
+		_chextrek_exit_environment \
+			"ENVIRONMENT: no display - this Windows session is not the active console session, so dhewm3 can't open a window." \
+			"ENVIRONMENT: this is not a test failure. Stop and tell the human to reconnect to this session; do not wait or retry."
 	fi
+}
+
+# _chextrek_exit_environment ENV_LINE...
+#
+# Shared plumbing for every environment stop (#28's chextrek_exit_no_display and #63's Wine/
+# Wine-prefix/Doom-3-data/dhewm3-engine checks below): prints each argument as its own line, stops
+# this call's own Xvfb if one had already been started (defensive - most #63 checks run before
+# Xvfb is ever started, but this keeps the contract identical regardless of check order, same as
+# chextrek_exit_no_display already needed), and exits the whole calling script with 3 - never a
+# plain FAIL that reads like a code bug (#58 story 16/29, #63 AC).
+_chextrek_exit_environment() {
+	local LINE
+	for LINE in "$@"; do
+		echo "$LINE"
+	done
+	_chextrek_stop_xvfb
 	exit 3
+}
+
+# _chextrek_check_engine_or_exit
+#
+# Unicron-only (#63): dhewm3 itself - unlike chextrek.dll, which every scenario (re)builds - is a
+# fixed, one-time install (docs/dev-setup.md: DHEWM3_HOME). Missing it on Linux means this
+# machine's environment isn't set up, not that the game library has a bug, so it gets the same
+# ENVIRONMENT/exit-3 treatment as a missing display, Wine/Wine-prefix or Doom 3 data (#63's four
+# broken-environment cases). Checked before the display check, before Xvfb ever starts, so a
+# missing engine is reported without paying for a display first. Windows keeps its pre-#63
+# behavior unchanged (#63 AC): a missing dhewm3.exe there still falls through to the ordinary
+# FAIL/exit-1 check next to chextrek.dll's, further down.
+_chextrek_check_engine_or_exit() {
+	local EXE="${DHEWM3_HOME}/dhewm3.exe"
+	if [ ! -f "$EXE" ]; then
+		_chextrek_exit_environment \
+			"ENVIRONMENT: dhewm3 engine not found at ${EXE}." \
+			"ENVIRONMENT: this is not a test failure. Install dhewm3 1.5.5 win32 or point DHEWM3_HOME at it (see docs/dev-setup.md); do not wait or retry."
+	fi
+}
+
+# _chextrek_linux_preflight_or_exit
+#
+# Unicron-only checks (#58/#63) for the resources dhewm3-under-Wine needs before it can even
+# attempt to open a display: Wine itself (`wine`, `winepath`), an initialized $WINEPREFIX, and the
+# classic Doom 3 data. Without these, a run previously either silently limped on with an empty
+# converted path (winepath missing - a plain "command not found" on stderr, swallowed by the
+# `$(...)` capture) or failed downstream with a generic "no engine log was produced at all" FAIL
+# once `wine` itself turned out missing - neither of which named the actual missing piece or
+# stopped with exit 3 (#63's bug report: a missing Wine/winepath on PATH made the harness FAIL
+# instead of exit 3). Each of these is a #63 "broken environment" case: exit 3, one ENVIRONMENT
+# line naming what's missing, dhewm3 never launched. Run before chextrek_ensure_display_or_exit so
+# a broken Wine setup doesn't pay for starting Xvfb first.
+_chextrek_linux_preflight_or_exit() {
+	if ! command -v wine >/dev/null 2>&1; then
+		_chextrek_exit_environment \
+			"ENVIRONMENT: wine not found on PATH - dhewm3 runs under Wine on Unicron." \
+			"ENVIRONMENT: this is not a test failure. Put Wine's bin dir on PATH (see docs/dev-setup.md); do not wait or retry."
+	fi
+	if ! command -v winepath >/dev/null 2>&1; then
+		_chextrek_exit_environment \
+			"ENVIRONMENT: winepath not found on PATH - needed to convert paths for dhewm3 under Wine." \
+			"ENVIRONMENT: this is not a test failure. Put Wine's bin dir on PATH (see docs/dev-setup.md); do not wait or retry."
+	fi
+	if [ ! -f "${WINEPREFIX}/system.reg" ]; then
+		_chextrek_exit_environment \
+			"ENVIRONMENT: Wine prefix not set up at ${WINEPREFIX} (no system.reg)." \
+			"ENVIRONMENT: this is not a test failure. Initialize \$WINEPREFIX, including the VC++ x86 redist (see docs/dev-setup.md); do not wait or retry."
+	fi
+	if [ ! -f "${DOOM3_BASEPATH}/base/pak000.pk4" ]; then
+		_chextrek_exit_environment \
+			"ENVIRONMENT: classic Doom 3 data not found at ${DOOM3_BASEPATH} (no base/pak000.pk4)." \
+			"ENVIRONMENT: this is not a test failure. Copy the Doom 3 1.3.1 data there (see docs/dev-setup.md); do not wait or retry."
+	fi
 }
 
 # chextrek_run_console_script REPO_ROOT CONSOLE_SCRIPT_BODY TIMEOUT_SECS RUN_LABEL
@@ -252,16 +328,19 @@ chextrek_exit_no_display() {
 # On return: CHEXTREK_RUN_STATUS is always set (0 pass, 1 fail; a timeout kill is a fail). CHEXTREK_ARTIFACT_DIR and
 # CHEXTREK_LOCAL_LOG are set once the run actually launches dhewm3; CHEXTREK_MOD_SAVE_DIR is set a
 # little earlier (as soon as the scratch save dir itself is resolved and wiped, before dhewm3 is
-# launched). On an early-return failure (missing dhewm3.exe/chextrek.dll, can't create the mount
-# symlink) all three are left unset, so callers that echo them should use
-# "${CHEXTREK_LOCAL_LOG:-}" under `set -u`. CHEXTREK_MOD_SAVE_DIR is the scratch save dir itself
+# launched). On an early-return failure (missing chextrek.dll, can't create the mount symlink, or -
+# Windows only, #63 AC: Linux exits instead, see below - a missing dhewm3.exe) all three are left
+# unset, so callers that echo them should use "${CHEXTREK_LOCAL_LOG:-}" under `set -u`.
+# CHEXTREK_MOD_SAVE_DIR is the scratch save dir itself
 # (Documents/My Games/dhewm3/chextrek/) -
 # callers that need to inspect something the archiving loop below doesn't copy out (e.g. #44's
 # nested env/ subfolder) should read it from there rather than recomputing the path, so the two
 # can't drift. It isn't wiped until the *next* run, so it's still valid to read right after this
 # call returns. Does not exit the shell - callers decide what to do with a non-zero
-# CHEXTREK_RUN_STATUS - except when there is no display (see chextrek_exit_no_display), which
-# exits the calling script with code 3.
+# CHEXTREK_RUN_STATUS - except for an environment stop (no display, or - Linux only, #63 - missing
+# Wine/winepath, an uninitialized Wine prefix, missing Doom 3 data or a missing dhewm3 engine; see
+# chextrek_exit_no_display and _chextrek_exit_environment), which exits the calling script with
+# code 3.
 #
 # This is a thin wrapper around _chextrek_run_console_script_impl so that an Xvfb this call
 # started on Linux/Wine (#60, see chextrek_ensure_display_or_exit) always gets stopped again on
@@ -286,6 +365,10 @@ _chextrek_run_console_script_impl() {
 		DHEWM3_HOME="${DHEWM3_HOME:-$HOME/games/dhewm3/1.5.5-win32/dhewm3}"
 		DOOM3_BASEPATH="${DOOM3_BASEPATH:-$HOME/games/doom3}"
 		export WINEPREFIX="${WINEPREFIX:-$HOME/games/wineprefix-chextrek}"
+		# #63: Wine, the Wine prefix, the Doom 3 data and the dhewm3 engine are all fixed, one-time
+		# resources (docs/dev-setup.md) - check the cheap ones before paying for an Xvfb start.
+		_chextrek_linux_preflight_or_exit
+		_chextrek_check_engine_or_exit
 		# Unicron has nobody logged in, ever (#60 AC: "works over SSH with no DISPLAY set") - bring
 		# our own display instead of treating "no display" as the environment stop qwinsta is for on
 		# Windows below.
@@ -295,6 +378,9 @@ _chextrek_run_console_script_impl() {
 		DOOM3_BASEPATH="${DOOM3_BASEPATH:-/c/Program Files (x86)/Steam/steamapps/common/Doom 3}"
 
 		# qwinsta marks this process's own session with ">"; anything but Active means no display.
+		# Windows behavior here is unchanged by #63 (its AC): a missing dhewm3.exe still falls
+		# through to the ordinary FAIL/exit-1 check just below, not the Linux-only ENVIRONMENT/
+		# exit-3 treatment _chextrek_check_engine_or_exit gives it above.
 		if command -v qwinsta >/dev/null 2>&1 && ! qwinsta 2>/dev/null | grep -E '^>' | grep -qw Active; then
 			chextrek_exit_no_display
 		fi
