@@ -3,7 +3,8 @@
 If you're an agent working on Unicron (the Linux host) and your change touches the game library -
 anything under `engine/dhewm3-sdk/`, `tools/build-chextrek.sh`, `tools/lib-harness.sh`, or any
 `tools/test-*.sh`/scenario script - run the whole suite yourself and get it green **before opening
-a PR**. Don't ship a game-library change that wasn't run in game (PR #57 did, and it broke).
+a PR**. Don't ship a game-library change that wasn't run in game - PR #57 did (see spec #58's
+Problem Statement).
 
 ## The one command
 
@@ -15,15 +16,15 @@ bash tools/run-all-tests.sh
 Run it plain - no `CHEXTREK_SKIP_BUILD` set. That builds `chextrek.dll` with the Unicron
 toolchain (msvc-wine, spec #64) and then runs the harness self-test, the main-menu smoke check
 and every feature scenario, the same one command as on the Windows dev machine (spec #28 story
-38/5). It's mode `100644` in git (a repo convention, not a mistake) - invoke it with `bash`, not
-directly.
+38, extended to Unicron by spec #58 story 5). It's mode `100644` in git (a repo convention, not a
+mistake) - invoke it with `bash`, not directly.
 
 The `export` matters: the harness's Wine (`/opt/wine-11.0-wow64/bin`, built from source for
 new-WoW64 - the distro-packaged Wine can't do this) isn't on `PATH` by default in a fresh shell.
-Without it, the suite doesn't fail the game - it stops at once with `ENVIRONMENT: wine not found
-on PATH - dhewm3 runs under Wine on Unicron.` and exit 3, spec #63's environment check working as
-designed. That's not a game bug and not something to wait out or retry; put Wine on `PATH` and run
-it again.
+Without it, the suite doesn't report a test failure - it stops at once with `ENVIRONMENT: wine not
+found on PATH - dhewm3 runs under Wine on Unicron.` and exit 3, spec #63's environment check
+working as designed. That's not a game bug and not something to wait out or retry; put Wine on
+`PATH` and run it again.
 
 ## Reading the result
 
@@ -48,6 +49,6 @@ build and every scenario together, the same guarantee the Windows dev machine gi
 
 ## Only one run at a time
 
-Unicron enforces a single-run lock (spec #62) across concurrent worktrees and the automatic
-per-commit pipeline (spec #58), so two agents' runs never race on the shared `chextrek` mount or
-save dir - a second run just waits and prints that it's waiting. See `docs/dev-setup.md`.
+Unicron enforces a single-run lock (spec #62) across concurrent worktrees, so two agents' runs
+never race on the shared `chextrek` mount or save dir - a second run just waits and prints that
+it's waiting. See `docs/dev-setup.md`.
