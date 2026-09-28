@@ -92,9 +92,38 @@ win32 dhewm3 1.5.5 (spec #59) loads. `tools/test-menu-smoke.sh` on Unicron, run 
 `CHEXTREK_SKIP_BUILD` set, is the reproducible proof: it builds via this Linux branch, then checks
 that result against every always-on check. See the #64 PR for a run of it.
 
-**This is noticeably slower than the Windows/MSBuild build** - every `cl`/`link` invocation pays
-Wine per-process startup overhead - expect it to take much longer wall-clock than a native Windows
-build of the same config; budget accordingly rather than assuming a hang.
+**mspdbsrv pre-start, and why:** `mspdbsrv.exe` (spawned under `/Zi`/`/FS` for PDB writes) is a
+long-lived background daemon; the first `cl.exe` invocation that needs it and finds none running
+spawns it *itself*, and it inherits that `cl` invocation's stdout/stderr pipe - the one msvc-wine's
+`sed` output filter reads from. Because `mspdbsrv` keeps that pipe's write end open long after the
+`cl` that spawned it has exited, `sed` (and so that one build step) blocks waiting for EOF until
+`mspdbsrv`'s own idle-shutdown timer closes it - about 10 minutes, observed to hit twice during a
+from-scratch configure (once per compiler-ABI probe) and again during the first real compile.
+`tools/build-chextrek.sh`'s Linux branch now starts `mspdbsrv.exe` itself first, stdio pointed at
+`/dev/null`, before configuring, so every `cl.exe` invocation connects to that already-running
+instance instead of spawning (and stalling behind) a new one; it also configures with
+`-DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded` (CMake >= 3.25, msvc-wine's documented workaround)
+so CMake's own ABI-detection probes use `/Z7` instead of `/Zi` and need `mspdbsrv` even less. (This
+also flips dhewm3-sdk's own explicit `/Zi` in `CMAKE_CXX_FLAGS_RELWITHDEBINFO` to `/Z7` - `cl` prints
+a harmless `D9025: overriding '/Zi' with '/Z7'` warning for every file - since dhewm3-sdk sets that
+flag directly rather than through CMake's debug-format abstraction, this repo can't fix that
+warning at the source without patching the pinned SDK import; it doesn't affect correctness or the
+resulting `.pdb`.)
+
+**Measured build times** (Unicron, 32 logical CPUs, `ninja`'s default job count, RelWithDebInfo,
+after the `mspdbsrv` fix above; one-time `docker build`/image-pull setup not included):
+
+| Build | Wall-clock | Notes |
+|---|---|---|
+| Clean (`rm -rf engine/build`, 122 objects) | ~8s | Configure ~1s, rest is compile+link; no minutes-long stall. |
+| No-change rebuild | ~1s | Ninja partially over-rebuilds (about 22/122 objects) some runs - same-second mtimes on a fast build outrace ninja's mtime-based staleness check on this filesystem; harmless and self-corrects, not a correctness issue. |
+| One-file incremental (`touch` a `game/*.cpp`) | ~1s | Rebuilds just that file (plus its usual reverse dependents) and relinks. |
+
+Before the `mspdbsrv` fix, a from-scratch configure alone measured ~1211s (about 20 minutes, two
+~10-minute stalls) - the fix above is what makes the numbers above possible. This is no longer
+"noticeably slower than Windows/MSBuild" in any way that matters for an iteration loop; docker's own
+per-invocation overhead (container start against the already-booted image) is negligible next to
+the compile time itself.
 
 What the Linux platform layer does differently (same `chextrek_run_console_script` interface,
 `tools/lib-harness.sh`):

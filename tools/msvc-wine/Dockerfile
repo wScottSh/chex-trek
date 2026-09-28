@@ -28,10 +28,11 @@ RUN apt-get update && \
 	rm -rf /var/lib/apt/lists/*
 
 # Initialize the wine environment once at image-build time so every later `docker run` of this
-# image starts from an already-booted wine prefix. Wait for wineserver to exit before the layer
-# closes, or the prefix can end up corrupted.
+# image starts from an already-booted wine prefix. `wineserver -w` blocks until the just-started
+# wineserver exits, so the layer never closes over a half-written prefix; wrapped in `timeout` so
+# a wedged wineserver fails the image build instead of hanging it forever.
 RUN $(command -v wine64 || command -v wine || false) wineboot --init && \
-	while pgrep wineserver > /dev/null; do sleep 1; done
+	timeout 120 wineserver -w
 
 ADD https://github.com/mstorsjo/msvc-wine/archive/${MSVC_WINE_COMMIT}.tar.gz /tmp/msvc-wine.tar.gz
 RUN mkdir -p /opt/msvc-wine-src && \
@@ -52,10 +53,11 @@ RUN PYTHONUNBUFFERED=1 /opt/msvc-wine-src/vsdownload.py --accept-license \
 # vsdownload.py falls back to "whatever's latest" (silently) if the pinned MSVC_VERSION isn't in
 # the manifest it fetches live from Microsoft at build time, instead of failing - guard against
 # that quietly drifting this "pinned" image onto a different compiler. `cl` itself is a wine
-# invocation (msvc-wine's wrapper script), so wait for wineserver to exit after, same as the
-# wineboot step above, or this layer can close with an unflushed prefix.
+# invocation (msvc-wine's wrapper script); `wineserver -w` waits for it to exit after, same as the
+# wineboot step above, or this layer can close with an unflushed prefix. Wrapped in `timeout` so a
+# wedged wineserver fails the build instead of hanging it forever.
 RUN CL_VERSION="$(/opt/msvc/bin/x86/cl 2>&1)"; \
-	while pgrep wineserver > /dev/null; do sleep 1; done; \
+	timeout 120 wineserver -w; \
 	echo "$CL_VERSION" | grep -qE "Version 19\.50\." || \
 	(echo "error: expected MSVC 14.50.x (cl reporting Version 19.50.x), got:" >&2 && \
 	 echo "$CL_VERSION" >&2 && exit 1)

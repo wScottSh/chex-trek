@@ -56,9 +56,35 @@ set -euo pipefail
 # Run even if a step below fails, so a failed configure/build never leaves engine/build owned by
 # root (unwritable/undeletable by the invoking user, and in the way of the next attempt).
 trap 'chown -R "${HOST_UID}:${HOST_GID}" engine/build 2>/dev/null || true' EXIT
+
+# Pre-start mspdbsrv.exe detached, stdio pointed at /dev/null, before any cl.exe invocation.
+# Without this, whichever cl.exe invocation is first to need it (a CMake ABI-detection probe,
+# or the first /Zi compile) spawns it itself and it inherits *that* cl invocation's stdout/stderr
+# pipe - the one msvc-wine's `sed` output filter reads from. mspdbsrv is a long-lived background
+# daemon, so it holds that pipe's write end open long after the cl.exe that spawned it has exited,
+# and `sed` (and so that one ninja/cmake step) blocks waiting for EOF until mspdbsrv's own ~10-minute
+# idle-shutdown timer closes it - paying that ~10 minutes on every from-scratch build. Starting it
+# ourselves first, with stdio that isn't any build step's pipe, means every later cl.exe just
+# connects to the already-running instance instead of spawning (and stalling on) a new one.
+MSPDBSRV="$(find /opt/msvc -iname mspdbsrv.exe -print -quit || true)"
+if [ -n "$MSPDBSRV" ]; then
+	wine "$MSPDBSRV" -start -spawn < /dev/null > /dev/null 2>&1 &
+fi
+
+# CMAKE_POLICY_DEFAULT_CMP0141=NEW + CMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded: makes CMake's
+# own compiler-identification/ABI-detection try_compile probes use /Z7 instead of their default
+# /Zi (see mstorsjo/msvc-wine's README) - those probes run before the pre-started mspdbsrv above
+# would otherwise help, cutting configure time dramatically. It also ends up overriding dhewm3-sdk's
+# own explicit /Zi (engine/dhewm3-sdk/CMakeLists.txt sets that directly in CMAKE_CXX_FLAGS_*, not
+# through this CMake abstraction) - CMake appends this flag's /Z7 after it on every compile command
+# line, and cl takes the last debug-format switch, printing a harmless
+# `D9025: overriding '/Zi' with '/Z7'` warning per file. Real source compiles mostly don't need
+# mspdbsrv either way now; the pre-started instance above is the backstop for whatever still does
+# (e.g. /FS-forced synchronous PDB writes at link time).
 CC=cl CXX=cl cmake -S engine/dhewm3-sdk -B engine/build -G Ninja \
 	-DCMAKE_SYSTEM_NAME=Windows -DCMAKE_SYSTEM_PROCESSOR=x86 \
 	-DCMAKE_EXE_LINKER_FLAGS=/MANIFEST:NO -DCMAKE_SHARED_LINKER_FLAGS=/MANIFEST:NO \
+	-DCMAKE_POLICY_DEFAULT_CMP0141=NEW -DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded \
 	-DBASE=ON -DBASE_NAME=chextrek -DD3XP=OFF -DCMAKE_BUILD_TYPE="${CONFIG}"
 echo "==> Building (${CONFIG})"
 cmake --build engine/build --target base
