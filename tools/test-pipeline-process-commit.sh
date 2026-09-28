@@ -18,8 +18,9 @@
 # the calling shell never reaches the suite command; a `gh release create` failure is a pipeline
 # error unless the recheck finds the release was actually made (response lost, not a duplicate
 # create); two overlapping runs of the *same* commit never corrupt each other's scratch worktree
-# (the per-tag lock); the worktree it made is cleaned up every time; the caller's own working copy
-# is left untouched; logs land outside the repo.
+# (the per-tag lock); a worktree left over from an earlier crashed run is removed, not mistaken for
+# a live one; the worktree it made is cleaned up every time; the caller's own working copy is left
+# untouched; logs land outside the repo.
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -181,6 +182,7 @@ SHA_SKIP_BUILD="$(commit_sha "ambient-skip-build commit")"
 SHA_CREATE_FAIL="$(commit_sha "create-call-fails-cleanly commit")"
 SHA_CREATE_RACE="$(commit_sha "create-call-fails-after-succeeding commit")"
 SHA_CONCURRENT="$(commit_sha "processed-by-two-overlapping-runs commit")"
+SHA_STALE_WORKTREE="$(commit_sha "stale-worktree-from-a-crashed-run commit")"
 
 # A second scratch repo, identical except its origin is an https URL (git@ / ssh:// are covered by
 # $REPO's own origin above) - proves default --repo parsing handles both remote URL forms.
@@ -323,7 +325,15 @@ CODE6C=$?
 SHORT_SKIP_BUILD="$(git -C "$REPO" rev-parse --short=10 "$SHA_SKIP_BUILD")"
 TAG_SKIP_BUILD="win-${SHORT_SKIP_BUILD}"
 if [ $CODE6C -eq 0 ]; then pass "exits 0 - the ambient CHEXTREK_SKIP_BUILD=1 didn't reach the suite command"; else fail "exit code $CODE6C, want 0 (suite would have reported the leak as a FAIL)"; echo "$OUT6C"; fi
-if echo "$OUT6C" | grep -qF "CHEXTREK_SKIP_BUILD leaked"; then fail "the suite command's own check caught a CHEXTREK_SKIP_BUILD leak"; else pass "no leak detected by the suite command's own check"; fi
+# The suite command's own stdout/stderr goes only to the pipeline's log file (captured via
+# >>"$LOG_FILE" inside pipeline-process-commit.sh), not to this run's own $(...) stdout - so the
+# leak check has to read the log file, not OUT6C, or it could never actually fire either way.
+LOG_SKIP_BUILD="$(find "${STATE_DIR}/logs" -name "*-${TAG_SKIP_BUILD}-*.log" | head -1)"
+if [ -n "$LOG_SKIP_BUILD" ] && grep -qF "CHEXTREK_SKIP_BUILD leaked" "$LOG_SKIP_BUILD"; then
+	fail "the suite command's own check caught a CHEXTREK_SKIP_BUILD leak"
+else
+	pass "no leak detected by the suite command's own check"
+fi
 if grep -qxF "$TAG_SKIP_BUILD" "$STUB_GH_RELEASES"; then pass "still published despite the ambient CHEXTREK_SKIP_BUILD=1"; else fail "expected a release despite the ambient CHEXTREK_SKIP_BUILD=1"; fi
 
 echo
@@ -398,6 +408,19 @@ else
 fi
 
 echo
+echo "=== case 6h: a stale scratch worktree left by an earlier crashed run is removed, not mistaken for a live one ==="
+SHORT_STALE="$(git -C "$REPO" rev-parse --short=10 "$SHA_STALE_WORKTREE")"
+TAG_STALE="win-${SHORT_STALE}"
+STALE_WT_DIR="${STATE_DIR}/worktrees/${TAG_STALE}"
+mkdir -p "$STALE_WT_DIR"
+printf 'leftover from a crashed run\n' >"${STALE_WT_DIR}/leftover-file"
+OUT6H="$(run_pipeline "$SHA_STALE_WORKTREE" "${SCRATCH}/suite-green.sh")"
+CODE6H=$?
+if [ $CODE6H -eq 0 ]; then pass "exits 0 despite a stale worktree directory already sitting at its path"; else fail "exit code $CODE6H, want 0"; echo "$OUT6H"; fi
+if [ -f "${STALE_WT_DIR}/leftover-file" ]; then fail "the stale leftover file is still there - the stale worktree wasn't actually replaced"; else pass "the stale worktree (and its leftover file) was removed before this run's real checkout"; fi
+if grep -qxF "$TAG_STALE" "$STUB_GH_RELEASES"; then pass "published normally despite the stale worktree"; else fail "expected a release despite the stale worktree"; fi
+
+echo
 echo "=== case 7: the worktrees this pipeline made are always cleaned up, and the caller's own working copy is untouched ==="
 WT_LIST="$(git -C "$REPO" worktree list --porcelain | grep -c '^worktree ')"
 if [ "$WT_LIST" = "1" ]; then pass "no leftover scratch worktrees - only the main checkout remains"; else fail "expected exactly 1 worktree (the main checkout), found ${WT_LIST}"; git -C "$REPO" worktree list; fi
@@ -411,7 +434,7 @@ if find "$REPO" -name "chextrek.dll" -o -name "chextrek.pdb" 2>/dev/null | grep 
 echo
 echo "=== case 8: pipeline logs are kept outside the repo (CHEXTREK_PIPELINE_STATE_DIR) ==="
 LOG_COUNT="$(find "${STATE_DIR}/logs" -name '*.log' 2>/dev/null | wc -l | tr -d ' ')"
-if [ "$LOG_COUNT" -ge 13 ]; then pass "one log file per run was kept under ${STATE_DIR}/logs (found ${LOG_COUNT})"; else fail "expected at least 13 log files under ${STATE_DIR}/logs, found ${LOG_COUNT}"; fi
+if [ "$LOG_COUNT" -ge 14 ]; then pass "one log file per run was kept under ${STATE_DIR}/logs (found ${LOG_COUNT})"; else fail "expected at least 14 log files under ${STATE_DIR}/logs, found ${LOG_COUNT}"; fi
 case "$STATE_DIR" in
 "$REPO"*) fail "STATE_DIR ($STATE_DIR) is inside the repo - logs would be gitignored plumbing at best, lost worktree cleanup at worst" ;;
 *) pass "STATE_DIR is outside the repo" ;;

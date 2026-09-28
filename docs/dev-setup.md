@@ -198,9 +198,13 @@ assertions were unchanged; only a `wait` count each script sends the game grew, 
 hand for now (the poller trigger is #68, red-issue handling is #67):
 
 ```
-export PATH=/opt/wine-11.0-wow64/bin:$PATH   # same Wine as docs/agents/unicron-build-test.md
 bash tools/pipeline-process-commit.sh <commit-ish>
 ```
+
+No `export PATH=...wine...` needed first (unlike `docs/agents/unicron-build-test.md`'s one
+command) - this script prepends the harness's own Wine location itself if `wine` isn't already on
+`PATH`, since it also has to work unattended once #68 invokes it with nobody around to have set up
+a shell first.
 
 It resolves `<commit-ish>` to an exact commit, then:
 

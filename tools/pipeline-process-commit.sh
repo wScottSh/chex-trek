@@ -124,12 +124,16 @@ log "log: ${LOG_FILE}"
 # the first run's live worktree as "stale" and force-removing it out from under an in-progress
 # build would corrupt or kill that first run. Different commits get different tags and never
 # contend. Held for the whole run (idempotency check through cleanup), released automatically on
-# exit since the lock lives on this shell's own fd 9. ---
+# exit since the lock lives on this shell's own fd 9 - the suite command explicitly closes its own
+# copy of fd 9 (see below) so a wine/Xvfb process it starts can never hold it past this run. ---
 LOCK_FILE="${LOCK_DIR}/${TAG}.lock"
 exec 9>"$LOCK_FILE"
 if ! flock -n 9; then
 	log "==> waiting for another run already processing ${TAG}..."
-	flock 9
+	if ! flock 9; then
+		log "OUTCOME: pipeline error - couldn't acquire the per-tag lock at ${LOCK_FILE} (is 'flock' on PATH?)"
+		exit 2
+	fi
 fi
 
 # --- idempotency (AC: re-processing the same commit doesn't create a duplicate release): check
@@ -183,7 +187,13 @@ SUITE_LOG_LINES_BEFORE="$(wc -l <"$LOG_FILE")"
 # run the suite against a prebuilt DLL) would make the suite skip building in this brand-new
 # scratch worktree, where no prebuilt DLL exists - a false red, not the "builds fresh from this
 # exact commit" guarantee this pipeline exists to make.
-(cd "$WT_DIR" && unset CHEXTREK_SKIP_BUILD && eval "$SUITE_CMD") >>"$LOG_FILE" 2>&1
+#
+# `9>&-` closes this subshell's own copy of the per-tag lock fd before the suite runs: the suite
+# itself starts wine/Xvfb (tools/lib-harness.sh, #62), which can daemonize past this pipeline run -
+# lib-harness.sh closes its own lock fd for exactly this reason (see _chextrek_acquire_lock there).
+# Without this, an orphaned wineserver/Xvfb from a killed or timed-out run could keep holding this
+# tag's lock forever, hanging every future run of the same commit at the blocking `flock 9` above.
+(cd "$WT_DIR" && unset CHEXTREK_SKIP_BUILD && eval "$SUITE_CMD" 9>&-) >>"$LOG_FILE" 2>&1
 SUITE_EXIT=$?
 # The suite's own output only (not this script's later log lines) - the source for the notes
 # summary below, so a `=== summary:` line from some *other* nested self-test earlier in the run
