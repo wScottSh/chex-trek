@@ -154,6 +154,17 @@ the harness brings its own display (Xvfb) instead of treating "no display" as th
 stop - see "Unicron (Linux/Wine)" above; exit 3 there means Xvfb itself couldn't be started at all.
 `tools/test-harness-no-display.sh` covers both without needing a display itself.
 
+**Every other broken-Unicron-environment case stops the same way (#63).** Before ever touching a
+display, on Linux the harness checks that `wine` and `winepath` are on `PATH`, that `$WINEPREFIX`
+looks initialized (`system.reg` present) and that the classic Doom 3 data is at `$DOOM3_BASEPATH`
+(`base/pak000.pk4` present); on either platform it then checks that the dhewm3 engine itself is at
+`$DHEWM3_HOME`. Any of these missing prints one `ENVIRONMENT: ...` line naming the missing piece
+and exits the whole script with code 3, the same contract as the no-display case above - never an
+ordinary FAIL, and never a bare "command not found" from a missing `wine`/`winepath` silently
+swallowed by a path-conversion call. `tools/test-harness-broken-environment.sh` covers each of
+these in isolation (Linux-only; a no-op on Windows), without needing any of the real installs
+itself.
+
 ## Writing a feature scenario
 
 Scenarios `map` into a real level and drive it with console commands. A `tools/test-*.sh` script
