@@ -3059,8 +3059,13 @@ void idPlayer::UpdateHudAmmo( idUserInterface *_hud ) {
 		// show remaining ammo
 		_hud->SetStateString( "player_totalammo", va( "%i", ammoamount - inclip ) );
 		_hud->SetStateString( "player_ammo", weapon.GetEntity()->ClipSize() ? va( "%i", inclip ) : "--" );		// how much in the current clip
-		_hud->SetStateString( "player_clips", weapon.GetEntity()->ClipSize() ? va( "%i", ammoamount / weapon.GetEntity()->ClipSize() ) : "--" );
+		// chextrek: bug #73, per the original gamex86.so's UpdateHudAmmo (0x14dbb0). hud.gui's
+		// clip1-7 pips count spare clips, so the loaded clip isn't counted; its ammo battery fills
+		// by player_ammo / player_clipsize and prints player_ammopercent, which stock never sets.
+		_hud->SetStateString( "player_clips", weapon.GetEntity()->ClipSize() ? va( "%i", ( ammoamount - inclip ) / weapon.GetEntity()->ClipSize() ) : "--" );
 		_hud->SetStateString( "player_allammo", va( "%i/%i", inclip, ammoamount - inclip ) );
+		_hud->SetStateInt( "player_clipsize", weapon.GetEntity()->ClipSize() );
+		_hud->SetStateString( "player_ammopercent", weapon.GetEntity()->ClipSize() ? va( "%.0f%%", inclip * 100.0f / weapon.GetEntity()->ClipSize() ) : va( "%i", ammoamount ) );
 	}
 
 	_hud->SetStateBool( "player_ammo_empty", ( ammoamount == 0 ) );
@@ -6243,12 +6248,17 @@ void idPlayer::PerformImpulse( int impulse ) {
 		case IMPULSE_19: {
 			// when we're not in single player, IMPULSE_19 is used for showScores
 			// otherwise it opens the pda
-			if ( !gameLocal.isMultiplayer ) {
-				if ( objectiveSystemOpen ) {
-					TogglePDA();
-				} else if ( weapon_pda >= 0 ) {
+			// chextrek: bug #48 (edits-inside-stock-functions lead: idPlayer::PerformImpulse,
+			// 0x16cc8f-0x16cd99). The mod's item_pda::Idle no longer calls openPDA() (its script
+			// comment: "it's in the SDK now"), so the impulse opens the PDA itself: raise
+			// weapon_pda if closed, then TogglePDA either way. Stock only raised the weapon,
+			// which left the PDA model's "comm down" screen up and never opened the PDA gui.
+			// With no PDA owned it does nothing (no stock "no PDA" tip).
+			if ( !gameLocal.isMultiplayer && weapon_pda >= 0 && inventory.pdas.Num() > 0 ) {
+				if ( !objectiveSystemOpen ) {
 					SelectWeapon( weapon_pda, true );
 				}
+				TogglePDA();
 			}
 			break;
 		}
