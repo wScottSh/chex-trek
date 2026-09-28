@@ -192,6 +192,75 @@ assertions were unchanged; only a `wait` count each script sends the game grew, 
   reliably reaches state `0` with the monsters line only 1-2% into its count, the same "started but
   not finished" margin the original wait targets.
 
+### Publishing pipeline: "process commit X" (spec #58/#66)
+
+`tools/pipeline-process-commit.sh <commit-ish>` is the pipeline's one entry point. It's invoked by
+hand for now (the poller trigger is #68, red-issue handling is #67):
+
+```
+bash tools/pipeline-process-commit.sh <commit-ish>
+```
+
+No `export PATH=...wine...` needed first (unlike `docs/agents/unicron-build-test.md`'s one
+command) - this script prepends the harness's own Wine location itself if `wine` isn't already on
+`PATH`, since it also has to work unattended once #68 invokes it with nobody around to have set up
+a shell first.
+
+It resolves `<commit-ish>` to an exact commit, then:
+
+1. checks that commit out into its **own scratch git worktree** - never the caller's own working
+   copy, never an agent's checkout - removing any stale worktree left by an earlier crashed run of
+   the same commit first;
+2. runs the full suite (`tools/run-all-tests.sh`, unchanged - see "Running the tests" below) inside
+   that scratch worktree, which builds `chextrek.dll` fresh from that exact commit;
+3. on green, publishes a GitHub Release tagged `win-<short-sha>`, targeting that commit, with
+   `chextrek.dll` and `chextrek.pdb` as assets, marked Latest (never `--prerelease`), with notes
+   that include the suite's own summary line;
+4. always removes the scratch worktree again, whether the run was green, red, or blocked.
+
+It's idempotent: before doing any of the above, it checks whether `win-<short-sha>` already exists
+(`gh release view`) and exits at once if so - a repeat run of an already-published commit publishes
+nothing new and doesn't rebuild.
+
+**Exit status** (the seam #67's red/green issue handling hangs off of):
+
+| Exit | Meaning |
+|---|---|
+| `0` | Published (just now, or already was - idempotent no-op). |
+| `1` | The suite ran and found a real test FAIL - nothing published. |
+| `2` | A pipeline-level error: bad commit-ish, a worktree/`gh` failure, the suite reported green but didn't actually produce `chextrek.dll`/`chextrek.pdb`, or the suite exited with anything other than 0/1/3 - not a game result either way. |
+| `3` | An environment blocker, propagated verbatim from `tools/run-all-tests.sh`'s own exit 3 (e.g. Wine not on `PATH`) - not a test result. |
+
+Two runs of the *same* commit (a by-hand run overlapping #68's poller, say) never corrupt each
+other: a per-tag `flock` (under `$CHEXTREK_PIPELINE_STATE_DIR/locks/`, separate from the harness's
+own single-run lock, #62) serializes them, so a second run never force-removes the first run's live
+scratch worktree out from under it. A second run finding the tag already published after waiting
+for the lock is the normal idempotent case above, not an error.
+
+**Where things live, outside every repo/worktree on purpose** (so a scratch worktree's removal in
+step 4 above never touches them, and logs outlive the checkout they describe):
+
+| Thing | Location | Override |
+|---|---|---|
+| Scratch worktrees | `$CHEXTREK_PIPELINE_STATE_DIR/worktrees/win-<short-sha>` | one per commit currently being processed; removed again once that run finishes |
+| Pipeline run logs | `$CHEXTREK_PIPELINE_STATE_DIR/logs/<timestamp>-win-<short-sha>-<pid>.log` | one file per run, `tail`-able while a run is in progress |
+| Per-commit locks | `$CHEXTREK_PIPELINE_STATE_DIR/locks/win-<short-sha>.lock` | one per commit tag; held for a run's whole duration, released automatically on exit |
+
+`$CHEXTREK_PIPELINE_STATE_DIR` defaults to `$XDG_STATE_HOME/chextrek-pipeline` if `$XDG_STATE_HOME`
+is set, else `$HOME/.local/state/chextrek-pipeline`.
+
+Also injectable, mainly for `tools/test-pipeline-process-commit.sh` (never point these at the real
+repo/a real `gh` outside that self-test):
+
+- `CHEXTREK_PIPELINE_REPO` - `owner/repo` passed to every `gh` call. Defaults to the `owner/repo`
+  parsed from this checkout's own `origin` remote.
+- `CHEXTREK_PIPELINE_SUITE_CMD` - the build+test command run inside the scratch worktree. Defaults
+  to `bash tools/run-all-tests.sh`.
+- `CHEXTREK_PIPELINE_TAG_PREFIX` - release tag prefix. Defaults to `win-`.
+
+The DLL is still never committed (same as always - see "Why none of this lives in the repo"); the
+release is the only place a built `chextrek.dll` is ever published.
+
 ## Building
 
 ```
