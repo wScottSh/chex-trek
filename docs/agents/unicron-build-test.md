@@ -33,8 +33,9 @@ working as designed. That's not a game bug and not something to wait out or retr
   script's own output just above it. Fix the change (or the test, if the test was wrong) and
   rerun - don't open a PR on a red run.
 - **Exit 3:** an `ENVIRONMENT:` line names a broken-Unicron-environment blocker (missing
-  Wine/`winepath` on `PATH`, an uninitialized Wine prefix, missing Doom 3 data, a missing dhewm3
-  engine, or no usable display) - not a test result. Stop; don't wait, poll, or retry. If it's the
+  `wine`/`winepath`/`wineserver`/`flock` on `PATH`, an uninitialized Wine prefix, missing Doom 3
+  data, a missing dhewm3 engine, an unopenable lock file, `docker` or the msvc-wine image missing
+  for the build, or no usable display) - not a test result. Stop; don't wait, poll, or retry. If it's the
   Wine-on-`PATH` case above, fix that and rerun once; any other blocker is an environment problem
   to escalate, not code to change. See `docs/dev-setup.md`'s "Unicron (Linux/Wine)" section for
   what each blocker means and where each piece is supposed to live.
@@ -42,9 +43,10 @@ working as designed. That's not a game bug and not something to wait out or retr
 ## Iterating quickly
 
 A full suite run rebuilds `chextrek.dll` first every time (clean build ~8s on Unicron, incremental
-~1s - see `docs/dev-setup.md`). While iterating on one scenario, run just that scenario's own
-`tools/test-<feature>.sh` instead of the whole suite; still run the whole plain
-`tools/run-all-tests.sh` once before opening the PR, since that's the one command that proves the
+~1s) and takes about 3.5 minutes in all (27 scripts, measured on Unicron - see
+`docs/dev-setup.md`'s "Running the tests"). While iterating on one scenario, run just that
+scenario's own `bash tools/test-<feature>.sh` instead of the whole suite; still run the whole plain
+`bash tools/run-all-tests.sh` once before opening the PR, since that's the one command that proves the
 build and every scenario together, the same guarantee the Windows dev machine gives.
 
 ## Only one run at a time

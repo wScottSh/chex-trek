@@ -10,7 +10,7 @@
 # human (or cron, or anything else) can run by hand, which is also what makes it self-testable
 # without systemd (tools/test-pipeline-poll.sh).
 #
-# Usage: tools/pipeline-poll.sh
+# Usage: bash tools/pipeline-poll.sh
 #
 # Why "each new commit, oldest first, one full run before the next is picked up" rather than
 # "skip straight to the newest": #67's red/green issue tracking is explicitly documented as only
@@ -23,10 +23,10 @@
 # that assumption the moment any of the skipped commits was red: the red issue #67 would have
 # opened for it just never gets opened, and a later green run would silently look like the first
 # and only outcome. Processing every commit in order costs more wall-clock time when a backlog
-# piles up (each full suite run is on the order of tens of minutes - see docs/dev-setup.md's
-# "Measured build times"), which delays the newest commit's own release/issue update until every
-# older one in the backlog has been processed - an accepted, documented trade-off in favor of
-# never producing a wrong answer.
+# piles up (each commit is a full build + suite run - a few minutes on Unicron, see
+# docs/dev-setup.md's "Running the tests"), which delays the newest commit's own release/issue
+# update until every older one in the backlog has been processed - an accepted, documented
+# trade-off in favor of never producing a wrong answer.
 #
 # State: a single file, STATE_DIR/poller-last-processed (see CHEXTREK_PIPELINE_STATE_DIR below),
 # holding the full SHA of the newest commit this poller has already handed to
@@ -90,10 +90,12 @@ set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+# shellcheck source=tools/lib-harness.sh
+source "${SCRIPT_DIR}/lib-harness.sh"
 
 BRANCH="${CHEXTREK_PIPELINE_POLL_BRANCH:-master}"
 
-STATE_DIR="${CHEXTREK_PIPELINE_STATE_DIR:-${XDG_STATE_HOME:-${HOME}/.local/state}/chextrek-pipeline}"
+STATE_DIR="$(chextrek_pipeline_state_dir)"
 LOCK_DIR="${STATE_DIR}/locks"
 mkdir -p "$STATE_DIR" "$LOCK_DIR" || {
 	echo "error: couldn't create state dir ${STATE_DIR}" >&2
@@ -235,11 +237,13 @@ for SHA in "${NEW_COMMITS[@]}"; do
 		# tracker already handled it inside process-commit.sh itself) - advance the baseline past
 		# this commit and move on to the next one in the backlog. This deliberately includes exit
 		# 3 (environment blocker): the thing that's broken is the *environment*, not this specific
-		# commit, so there's nothing to gain by re-testing this exact commit again later - once the
-		# environment is fixed, whatever is the current master tip at that point gets built and
-		# tested, which is what actually matters. Leaving an environment-blocked commit unadvanced
-		# would instead retry that same stale commit forever until someone fixes the environment,
-		# even if master has long since moved on.
+		# commit, and it's already been reported in the pipeline:red issue. Not advancing would
+		# retry the same commit every tick until someone fixes the environment - commenting on the
+		# issue each time, and holding up every newer commit behind it. The cost: the poller never
+		# retests a blocked commit on its own. Once the environment is fixed, the next commit pushed
+		# to master is processed normally; to get a result for the blocked commit itself (e.g. it
+		# is still the tip), run `bash tools/pipeline-process-commit.sh <sha>` by hand
+		# (docs/dev-setup.md's "AFK trigger" section).
 		write_state "$SHA"
 		;;
 	*)

@@ -6,7 +6,8 @@
 # build-chextrek.sh and run the suite against that prebuilt DLL as-is - see docs/dev-setup.md's
 # "Unicron (Linux/Wine)" section. This never launches the game: it copies run-all-tests.sh into a
 # scratch dir alongside a fake build-chextrek.sh (touches a marker instead of building) and fake
-# test-*.sh scripts (just exit 0), so it exercises only the build-skipping logic itself.
+# test-*.sh scripts (just exit 0), so it exercises only the build-skipping logic itself - plus the
+# build step's own exit 3 (environment blocker) propagating as the suite's exit 3.
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -59,6 +60,26 @@ CODE=$?
 if [ $CODE -eq 1 ]; then echo "PASS: exits 1 when the prebuilt DLL is missing"; else echo "FAIL: exit code $CODE, want 1"; FAIL=1; fi
 if echo "$OUT" | grep -qi "chextrek.dll"; then echo "PASS: error mentions chextrek.dll"; else echo "FAIL: expected an error mentioning chextrek.dll"; echo "$OUT"; FAIL=1; fi
 if [ -f "${SCRATCH}/build-was-called" ]; then echo "FAIL: build-chextrek.sh was called anyway"; FAIL=1; else echo "PASS: build-chextrek.sh not called"; fi
+
+# --- case 4: CHEXTREK_SKIP_BUILD unset and build-chextrek.sh stops on an environment blocker
+# (exit 3, e.g. docker or the msvc-wine image missing) -> the suite exits 3 too, not 1, and runs no
+# test-*.sh ---
+setup_scratch
+cat > "${SCRATCH}/tools/build-chextrek.sh" <<'EOF'
+#!/usr/bin/env bash
+echo "ENVIRONMENT: docker not found on PATH (stub)"
+exit 3
+EOF
+cat > "${SCRATCH}/tools/test-fake.sh" <<'EOF'
+#!/usr/bin/env bash
+touch "$(dirname "${BASH_SOURCE[0]}")/../test-was-run"
+exit 0
+EOF
+OUT="$(cd "$SCRATCH" && env -u CHEXTREK_SKIP_BUILD bash tools/run-all-tests.sh 2>&1)"
+CODE=$?
+if [ $CODE -eq 3 ]; then echo "PASS: exits 3 when the build stops on an environment blocker"; else echo "FAIL: exit code $CODE, want 3"; echo "$OUT"; FAIL=1; fi
+if echo "$OUT" | grep -q "^ENVIRONMENT:"; then echo "PASS: prints an ENVIRONMENT line"; else echo "FAIL: no ENVIRONMENT line"; echo "$OUT"; FAIL=1; fi
+if [ -f "${SCRATCH}/test-was-run" ]; then echo "FAIL: a test-*.sh ran despite the build's environment blocker"; FAIL=1; else echo "PASS: no test-*.sh ran"; fi
 
 [ $FAIL -eq 0 ] && { echo "PASS: whole self-test"; exit 0; }
 echo "FAIL: whole self-test"

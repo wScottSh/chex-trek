@@ -5,7 +5,9 @@
 # (or a bare "command not found") that reads like a code bug. The four cases from #58/#63: no
 # display, missing Doom 3 data, missing dhewm3 engine, missing Wine or its prefix. This covers the
 # latter three, each in isolation, with every other resource stubbed present so only the one
-# case's check can fire. Linux/Wine-only (Windows keeps its own qwinsta/no-display path unchanged,
+# case's check can fire - plus the same contract for the rest of the Unicron machine setup:
+# wineserver or flock missing from PATH, an unopenable lock file, and (build-chextrek.sh) docker
+# missing. Linux/Wine-only (Windows keeps its own qwinsta/no-display path unchanged,
 # #63 AC3); this self-test is a no-op there. Needs no display itself either way.
 set -u
 
@@ -48,14 +50,23 @@ setup_good_fixtures() {
 	: > "${SCRATCH}/dhewm3/dhewm3.exe"
 }
 
-# stub_wine_tools BIN_DIR
+# base-bin minus flock, for the "flock missing" case.
+mkdir -p "${SCRATCH}/base-bin-noflock"
+for T in "${SCRATCH}/base-bin"/*; do
+	[ "$(basename "$T")" = "flock" ] || ln -sf "$(readlink "$T")" "${SCRATCH}/base-bin-noflock/$(basename "$T")"
+done
+
+# stub_wine_tools BIN_DIR [TOOL...]
 #
-# Fake `wine`/`winepath` that exist on PATH and exit 0 (this test never needs them to actually do
+# Fake `wine`/`winepath`/`wineserver` (or just the named TOOLs) that exist on PATH and exit 0 (this test never needs them to actually do
 # anything - the checks under test are only `command -v`, not behavior).
 stub_wine_tools() {
 	local BIN_DIR="$1"
+	shift
+	local TOOLS=("$@")
+	[ ${#TOOLS[@]} -gt 0 ] || TOOLS=(wine winepath wineserver)
 	mkdir -p "$BIN_DIR"
-	for TOOL in wine winepath; do
+	for TOOL in "${TOOLS[@]}"; do
 		cat > "${BIN_DIR}/${TOOL}" <<'EOF'
 #!/usr/bin/env bash
 exit 0
@@ -64,15 +75,16 @@ EOF
 	done
 }
 
-# run_case PATH_DIRS DHEWM3_HOME DOOM3_BASEPATH WINEPREFIX
+# run_case PATH_DIRS DHEWM3_HOME DOOM3_BASEPATH WINEPREFIX [LOCK_FILE]
 #
 # Runs chextrek_run_console_script with the given fixtures and PATH, in a subshell so `exit 3`
 # doesn't kill this script. Sets OUT/CODE/ELAPSED.
 run_case() {
 	local CASE_PATH="$1" CASE_HOME="$2" CASE_DOOM3="$3" CASE_PREFIX="$4"
+	local CASE_LOCK="${5:-${SCRATCH}/harness.lock}"
 	local START
 	START=$(date +%s)
-	OUT="$(env -i PATH="$CASE_PATH" HOME="$SCRATCH" CHEXTREK_LOCK_FILE="${SCRATCH}/harness.lock" \
+	OUT="$(env -i PATH="$CASE_PATH" HOME="$SCRATCH" CHEXTREK_LOCK_FILE="$CASE_LOCK" \
 		DHEWM3_HOME="$CASE_HOME" DOOM3_BASEPATH="$CASE_DOOM3" WINEPREFIX="$CASE_PREFIX" \
 		bash -c '
 			unset DISPLAY
@@ -115,6 +127,22 @@ stub_wine_tools "${SCRATCH}/wine-bin"
 run_case "${SCRATCH}/wine-bin:${SCRATCH}/base-bin" "${SCRATCH}/dhewm3" "${SCRATCH}/doom3" "${SCRATCH}/missing-wineprefix"
 assert_environment_exit "Wine prefix not set up" "wine prefix"
 
+# --- case: wine+winepath present, wineserver missing -> exit 3, ENVIRONMENT names wineserver ---
+setup_good_fixtures
+stub_wine_tools "${SCRATCH}/wine-no-server-bin" wine winepath
+run_case "${SCRATCH}/wine-no-server-bin:${SCRATCH}/base-bin" "${SCRATCH}/dhewm3" "${SCRATCH}/doom3" "${SCRATCH}/wineprefix"
+assert_environment_exit "wineserver missing" "wineserver not found"
+
+# --- case: Wine OK, flock missing -> exit 3, ENVIRONMENT names flock ---
+setup_good_fixtures
+run_case "${SCRATCH}/wine-bin:${SCRATCH}/base-bin-noflock" "${SCRATCH}/dhewm3" "${SCRATCH}/doom3" "${SCRATCH}/wineprefix"
+assert_environment_exit "flock missing" "flock not found"
+
+# --- case: everything present but the lock file can't be opened -> exit 3, ENVIRONMENT names it ---
+setup_good_fixtures
+run_case "${SCRATCH}/wine-bin:${SCRATCH}/base-bin" "${SCRATCH}/dhewm3" "${SCRATCH}/doom3" "${SCRATCH}/wineprefix" "${SCRATCH}/no-such-dir/harness.lock"
+assert_environment_exit "lock file unopenable" "lock file"
+
 # --- case: Wine OK, Doom 3 data missing -> exit 3, ENVIRONMENT names the Doom 3 data ---
 setup_good_fixtures
 run_case "${SCRATCH}/wine-bin:${SCRATCH}/base-bin" "${SCRATCH}/dhewm3" "${SCRATCH}/missing-doom3" "${SCRATCH}/wineprefix"
@@ -138,13 +166,20 @@ else
 	echo "$OUT" | tail -8
 	FAIL=1
 fi
-if echo "$OUT" | grep -qi "wine not found\|winepath not found\|wine prefix\|doom 3 data\|dhewm3 engine"; then
+if echo "$OUT" | grep -qi "wine not found\|winepath not found\|wineserver not found\|flock not found\|lock file\|wine prefix\|doom 3 data\|dhewm3 engine"; then
 	echo "FAIL: a #63 preflight check false-positived even though its resource was present:"
-	echo "$OUT" | grep -i "wine not found\|winepath not found\|wine prefix\|doom 3 data\|dhewm3 engine"
+	echo "$OUT" | grep -i "wine not found\|winepath not found\|wineserver not found\|flock not found\|lock file\|wine prefix\|doom 3 data\|dhewm3 engine"
 	FAIL=1
 else
 	echo "PASS: no #63 preflight check false-positived"
 fi
+
+# --- case: build-chextrek.sh with docker not on PATH -> exit 3 with an ENVIRONMENT line, not an
+# ordinary build failure (so tools/run-all-tests.sh and the pipeline report it as a blocker) ---
+OUT="$(env -i PATH="${SCRATCH}/base-bin" HOME="$SCRATCH" bash "${REPO_ROOT}/tools/build-chextrek.sh" 2>&1)"
+CODE=$?
+if [ "$CODE" -eq 3 ]; then echo "PASS: build with docker missing exits 3"; else echo "FAIL: build with docker missing exit code $CODE, want 3"; echo "$OUT" | tail -5; FAIL=1; fi
+if echo "$OUT" | grep -q "^ENVIRONMENT: docker not found"; then echo "PASS: build with docker missing prints an ENVIRONMENT line naming docker"; else echo "FAIL: build with docker missing: no 'ENVIRONMENT: docker not found' line"; FAIL=1; fi
 
 echo
 [ $FAIL -eq 0 ] && echo "PASS: harness broken-environment self-test" || echo "FAIL: harness broken-environment self-test"

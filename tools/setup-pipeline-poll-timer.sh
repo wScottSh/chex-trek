@@ -5,12 +5,12 @@
 # systemd user manager - never system-wide systemd, never root.
 #
 # Usage:
-#   tools/setup-pipeline-poll-timer.sh install [--repo-dir DIR] [--interval DURATION] [--branch BRANCH] [--unit-name NAME]
-#   tools/setup-pipeline-poll-timer.sh enable [--unit-name NAME]
-#   tools/setup-pipeline-poll-timer.sh disable [--unit-name NAME]
-#   tools/setup-pipeline-poll-timer.sh status [--unit-name NAME]
-#   tools/setup-pipeline-poll-timer.sh logs [--unit-name NAME] [--follow]
-#   tools/setup-pipeline-poll-timer.sh uninstall [--unit-name NAME]
+#   bash tools/setup-pipeline-poll-timer.sh install [--repo-dir DIR] [--interval DURATION] [--branch BRANCH] [--unit-name NAME]
+#   bash tools/setup-pipeline-poll-timer.sh enable [--unit-name NAME]
+#   bash tools/setup-pipeline-poll-timer.sh disable [--unit-name NAME]
+#   bash tools/setup-pipeline-poll-timer.sh status [--unit-name NAME]
+#   bash tools/setup-pipeline-poll-timer.sh logs [--unit-name NAME] [--follow]
+#   bash tools/setup-pipeline-poll-timer.sh uninstall [--unit-name NAME]
 #
 # install:   renders tools/systemd/*.tmpl into ~/.config/systemd/user/<unit-name>.{service,timer}
 #            (substituting @@REPO_DIR@@/@@INTERVAL@@/@@BRANCH@@) and runs `systemctl --user
@@ -48,7 +48,7 @@ FOLLOW=0
 
 usage() {
 	cat >&2 <<'EOF'
-Usage: tools/setup-pipeline-poll-timer.sh <install|enable|disable|status|logs|uninstall> [options]
+Usage: bash tools/setup-pipeline-poll-timer.sh <install|enable|disable|status|logs|uninstall> [options]
   install   [--repo-dir DIR] [--interval DURATION] [--branch BRANCH] [--unit-name NAME]
   enable    [--unit-name NAME]
   disable   [--unit-name NAME]

@@ -71,6 +71,7 @@ git clone -q "$ORIGIN" "$REPO_DIR"
 mkdir -p "${REPO_DIR}/tools"
 cp "${SCRIPT_DIR}/pipeline-poll.sh" "${REPO_DIR}/tools/pipeline-poll.sh"
 cp "${SCRIPT_DIR}/pipeline-process-commit.sh" "${REPO_DIR}/tools/pipeline-process-commit.sh"
+cp "${SCRIPT_DIR}/lib-harness.sh" "${REPO_DIR}/tools/lib-harness.sh"
 
 # --- stub gh: release view/create only (green-path publish + idempotent skip is all this test
 # needs - the red/green issue-tracking logic is tools/test-pipeline-process-commit.sh's job) ---

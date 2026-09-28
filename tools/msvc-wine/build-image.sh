@@ -5,7 +5,7 @@
 # minutes; only needs to run again if the pin in that Dockerfile changes. See docs/dev-setup.md's
 # "Unicron (Linux/Wine)" section.
 #
-# Usage: tools/msvc-wine/build-image.sh
+# Usage: bash tools/msvc-wine/build-image.sh
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

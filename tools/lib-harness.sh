@@ -10,15 +10,19 @@
 #   chextrek_ensure_mount - just the "chextrek" mount step on its own (#69): shared by
 #     chextrek_run_console_script and tools/fetch-and-play.sh, which needs the mount but not a
 #     console script, a timeout or the display/lock machinery.
-#   chextrek_apply_engine_defaults / chextrek_parse_github_repo - small, standalone helpers (#69)
-#     also shared with tools/fetch-and-play.sh: per-platform DHEWM3_HOME/DOOM3_BASEPATH/WINEPREFIX
-#     defaults, and parsing `owner/repo` out of a github.com remote URL.
+#   chextrek_apply_engine_defaults / chextrek_parse_github_repo / chextrek_release_tag /
+#     chextrek_pipeline_state_dir - small, standalone helpers shared with tools/fetch-and-play.sh
+#     and the pipeline scripts (tools/pipeline-process-commit.sh, tools/pipeline-poll.sh):
+#     per-platform DHEWM3_HOME/DOOM3_BASEPATH/WINEPREFIX defaults, parsing `owner/repo` out of a
+#     github.com remote URL, a commit's release tag (win-<10-char sha>), and the pipeline's state
+#     root.
 #   chextrek_log_has_no_display / chextrek_exit_no_display - the no-display environment stop
 #     (exit 3) the run makes when there's no way to open a window (Windows: this session has no
 #     active desktop; Linux/Wine: the display this run had died mid-run).
 #   _chextrek_check_engine_or_exit / _chextrek_linux_preflight_or_exit - the other broken-
 #     environment stops (exit 3, one ENVIRONMENT line), Linux/Wine-only (#63): a missing dhewm3
-#     engine, missing Wine/winepath on PATH, an uninitialized Wine prefix, or missing Doom 3 data.
+#     engine, missing wine/winepath/wineserver/flock on PATH, an uninitialized Wine prefix, or
+#     missing Doom 3 data. The lock file itself not opening is the same kind of stop.
 #     Windows keeps its pre-#63 behavior for all of these unchanged.
 #
 # Scenario-script helpers (tools/test-*.sh):
@@ -46,13 +50,20 @@
 # chextrek_build_or_exit
 #
 # Builds chextrek.dll with tools/build-chextrek.sh, exiting the calling script with 1 if the build
-# fails. A no-op when CHEXTREK_SKIP_BUILD=1 (set by tools/run-all-tests.sh, which builds once
+# fails (or 3 if it stopped on an environment blocker - its own exit 3). A no-op when CHEXTREK_SKIP_BUILD=1 (set by tools/run-all-tests.sh, which builds once
 # up front instead of once per scenario).
 chextrek_build_or_exit() {
 	[ "${CHEXTREK_SKIP_BUILD:-0}" = "1" ] && return 0
 	local LIB_DIR
 	LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-	if ! bash "${LIB_DIR}/build-chextrek.sh"; then
+	bash "${LIB_DIR}/build-chextrek.sh"
+	local BUILD_EXIT=$?
+	if [ $BUILD_EXIT -eq 3 ]; then
+		# An environment blocker (e.g. docker or the msvc-wine image missing on Unicron), with its
+		# own ENVIRONMENT line already printed - propagate it, never report it as a FAIL.
+		exit 3
+	fi
+	if [ $BUILD_EXIT -ne 0 ]; then
 		echo "FAIL: build-chextrek.sh failed"
 		exit 1
 	fi
@@ -316,8 +327,8 @@ _chextrek_check_engine_or_exit() {
 # _chextrek_linux_preflight_or_exit
 #
 # Unicron-only checks (#58/#63) for the resources dhewm3-under-Wine needs before it can even
-# attempt to open a display: Wine itself (`wine`, `winepath`), an initialized $WINEPREFIX, and the
-# classic Doom 3 data. Without these, a run previously either silently limped on with an empty
+# attempt to open a display: Wine itself (`wine`, `winepath`, `wineserver`), `flock` for the
+# single-run lock, an initialized $WINEPREFIX, and the classic Doom 3 data. Without these, a run previously either silently limped on with an empty
 # converted path (winepath missing - a plain "command not found" on stderr, swallowed by the
 # `$(...)` capture) or failed downstream with a generic "no engine log was produced at all" FAIL
 # once `wine` itself turned out missing - neither of which named the actual missing piece or
@@ -335,6 +346,20 @@ _chextrek_linux_preflight_or_exit() {
 		_chextrek_exit_environment \
 			"ENVIRONMENT: winepath not found on PATH - needed to convert paths for dhewm3 under Wine." \
 			"ENVIRONMENT: this is not a test failure. Put Wine's bin dir on PATH (see docs/dev-setup.md); do not wait or retry."
+	fi
+	# wineserver: the post-run `wineserver -k` cleanup needs it - without it, a daemonized
+	# wineserver can hold the caller's output capture open and hang the run (see that cleanup's
+	# own comment in _chextrek_run_console_script_impl).
+	if ! command -v wineserver >/dev/null 2>&1; then
+		_chextrek_exit_environment \
+			"ENVIRONMENT: wineserver not found on PATH - needed to clean up Wine after each run." \
+			"ENVIRONMENT: this is not a test failure. Put Wine's bin dir on PATH (see docs/dev-setup.md); do not wait or retry."
+	fi
+	# flock: the single-run lock (#62) - proceeding unlocked would defeat it.
+	if ! command -v flock >/dev/null 2>&1; then
+		_chextrek_exit_environment \
+			"ENVIRONMENT: flock not found on PATH - needed for the single-run harness lock." \
+			"ENVIRONMENT: this is not a test failure. Install util-linux's flock (see docs/dev-setup.md); do not wait or retry."
 	fi
 	if [ ! -f "${WINEPREFIX}/system.reg" ]; then
 		_chextrek_exit_environment \
@@ -354,8 +379,8 @@ _chextrek_linux_preflight_or_exit() {
 # (Linux/Wine) takes an exclusive flock on this file for its whole run - mount, save-dir wipe,
 # launch, cleanup - so two concurrent runs on this machine (two worktrees, an agent plus the
 # pipeline, whatever) serialize instead of racing on the shared DOOM3_BASEPATH/chextrek mount and
-# the shared per-mod save dir; today that's just a documented "one at a time" rule (see
-# docs/dev-setup.md), not something enforced. A fixed path (not `$TMPDIR`, which can differ between
+# the shared per-mod save dir (on Windows it's still just a documented "one at a time" rule - see
+# docs/dev-setup.md). A fixed path (not `$TMPDIR`, which can differ between
 # sessions/users and would silently split them onto different, non-serializing lock files) outside
 # the repo and outside any worktree, so every worktree on this machine shares the same lock file by
 # default. CHEXTREK_LOCK_FILE overrides it - a test that wants to prove the locking itself, without
@@ -370,8 +395,10 @@ chextrek_lock_file() {
 #
 # Opens chextrek_lock_file on fd CHEXTREK_LOCK_FD and takes an exclusive flock on it, printing a
 # "waiting" line (#62 AC2) once if another run already holds it, then blocking until it's free.
-# Exits the calling script with 1 if the lock file itself can't even be opened (e.g. permissions) -
-# proceeding unlocked would defeat the whole point.
+# Stops the calling script with the ENVIRONMENT/exit-3 treatment if the lock file can't be opened
+# (e.g. permissions) or locked - proceeding unlocked would defeat the whole point, and it's a
+# machine-setup problem, not a test result. (`flock` itself being missing is caught earlier, by
+# _chextrek_linux_preflight_or_exit.)
 #
 # flock's lock lives on the open file descriptor, not on the file's contents or a pid recorded in
 # it, so a run that dies while holding it - crash, SIGKILL, whatever - has the kernel close that fd
@@ -390,14 +417,17 @@ _chextrek_acquire_lock() {
 	local LOCK_FILE
 	LOCK_FILE="$(chextrek_lock_file)"
 	if ! exec {CHEXTREK_LOCK_FD}>"$LOCK_FILE"; then
-		echo "error: couldn't open the harness lock file ${LOCK_FILE}. See docs/dev-setup.md." >&2
-		exit 1
+		CHEXTREK_LOCK_FD=""
+		_chextrek_exit_environment \
+			"ENVIRONMENT: couldn't open the harness lock file ${LOCK_FILE} (CHEXTREK_LOCK_FILE)." \
+			"ENVIRONMENT: this is not a test failure. Fix its permissions or point CHEXTREK_LOCK_FILE elsewhere (see docs/dev-setup.md); do not wait or retry."
 	fi
 	if ! flock -n "$CHEXTREK_LOCK_FD"; then
 		echo "==> Waiting for the harness lock (another run holds ${LOCK_FILE}) ..."
 		if ! flock "$CHEXTREK_LOCK_FD"; then
-			echo "error: couldn't take the harness lock on ${LOCK_FILE} (is 'flock' installed?). See docs/dev-setup.md." >&2
-			exit 1
+			_chextrek_exit_environment \
+				"ENVIRONMENT: couldn't take the harness lock on ${LOCK_FILE}." \
+				"ENVIRONMENT: this is not a test failure. See docs/dev-setup.md; do not wait or retry."
 		fi
 	fi
 }
@@ -418,10 +448,36 @@ _chextrek_release_lock() {
 # Parses an `owner/repo` string out of a git remote URL pointing at github.com, in any of its usual
 # forms (`git@github.com:owner/repo.git`, `https://github.com/owner/repo.git`,
 # `ssh://git@github.com/owner/repo`, with or without the trailing `.git`). Used by
-# tools/fetch-and-play.sh (#69) to default `--repo` for every `gh` call to the same remote this
-# checkout's own `origin` points at, without hardcoding a repo name anywhere.
+# tools/fetch-and-play.sh and tools/pipeline-process-commit.sh to default `--repo` for every `gh`
+# call to the same remote this checkout's own `origin` points at, without hardcoding a repo name.
 chextrek_parse_github_repo() {
 	printf '%s' "$1" | sed -E 's#^(https?://|git\+ssh://|ssh://)?(git@)?github\.com[:/]##; s#\.git$##'
+}
+
+# chextrek_release_tag REPO_DIR SHA
+#
+# The pipeline's release tag for commit SHA: CHEXTREK_PIPELINE_TAG_PREFIX (default "win-") plus a
+# fixed 10-char short sha. Fixed length, not plain `rev-parse --short` (which grows with the repo's
+# object count), so the same commit always maps to the same tag - a length that changed later
+# would make the pipeline's idempotency check miss an already-published commit. The one definition
+# shared by tools/pipeline-process-commit.sh (which publishes under it) and
+# tools/fetch-and-play.sh (which looks a commit's release up by it). Prints nothing and returns
+# non-zero if SHA doesn't resolve in REPO_DIR.
+chextrek_release_tag() {
+	local SHORT
+	SHORT="$(git -C "$1" rev-parse --short=10 "$2" 2>/dev/null)" || return 1
+	[ -n "$SHORT" ] || return 1
+	printf '%s%s\n' "${CHEXTREK_PIPELINE_TAG_PREFIX:-win-}" "$SHORT"
+}
+
+# chextrek_pipeline_state_dir
+#
+# The pipeline's state root (scratch worktrees, run logs, locks, the poller's state file), outside
+# every repo/worktree: CHEXTREK_PIPELINE_STATE_DIR, else $XDG_STATE_HOME/chextrek-pipeline, else
+# $HOME/.local/state/chextrek-pipeline. Shared by tools/pipeline-process-commit.sh and
+# tools/pipeline-poll.sh so the two can't drift apart.
+chextrek_pipeline_state_dir() {
+	printf '%s\n' "${CHEXTREK_PIPELINE_STATE_DIR:-${XDG_STATE_HOME:-${HOME}/.local/state}/chextrek-pipeline}"
 }
 
 # chextrek_apply_engine_defaults

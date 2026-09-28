@@ -37,46 +37,32 @@
 # one narrow exception (moving the already-downloaded files into place, or pointing the mount,
 # after HEAD has already moved).
 #
-# Self-rewrite hazard (#70, flagged in #69's review): step 4's `git checkout --detach` can rewrite
-# this very file, tools/fetch-and-play.sh, on disk while bash is still executing it (a checkout of
-# any commit whose tools/fetch-and-play.sh differs from the one currently running does this every
-# time, not just occasionally). bash normally reads a plain script incrementally, off disk, as it
-# runs each command - so a rewrite mid-run is a real hazard: on Git for Windows this is reported to
-# surface as "Unlink of file ... failed", and more generally, if the file's bytes on disk change out
-# from under bash's read, bash can resume reading from the old byte offset into whatever new bytes
-# now sit there and execute garbage. This script's whole body below is wrapped in one
-# `main() { ...; }` function, called only at the very end (`main "$@"`). A function body is a single
-# parse unit: bash must read all the way through main's closing `}` before it can execute anything
-# inside it, so by the time `git checkout` ever runs, this entire script (including everything after
-# the checkout) is already fully parsed and held in memory - nothing past that point is ever read
-# from disk again, checkout or not. This directly closes the "resume reading into new/garbage bytes"
-# failure mode. It does NOT touch a separate possible failure mode - `git checkout` itself refusing
-# to replace an open file on Windows (an "Unlink of file ... failed" abort, which would be a git/
-# filesystem-level failure, not a bash-parsing one) - that's unverified here (see "Exit status"
-# below for how such a checkout failure is still handled safely either way: this script always
-# checks the checkout's own exit status and refuses cleanly if it fails, rather than assuming it
-# succeeded). (Re-executing from a self-copy, or a temp-file copy guarded by an env var, would also
-# work for the parsing hazard, but both add a process spawn or an extra file on *every* run for a
-# hazard this fully covers for free.) tools/test-fetch-and-play.sh's "self-rewriting checkout" case
-# proves the parsing hazard directly: a `git` wrapper simulates the exact race (an in-place,
-# same-inode overwrite of the running script's *not-yet-read* remainder - specifically injecting an
-# `exit 91` right after the checkout line that only exists in the on-disk bytes, not in whatever
-# bash already has buffered - the way a real concurrent replace would look to bash's already-open
-# read handle) and the run still completes correctly (exit 0, engine launched) using the original,
-# already-parsed script. This is a real mutation-tested guarantee, not just a plausible-looking
-# assertion: with the `main()` wrap temporarily removed, this same case genuinely fails (exit 91,
-# no engine launch) - confirmed directly while writing this fix, in this exact environment (a
-# plain, unguarded Linux `git checkout` of a changed tracked file replaces it via unlink+recreate,
-# which bash's open read handle on the old, now-unlinked inode never observes on its own - so this
-# case's `git` wrapper performs the same-inode overwrite itself, rather than relying on a plain
-# checkout to reproduce it).
+# Self-rewrite hazard (#70, flagged in #69's review): step 4's `git checkout --detach` rewrites
+# this very file, tools/fetch-and-play.sh, whenever the target commit's copy differs from the one
+# running. Two failure modes, two guards:
+#   - Git for Windows can abort the checkout with "Unlink of file 'tools/fetch-and-play.sh'
+#     failed" when a running process holds the file open. Guard: before doing anything else, the
+#     script copies itself to a temp file and re-execs bash on that copy (CHEXTREK_FETCH_AND_PLAY_SELF
+#     carries the original path and stops a second re-exec). So bash never holds the checkout's own
+#     tools/fetch-and-play.sh open while the checkout runs. tools/lib-harness.sh is `source`d, which
+#     reads it whole and closes it, so it has the same property. tools/test-fetch-and-play.sh's
+#     "temp-copy re-exec" case checks this on Linux: at checkout time, no process in the run's
+#     ancestry has the checkout's tools/fetch-and-play.sh open. Not yet run on real Windows
+#     (owner-pending).
+#   - bash reads a script incrementally, so a file rewritten in place mid-run could make it
+#     resume at the old byte offset into new bytes. Guard: the whole body is wrapped in one
+#     `main() { ...; }`, called only at the end. bash parses a function body whole before running
+#     any of it, so nothing is read from disk after the checkout. This is a second, independent
+#     guard: it holds even if the temp-copy step is skipped. The test's "self-rewriting checkout"
+#     case skips it on purpose and overwrites the running file in place, injecting `exit 91` after
+#     the checkout line. The run still completes. With the main() wrap removed, that case fails.
 #
-# Usage: tools/fetch-and-play.sh [COMMIT]
+# Usage: bash tools/fetch-and-play.sh [COMMIT]
 #   COMMIT - a commit-ish with a green release; plays/bisects that build instead of Latest.
 #
 # Exit status:
-#   0 - dhewm3 was launched. Once launched, this script's own exit status is whatever dhewm3 itself
-#       (a real, interactive process, not a pass/fail check) exits with - not necessarily 0.
+#   (launched) - the script `exec`s into dhewm3, so once the engine is launched the exit status
+#       is dhewm3's own (an interactive process, not a pass/fail check) - usually 0.
 #   1 - refused before ever launching anything. Up through and including everything before the
 #       checkout itself (a dirty working tree, COMMIT not resolving to a commit, no release for
 #       COMMIT (or no Latest release), a release whose target doesn't match the resolved commit, one
@@ -98,8 +84,36 @@
 #                         `origin` remote via chextrek_parse_github_repo, tools/lib-harness.sh).
 set -uo pipefail
 
+# --- run from a temp copy, never from the checkout's own tools/fetch-and-play.sh (see the header's
+# "Self-rewrite hazard"): before anything else, copy this script to a scratch file and re-exec bash
+# on that copy, passing the original path in CHEXTREK_FETCH_AND_PLAY_SELF. The copy is what bash
+# holds open for the rest of the run, so step 4's checkout can replace the checkout's own
+# tools/fetch-and-play.sh without anything having it open - which is what Git for Windows' "Unlink
+# of file 'tools/fetch-and-play.sh' failed" abort needs. The env var stops a second re-exec.
+# Setting it by hand to the script's own path skips the copy (tools/test-fetch-and-play.sh does
+# that, to test the main() wrap below on its own). ---
+if [ -z "${CHEXTREK_FETCH_AND_PLAY_SELF:-}" ]; then
+	_FAP_SELF="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
+	_FAP_COPY="$(mktemp "${TMPDIR:-/tmp}/chextrek-fetch-and-play-self.XXXXXX")" || {
+		echo "error: couldn't create a temp copy of ${_FAP_SELF} to run from (mktemp failed). Nothing was checked out or launched." >&2
+		exit 1
+	}
+	if ! cp "$_FAP_SELF" "$_FAP_COPY"; then
+		rm -f "$_FAP_COPY"
+		echo "error: couldn't copy ${_FAP_SELF} to ${_FAP_COPY} to run from. Nothing was checked out or launched." >&2
+		exit 1
+	fi
+	CHEXTREK_FETCH_AND_PLAY_SELF="$_FAP_SELF" exec "${BASH:-bash}" "$_FAP_COPY" "$@"
+fi
+
 main() {
-	SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+	SCRIPT_DIR="$(dirname "$CHEXTREK_FETCH_AND_PLAY_SELF")"
+	# Running from the temp copy made above: main() is already fully parsed, so delete the copy
+	# now rather than leaving it in TMPDIR (the launch below `exec`s, so no EXIT trap would run).
+	# Best effort - a failure here just leaves one small file in TMPDIR.
+	if [ "${BASH_SOURCE[0]}" != "$CHEXTREK_FETCH_AND_PLAY_SELF" ]; then
+		rm -f "${BASH_SOURCE[0]}" 2>/dev/null || true
+	fi
 	REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 	# shellcheck source=tools/lib-harness.sh
 	source "${SCRIPT_DIR}/lib-harness.sh"
@@ -177,10 +191,9 @@ main() {
 			echo "error: '${COMMIT_ARG}' doesn't resolve to a single commit in ${REPO_ROOT} (even after 'git fetch origin'): ${RESOLVE_ERR:-<no output>}. Nothing was checked out or launched." >&2
 			exit 1
 		fi
-		# Same fixed length as tools/pipeline-process-commit.sh's own tag scheme (spec #66) - a
-		# release is always tagged win-<10-char short sha> of the exact commit it targets.
-		SHORT_SHA="$(git -C "$REPO_ROOT" rev-parse --short=10 "$FULL_SHA")"
-		TAG="win-${SHORT_SHA}"
+		# The pipeline's own tag scheme (win-<10-char short sha>), from the one shared definition
+		# tools/pipeline-process-commit.sh publishes under (chextrek_release_tag, tools/lib-harness.sh).
+		TAG="$(chextrek_release_tag "$REPO_ROOT" "$FULL_SHA")"
 		RELEASE_OUT="$(gh release view "$TAG" --repo "$REPO" --json tagName,targetCommitish,assets \
 			--jq '[.tagName, .targetCommitish, ([.assets[].name] | join(","))] | join("\u001f")' 2>&1)"
 		RELEASE_RC=$?
@@ -325,7 +338,7 @@ main() {
 }
 
 usage() {
-	echo "Usage: tools/fetch-and-play.sh [COMMIT]" >&2
+	echo "Usage: bash tools/fetch-and-play.sh [COMMIT]" >&2
 }
 
 main "$@"

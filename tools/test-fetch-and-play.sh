@@ -42,7 +42,10 @@
 # release refuses naming the commit, HEAD untouched; a release whose target doesn't match the
 # resolved commit refuses naming both, HEAD untouched; a commit whose own tools/fetch-and-play.sh
 # differs from the copy currently running (the checkout rewrites this very script mid-run) still
-# completes correctly - proving the main()-wrap self-rewrite guard (see fetch-and-play.sh's header).
+# completes correctly - proving the main()-wrap self-rewrite guard (see fetch-and-play.sh's header);
+# and at checkout time no process in the run's ancestry holds the checkout's own
+# tools/fetch-and-play.sh open (the temp-copy re-exec guard against Git for Windows' "Unlink of
+# file ... failed"), with the temp copy itself already deleted.
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -139,10 +142,13 @@ exit 1
 STUBEOF
 chmod +x "${SCRATCH}/bin/gh"
 
-# --- git passthrough shim, used only by case 10 (self-rewriting checkout) below: forwards every
-# call to the real git unchanged, EXCEPT the one call this test arms via STUB_GIT_REWRITE_TARGET/
-# STUB_GIT_REWRITE_CONTENT (an exact "checkout --detach <STUB_GIT_REWRITE_TARGET>" with "-C <dir>").
-# For every other case (those two env vars unset), this is a pure passthrough - it changes nothing
+# --- git passthrough shim, used only by cases 10 and 11 below: forwards every call to the real git
+# unchanged, EXCEPT when armed. Case 10 arms STUB_GIT_REWRITE_TARGET/STUB_GIT_REWRITE_CONTENT (an
+# exact "checkout --detach <STUB_GIT_REWRITE_TARGET>" with "-C <dir>"). Case 11 arms
+# STUB_GIT_OPENCHECK_OUT: at any "checkout --detach", before the real checkout, it walks this
+# shim's process ancestry (the fetch-and-play run) and records, per ancestor, any open fd on the
+# checkout's own tools/fetch-and-play.sh ("OPEN") or on a fetch-and-play temp copy ("COPY").
+# For every other case (those env vars unset), this is a pure passthrough - it changes nothing
 # about how any other case's real git calls behave. See case 10 below for why this exists: a plain
 # Linux `git checkout` replaces a changed tracked file via unlink+recreate (a new inode), which
 # bash's already-open read handle on the old (now-unlinked) inode never observes - so it can't
@@ -160,6 +166,23 @@ for a in "\$@"; do
 	[ "\$PREV" = "--detach" ] && DETACH_SHA="\$a"
 	PREV="\$a"
 done
+if [ -n "\$DETACH_SHA" ] && [ -n "\${STUB_GIT_OPENCHECK_OUT:-}" ] && [ -n "\$DIR" ]; then
+	TARGET_FILE="\$(cd "\$DIR" && pwd -P)/tools/fetch-and-play.sh"
+	P="\$PPID"
+	# Bounded walk: the run is only a few processes deep (the \$(...) subshell, then the script).
+	for _ in 1 2 3 4 5 6 7 8; do
+		{ [ -n "\$P" ] && [ "\$P" -gt 1 ]; } || break
+		for FD in /proc/"\$P"/fd/*; do
+			L="\$(readlink "\$FD" 2>/dev/null)" || continue
+			case "\$L" in
+			"\$TARGET_FILE" | "\$TARGET_FILE (deleted)") echo "OPEN \$P \$FD \$L" >>"\$STUB_GIT_OPENCHECK_OUT" ;;
+			*chextrek-fetch-and-play-self.*) echo "COPY \$P \$FD \$L" >>"\$STUB_GIT_OPENCHECK_OUT" ;;
+			esac
+		done
+		P="\$(awk '{print \$4}' /proc/"\$P"/stat 2>/dev/null)"
+	done
+	echo "CHECKED" >>"\$STUB_GIT_OPENCHECK_OUT"
+fi
 if [ -n "\$DETACH_SHA" ] && [ -n "\${STUB_GIT_REWRITE_TARGET:-}" ] && [ "\$DETACH_SHA" = "\${STUB_GIT_REWRITE_TARGET}" ] && [ -n "\$DIR" ] && [ -f "\${STUB_GIT_REWRITE_CONTENT:-}" ]; then
 	# Same-inode sabotage: a plain \`>\` redirection to an *existing* file truncates and rewrites
 	# it in place (open(2) with O_TRUNC, no unlink/recreate) - exactly what would let a
@@ -283,6 +306,8 @@ run_fetch_and_play() {
 		STUB_GH_RELEASES="${STUB_GH_RELEASES:-}" \
 		STUB_GIT_REWRITE_TARGET="${STUB_GIT_REWRITE_TARGET:-}" \
 		STUB_GIT_REWRITE_CONTENT="${STUB_GIT_REWRITE_CONTENT:-}" \
+		STUB_GIT_OPENCHECK_OUT="${STUB_GIT_OPENCHECK_OUT:-}" \
+		${CHEXTREK_FETCH_AND_PLAY_SELF:+CHEXTREK_FETCH_AND_PLAY_SELF="$CHEXTREK_FETCH_AND_PLAY_SELF"} \
 		DHEWM3_HOME="${SCRATCH}/dhewm3-home" \
 		DOOM3_BASEPATH="$DOOM3_BASEPATH" \
 		bash "${CHECKOUT}/tools/fetch-and-play.sh" "$@"
@@ -511,9 +536,11 @@ echo "=== case 10: self-rewriting checkout - a git wrapper simulates the exact s
 # above, armed via STUB_GIT_REWRITE_TARGET/STUB_GIT_REWRITE_CONTENT below, performs the actual
 # same-inode overwrite (a plain `>` redirection to the existing file) when it sees
 # fetch-and-play.sh's own `checkout --detach` call, simulating the race directly rather than hoping
-# a real checkout reproduces it. Mutation-tested: with the main() wrap temporarily removed (a local,
-# uncommitted edit), this case genuinely fails - exit 91, zero engine launches - and with the wrap
-# restored it passes.
+# a real checkout reproduces it. This case sets CHEXTREK_FETCH_AND_PLAY_SELF to the checkout's own
+# script, which skips fetch-and-play.sh's temp-copy re-exec - so bash really is reading the file the
+# shim overwrites, and the main() wrap is the only guard in play (case 11 covers the temp copy).
+# Mutation-tested: with the main() wrap temporarily removed (a local, uncommitted edit), this case
+# genuinely fails - exit 91, zero engine launches - and with the wrap restored it passes.
 REWRITE_CONTENT_FILE="${SCRATCH}/rewrite-fetch-and-play.sh"
 awk '/^\techo "==> Checked out \${TARGET} \(detached\)"$/{print; print "\texit 91  # case-10 marker: only in bytes the currently-running script has not read yet at sabotage time"; next} {print}' \
 	"${SCRIPT_DIR}/fetch-and-play.sh" >"$REWRITE_CONTENT_FILE"
@@ -538,6 +565,7 @@ PRE10_INODE="$(stat -c %i "${CHECKOUT}/tools/fetch-and-play.sh")"
 OUT10="$(STUB_GH_RELEASES="$(printf '%s\x1f%s\x1fchextrek.dll,chextrek.pdb' "$REWRITE_TAG" "$REWRITE_SHA")" \
 	STUB_GIT_REWRITE_TARGET="$REWRITE_SHA" \
 	STUB_GIT_REWRITE_CONTENT="$REWRITE_CONTENT_FILE" \
+	CHEXTREK_FETCH_AND_PLAY_SELF="${CHECKOUT}/tools/fetch-and-play.sh" \
 	run_fetch_and_play "$REWRITE_SHA" 2>&1)"
 CODE10=$?
 if [ $CODE10 -eq 0 ]; then pass "the run completes even though its own checkout overwrites tools/fetch-and-play.sh in place, mid-run"; else fail "exit code $CODE10, want 0"; echo "$OUT10"; fi
@@ -555,6 +583,40 @@ if grep -q "case-10 marker" "${CHECKOUT}/tools/fetch-and-play.sh" 2>/dev/null; t
 # above (main() wrap removed -> this case fails), not this inode comparison.
 if [ "$PRE10_INODE" != "$POST10_INODE" ]; then pass "tools/fetch-and-play.sh's inode changed by the end of the run (inode ${PRE10_INODE} -> ${POST10_INODE}) - the real checkout ran to completion after the sabotage write"; else fail "expected tools/fetch-and-play.sh's inode to change (still ${PRE10_INODE}) - the checkout may not have completed"; fi
 if [ "$(wine_call_count)" = "1" ]; then pass "the engine was still launched exactly once despite the mid-run rewrite"; else fail "expected exactly one engine launch, found $(wine_call_count)"; fi
+
+echo
+echo "=== case 11: temp-copy re-exec - at checkout time nothing in the run holds the checkout's own tools/fetch-and-play.sh open (Git for Windows' \"Unlink of file ... failed\" guard), and the temp copy is already deleted ==="
+# The git shim (armed via STUB_GIT_OPENCHECK_OUT) inspects /proc/<pid>/fd of every process in the
+# run's ancestry at the moment of `checkout --detach`. "COPY" lines are the positive control: they
+# prove the walk does see bash's own open script fd, so "no OPEN line" is a real finding, not a
+# blind spot. Mutation-tested: with the re-exec block removed from fetch-and-play.sh, this case
+# fails (an OPEN line, no COPY line). The same scan can't be done on Windows from here - whether
+# Git for Windows then replaces the file cleanly is owner-pending.
+git -C "$CHECKOUT" checkout -q -f main-local
+rm -f "${CHECKOUT}/chextrek.dll" "${CHECKOUT}/chextrek.pdb"
+: >"${SCRATCH}/wine-invoked-count"
+rm -rf "${SCRATCH}/wine-invocations"
+mkdir -p "${SCRATCH}/wine-invocations"
+OPENCHECK_FILE="${SCRATCH}/openfd-check.txt"
+: >"$OPENCHECK_FILE"
+OUT11="$(STUB_GH_RELEASES="$(printf '%s\x1f%s\x1fchextrek.dll,chextrek.pdb' "$RELEASE_TAG" "$RELEASE_SHA")" \
+	STUB_GIT_OPENCHECK_OUT="$OPENCHECK_FILE" \
+	run_fetch_and_play "$RELEASE_SHA" 2>&1)"
+CODE11=$?
+if [ $CODE11 -eq 0 ]; then pass "exits 0 running from its temp copy"; else fail "exit code $CODE11, want 0"; echo "$OUT11"; fi
+if grep -q "^CHECKED" "$OPENCHECK_FILE"; then pass "the git shim inspected open fds at checkout time"; else fail "the git shim never ran its open-fd check"; fi
+if grep -q "^OPEN " "$OPENCHECK_FILE"; then
+	fail "a process in the run held ${CHECKOUT}/tools/fetch-and-play.sh open during the checkout:"
+	grep "^OPEN " "$OPENCHECK_FILE"
+else
+	pass "nothing in the run held the checkout's own tools/fetch-and-play.sh open during the checkout"
+fi
+if grep -q "^COPY " "$OPENCHECK_FILE"; then pass "positive control: bash's open fd on its temp copy was visible to the same scan"; else fail "no temp-copy fd seen - the scan can't be trusted (or the re-exec didn't happen)"; cat "$OPENCHECK_FILE"; fi
+COPY_PATH="$(sed -n 's/^COPY [0-9]* [^ ]* \(.*\)$/\1/p' "$OPENCHECK_FILE" | head -1)"
+COPY_PATH="${COPY_PATH% (deleted)}"
+if [ -n "$COPY_PATH" ] && [ ! -e "$COPY_PATH" ]; then pass "the temp copy (${COPY_PATH}) was already deleted by checkout time"; else fail "the temp copy '${COPY_PATH}' still exists (or wasn't found)"; fi
+if [ "$(git -C "$CHECKOUT" rev-parse HEAD)" = "$RELEASE_SHA" ]; then pass "HEAD landed on the release commit"; else fail "HEAD is $(git -C "$CHECKOUT" rev-parse HEAD), want ${RELEASE_SHA}"; fi
+if [ "$(wine_call_count)" = "1" ]; then pass "the engine was launched exactly once"; else fail "expected exactly one engine launch, found $(wine_call_count)"; fi
 
 echo
 if [ $FAIL -eq 0 ]; then

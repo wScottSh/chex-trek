@@ -1,6 +1,6 @@
 # Dev-machine setup: building and testing `chextrek.dll`
 
-Spec #28/#29 (Windows dev machine), extended by spec #58/#60/#61/#64 (Unicron, Linux/Wine). This
+Spec #28/#29 (Windows dev machine), extended by spec #58 (Unicron, Linux/Wine; sub-issues #59-#70). This
 is the one-time, per-machine setup the build and harness scripts assume. Everything here is outside
 this repo on purpose - see "Why none of this lives in the repo" below. The harness's *interface*
 (`tools/build-chextrek.sh`, `tools/run-harness.sh`, `tools/run-all-tests.sh`, every
@@ -28,7 +28,7 @@ Environment variables the scripts read (all optional, default to the table above
 
 ## Unicron (Linux/Wine)
 
-Spec #58/#60/#61/#64/#65. If you're an agent working on Unicron: `docs/agents/unicron-build-test.md`
+Spec #58. If you're an agent working on Unicron: `docs/agents/unicron-build-test.md`
 has the one command to run and when to run it (before opening a PR on any game-library change) -
 this section covers the one-time machine setup and internals that command depends on.
 
@@ -46,7 +46,7 @@ clear error if there isn't one. Left unset (the default), it always builds first
 
 | Thing | Location | Notes |
 |---|---|---|
-| Wine 11.0, new-WoW64 | `/opt/wine-11.0-wow64` (built from source; add `.../bin` to `PATH`) | The WineHQ `noble` packages can't do new-WoW64 (see spike #59's comment on #58 for the full build recipe). Provides `wine`, `winepath` and `wineserver`, all required on `PATH` - without `wineserver` on `PATH` the post-run cleanup below can't run, and a run can hang forever (see "Wine process cleanup"). This is a *separate* Wine install from the one baked into the `tools/msvc-wine/` build-toolchain image below - the harness's Wine runs the game engine, the image's Wine runs the compiler, and their versions don't need to match. |
+| Wine 11.0, new-WoW64 | `/opt/wine-11.0-wow64` (built from source; add `.../bin` to `PATH`) | The WineHQ `noble` packages can't do new-WoW64 (see spike #59's comment on #58 for the full build recipe). Provides `wine`, `winepath` and `wineserver`, all required on `PATH` - the harness stops with exit 3 if any is missing (`wineserver` runs the post-run cleanup; without it a run could hang - see "Wine process cleanup"). This is a *separate* Wine install from the one baked into the `tools/msvc-wine/` build-toolchain image below - the harness's Wine runs the game engine, the image's Wine runs the compiler, and their versions don't need to match. |
 | Wine prefix | `$WINEPREFIX`, default `$HOME/games/wineprefix-chextrek` | Needs the **VC++ 2015-2022 x86 redist** installed in it (`vc_redist.x86.exe /install /quiet`) - `dhewm3.exe` imports `mfc140.dll`, which Wine has no builtin for; without it the loader fails with `c0000135`. |
 | Classic Doom 3 1.3.1 | `$HOME/games/doom3` (has `base/pak000.pk4`-`pak008.pk4`) | Copied once from the Windows PC, outside every repo, same as the Windows machine's copy. This is `$DOOM3_BASEPATH`. |
 | dhewm3 1.5.5 win32 (official, unmodified) | `$HOME/games/dhewm3/1.5.5-win32/dhewm3/dhewm3.exe` | The same `dhewm3-1.5.5_win32.zip` as the Windows machine, run under Wine - never built from source. This is `$DHEWM3_HOME`. |
@@ -54,7 +54,7 @@ clear error if there isn't one. Left unset (the default), it always builds first
 | Xvfb | anywhere on `PATH` (e.g. the distro package) | The harness starts its own (`chextrek_ensure_display_or_exit` in `tools/lib-harness.sh`) on the first free display number when `$DISPLAY` isn't already usable, and stops it again when the run finishes. Nobody needs to be logged in, and no `DISPLAY` needs to be pre-set - that's the whole point on a headless box reached over SSH. |
 | Save/config/screenshot path | `$WINEPREFIX/drive_c/users/<you>/Documents/My Games/dhewm3/chextrek/` | The "Documents" dhewm3 hardcodes is the one inside the Wine prefix it's actually running in, not this Linux user's own `$HOME/Documents`. |
 | Docker | already installed, owner in the `docker` group (no `sudo` needed) | Runs the pinned MSVC-under-Wine build-toolchain container below. |
-| Build-toolchain image `chextrek-msvc-wine:14.50.35717-x86` | one-time: `tools/msvc-wine/build-image.sh` | Builds the image from `tools/msvc-wine/Dockerfile`; see "Building `chextrek.dll` on Unicron" below. |
+| Build-toolchain image `chextrek-msvc-wine:14.50.35717-x86` | one-time: `bash tools/msvc-wine/build-image.sh` | Builds the image from `tools/msvc-wine/Dockerfile`; see "Building `chextrek.dll` on Unicron" below. |
 
 Environment variables (all optional; Linux-specific defaults live in `tools/lib-harness.sh`):
 
@@ -66,7 +66,7 @@ Environment variables (all optional; Linux-specific defaults live in `tools/lib-
 
 ### Building `chextrek.dll` on Unicron (spec #64)
 
-One-time setup: `tools/msvc-wine/build-image.sh` builds the `chextrek-msvc-wine:14.50.35717-x86`
+One-time setup: `bash tools/msvc-wine/build-image.sh` builds the `chextrek-msvc-wine:14.50.35717-x86`
 Docker image from `tools/msvc-wine/Dockerfile`. That Dockerfile pins everything a rebuild needs to
 reproduce the same MSVC toolset months later:
 
@@ -76,20 +76,21 @@ reproduce the same MSVC toolset months later:
 - **MSVC 14.50.35717 (VS 18), x86-only** - the same MSVC toolset `tools/build-chextrek.sh`'s
   Windows branch gets from the "Visual Studio 18 2026" generator (spec #28's pin). Downloading it
   requires accepting the Visual Studio Build Tools license terms
-  (https://go.microsoft.com/fwlink/?LinkId=2327714 at the time of pinning) - spec #64's AC requires
-  the owner to confirm this use is acceptable before this lands; record that confirmation on this
-  sub-issue's PR, not here.
-- `winbind`, needed for `mspdbsrv.exe` (`/FS`-forced synchronous PDB writes still invoke it even
-  though nothing on Linux compiles with `/Zi` any more, or it's pre-started directly by
-  `tools/build-chextrek.sh` - see "Building `chextrek.dll` on Unicron" below) to work at all under
-  Wine; without `winbind` it fails with `C1902`, a known msvc-wine limitation.
+  (https://go.microsoft.com/fwlink/?LinkId=2327714 at the time of pinning). Spec #58 requires the
+  owner to confirm this use is acceptable before the pipeline goes live - still **owner-pending**
+  (#64's AC); until then the real poll timer stays off (see "AFK trigger" below).
+- `winbind`, which `mspdbsrv.exe` (the PDB server the toolchain uses for PDB writes;
+  `tools/build-chextrek.sh` pre-starts it - see "mspdbsrv pre-start" below) needs to work at all
+  under Wine; without `winbind` it fails with `C1902`, a known msvc-wine limitation.
 
 `tools/build-chextrek.sh`'s Linux branch (a `uname` check, the same test `chextrek_is_linux` in
 `tools/lib-harness.sh` makes - this script doesn't source that library, so it repeats the check
 rather than adding the dependency) then:
 
-1. Checks `docker` is on `PATH` and the pinned image exists - a clear `error:` line pointing at
-   `tools/msvc-wine/build-image.sh` if not, never a bare Docker error.
+1. Checks `docker` is on `PATH` and the pinned image exists - if not, an `ENVIRONMENT:` line
+   (pointing at `bash tools/msvc-wine/build-image.sh` for the image) and exit 3, the same
+   environment-blocker contract as the harness, never a bare Docker error or an ordinary build
+   FAIL.
 2. Runs `cmake -S engine/dhewm3-sdk -B engine/build -G Ninja` inside that image against this
    checkout (bind-mounted), with the same project options as Windows (`BASE=ON`,
    `BASE_NAME=chextrek`, `D3XP=OFF`), cross-compiling for `CMAKE_SYSTEM_NAME=Windows`/
@@ -172,13 +173,8 @@ What the Linux platform layer does differently (same `chextrek_run_console_scrip
   instead, when `winedevice.exe` outlives its display) so those fds close; scoped to one prefix, it
   can't touch a concurrent run's wine processes in a different prefix.
 
-**Not handled by #60** (left for later sub-issues, not asserted by anything here): building
-`chextrek.dll` itself on Linux - done by #64, see "Building `chextrek.dll` on Unicron" above; the
-two scenarios spike #59 found Wine-only-red (`test-end-level-nextmap.sh`, `test-objectives.sh`) -
-fixed by #61, see the next paragraph. The single-run lock across concurrent worktrees is #62 - see
-"Only run one harness invocation at a time on a given machine" below.
-
-**Fixed by #61** (both scenarios' Wine-only reds from the spike): in both cases the scenario's own
+**Two scenarios need longer waits under Wine (#61)** - the two spike #59 found Wine-only-red. In
+both cases the scenario's own
 assertions were unchanged; only a `wait` count each script sends the game grew, gated on
 `chextrek_is_linux` so the Windows-verified values are untouched.
 - `test-objectives.sh`: the `wait 150` after each `loadgame` (meant to comfortably outlast
@@ -194,8 +190,9 @@ assertions were unchanged; only a `wait` count each script sends the game grew, 
 
 ### Publishing pipeline: "process commit X" (spec #58/#66)
 
-`tools/pipeline-process-commit.sh <commit-ish>` is the pipeline's one entry point. It's invoked by
-hand for now (the poller trigger is #68, red-issue handling is #67):
+`tools/pipeline-process-commit.sh <commit-ish>` is the pipeline's one entry point. The poller
+(see "AFK trigger" below) invokes it once per new `origin/master` commit; you can also run it by
+hand for any one commit:
 
 ```
 bash tools/pipeline-process-commit.sh <commit-ish>
@@ -203,8 +200,7 @@ bash tools/pipeline-process-commit.sh <commit-ish>
 
 No `export PATH=...wine...` needed first (unlike `docs/agents/unicron-build-test.md`'s one
 command) - this script prepends the harness's own Wine location itself if `wine` isn't already on
-`PATH`, since it also has to work unattended once #68 invokes it with nobody around to have set up
-a shell first.
+`PATH`, since the poller invokes it unattended, with nobody around to have set up a shell first.
 
 It resolves `<commit-ish>` to an exact commit, then:
 
@@ -229,7 +225,7 @@ nothing new and doesn't rebuild.
 | `0` | Published (just now, or already was - idempotent no-op). |
 | `1` | The suite ran and found a real test FAIL - nothing published. |
 | `2` | A pipeline-level error: bad commit-ish, a worktree/`gh` failure, the suite reported green but didn't actually produce `chextrek.dll`/`chextrek.pdb`, or the suite exited with anything other than 0/1/3 - not a game result either way. |
-| `3` | An environment blocker, propagated verbatim from `tools/run-all-tests.sh`'s own exit 3 (e.g. Wine not on `PATH`) - not a test result. |
+| `3` | An environment blocker, propagated verbatim from `tools/run-all-tests.sh`'s own exit 3 (e.g. Wine not on `PATH`, or docker missing for the build) - not a test result. |
 
 Two runs of the *same* commit (a by-hand run overlapping #68's poller, say) never corrupt each
 other: a per-tag `flock` (under `$CHEXTREK_PIPELINE_STATE_DIR/locks/`, separate from the harness's
@@ -256,7 +252,8 @@ repo/a real `gh` outside that self-test):
   parsed from this checkout's own `origin` remote.
 - `CHEXTREK_PIPELINE_SUITE_CMD` - the build+test command run inside the scratch worktree. Defaults
   to `bash tools/run-all-tests.sh`.
-- `CHEXTREK_PIPELINE_TAG_PREFIX` - release tag prefix. Defaults to `win-`.
+- `CHEXTREK_PIPELINE_TAG_PREFIX` - release tag prefix. Defaults to `win-`. `tools/fetch-and-play.sh`
+  reads it too, so both use the same tag scheme (`chextrek_release_tag`, `tools/lib-harness.sh`).
 - `CHEXTREK_PIPELINE_RED_LABEL` - label on the single red-tracking issue. Defaults to
   `pipeline:red`.
 - `CHEXTREK_PIPELINE_RED_TITLE` - fixed title of that issue. Defaults to `Pipeline: chex-trek build
@@ -293,8 +290,8 @@ notification, without ever spamming a second issue for the same ongoing problem:
   tracker rather than risk a duplicate open or a wrongly-skipped close - the failure is logged as a
   WARNING in that run's own archive log, and a still-open issue waits for a later run.
 
-This all assumes commits are processed in order, one at a time - true for a by-hand run today, and
-for #68's poller (one commit fully processed before the next is picked up). It isn't proven safe
+This all assumes commits are processed in order, one at a time - true for the poller (one commit
+fully processed before the next is picked up) and for a single by-hand run. It isn't proven safe
 against two *different* commits being processed concurrently: e.g. two red commits racing could
 both see no issue open and both create one, or a fresh green publish of an old, out-of-order commit
 could close an issue a genuinely later, still-red commit opened. The per-commit lock above only
@@ -308,14 +305,15 @@ branch commit, commenting on it instead of duplicating for a second red run (ano
 commit), commenting on it again worded as an environment blocker, and finally closing it with a
 comment - that last run against `a39130d` itself (already known-green, not a throwaway commit).
 All four `gh label`/`gh issue` calls (create, comment x2, close) were real, against the real repo.
-Two things stayed simulated/dry-run rather than real, for this verification specifically, so it
-didn't wait on a full ~25-minute suite run four times over: the suite outcome itself (red/blocked/
-green) was chosen via `CHEXTREK_PIPELINE_SUITE_CMD` for all four runs, not by actually building and
-testing each commit - `bash tools/run-all-tests.sh` was separately run directly (not through this
-pipeline script) on this same branch during development and passed 24/24, proving the real
-build+test path independent of this issue-tracking verification; and release publishing stayed
-stubbed/dry-run (no real release/tag is allowed yet - see "Publishing pipeline" above), so the
-closing comment's release link is a dry-run URL, not a real one. That verification issue was
+Two things stayed simulated/dry-run rather than real, for this verification specifically: the
+suite outcome itself (red/blocked/green) was chosen via `CHEXTREK_PIPELINE_SUITE_CMD` for all four
+runs, not by actually building and testing each commit - `bash tools/run-all-tests.sh` was
+separately run directly (not through this pipeline script) on this same branch during development
+and passed 24/24 (the suite's size at the time), proving the real build+test path independent of
+this issue-tracking verification; and release publishing stayed stubbed/dry-run (no real
+release/tag may be created until spec #58 merges and the license use is confirmed - see "Never
+done in spec #58/#68" under "AFK trigger" below), so the closing comment's release link is a
+dry-run URL, not a real one. That verification issue was
 `wScottSh/chex-trek#72` - left closed, with a summary comment identifying it as this run and
 spelling out exactly what was real vs. simulated, once the verification finished (not the same
 issue as this spec ticket, #67).
@@ -333,11 +331,8 @@ This is spec #58's final piece - the owner's one command to play a Unicron-built
 release. It:
 
 1. **Refuses on a dirty working tree** (uncommitted changes) before touching anything else - it
-   never discards local work, whether or not `COMMIT` is given. This is also #70's own acceptance
-   criterion; #69 ships it and proves it here (`tools/test-fetch-and-play.sh`'s dirty-tree cases),
-   since shipping this command without it in the meantime would mean every play session silently
-   threw away whatever the owner had checked out and hadn't committed - not a missing feature, an
-   active hazard.
+   never discards local work, whether or not `COMMIT` is given (`tools/test-fetch-and-play.sh`'s
+   dirty-tree cases).
 2. Resolves which release to play, and checks both `chextrek.dll` and `chextrek.pdb` are attached
    to it, and that `dhewm3.exe` is actually installed - all before touching `HEAD`:
    - no `COMMIT`: the release marked Latest (`gh release view`, no tag).
@@ -359,24 +354,28 @@ release. It:
    at this checkout, the same engine conventions as `tools/run-harness.sh` - but interactively: no
    console script, no timeout. The owner plays until they quit.
 
-**Self-rewriting checkout (#70):** step 4's checkout can rewrite `tools/fetch-and-play.sh` itself
-on disk while it's still running (any commit whose copy differs from the one currently executing
-does this, not just occasionally) - bash can then resume reading mid-file into the new content and
-execute garbage. The whole script body is wrapped in one `main() { ...; }` function, called only at
-the very end, so bash has already fully parsed it - including everything after the checkout -
-before `git checkout` ever runs; nothing later in the file is read from disk again. This is
-mutation-tested, not just plausible: `tools/test-fetch-and-play.sh`'s "self-rewriting checkout" case
-injects a divergent instruction into the not-yet-read remainder of the on-disk file at the moment of
-checkout, and with the `main()` wrap removed, that same case genuinely fails - confirmed directly
-while building this fix. Separately, Git for Windows is reported to sometimes fail the file replace
-outright ("Unlink of file ... failed") rather than completing it with new content; that's a git/
-filesystem-level failure this wrap doesn't touch (a failed `git checkout` is still always checked
-and refused cleanly here, never assumed to have succeeded) and is unverified on real Windows. See
-the script's own header comment for the full reasoning.
+**Self-rewriting checkout (#70):** step 4's checkout rewrites `tools/fetch-and-play.sh` itself
+whenever the target commit's copy differs from the one running. Two guards:
 
-**Exit status:** `0` once `dhewm3` has been launched - the script's own exit status then becomes
-whatever `dhewm3` itself exits with (a real, interactive process, not a pass/fail check), not
-necessarily `0`. `1` on any refusal before ever launching anything. In every refusal case except
+- **Temp-copy re-exec** (for Git for Windows, which can abort with "Unlink of file
+  'tools/fetch-and-play.sh' failed" when a running process holds the file open): the script first
+  copies itself to a temp file and re-execs bash on that copy, so nothing holds the checkout's own
+  copy open during the checkout. The temp copy deletes itself once parsed.
+  `tools/test-fetch-and-play.sh`'s "temp-copy re-exec" case checks, at checkout time, that no process
+  in the run has the checkout's copy open. It passes on Linux and fails with the re-exec removed.
+  **Owner-pending:** a real Windows run across a commit whose copy differs.
+- **`main()` wrap** (bash reads scripts incrementally, so an in-place rewrite could make it resume
+  mid-file into new bytes): the whole body is one `main() { ...; }`, called only at the end, so
+  bash has parsed all of it before `git checkout` runs. The "self-rewriting checkout" case skips
+  the temp copy and overwrites the running file in place. It passes, and fails with the wrap
+  removed.
+
+A failed checkout is still always checked and refused cleanly, never assumed to have succeeded.
+See the script's own header comment for the full reasoning.
+
+**Exit status:** once `dhewm3` is launched the script `exec`s into it, so the exit status is
+`dhewm3`'s own (an interactive process, not a pass/fail check). `1` on any refusal before ever
+launching anything. In every refusal case except
 one, the working tree, `HEAD`, and `chextrek.dll`/`chextrek.pdb` are all left exactly as they were:
 a dirty working tree, `COMMIT` not resolving to a commit, no release for `COMMIT` (or no Latest
 release), a release whose target doesn't match the resolved commit, one missing an asset, a missing
@@ -392,6 +391,9 @@ repo/a real `gh` outside that self-test):
 - `CHEXTREK_FETCH_REPO` - `owner/repo` passed to every `gh` call. Defaults to the `owner/repo`
   parsed from this checkout's own `origin` remote (`chextrek_parse_github_repo`,
   `tools/lib-harness.sh`).
+- `CHEXTREK_FETCH_AND_PLAY_SELF` - internal: set by the script's own temp-copy re-exec (above) to
+  its original path. Setting it by hand to the script's own path skips the temp copy (the
+  self-test does, to test the `main()` wrap on its own).
 
 **What's proven where:** `tools/test-fetch-and-play.sh` runs on Unicron against a local bare git
 repo standing in for the real GitHub remote, a stubbed `gh`, and stubbed `wine`/`winepath`/
@@ -400,8 +402,8 @@ tree refusal (with and without a `COMMIT` argument), the release/asset resolutio
 commit), the detached checkout landing on the release's exact commit (not just the branch tip), the
 download, the mount, the exact engine launch arguments (`fs_basepath`/`fs_game`/`fs_gameDllPath`),
 a `COMMIT` with no release refusing and naming it, a release whose target doesn't match the resolved
-commit refusing, and the self-rewriting-checkout case above - all without a display, a real engine,
-or a real repo. It cannot prove the two things only the owner, on real Windows, can: that the engine
+commit refusing, and both self-rewriting-checkout guards above - all without a display, a real
+engine, or a real repo. It cannot prove the two things only the owner, on real Windows, can: that the engine
 log shows `chextrek.dll` loaded, and that the game is actually playable. Those are spec #58's own
 final acceptance checks: run `bash tools/fetch-and-play.sh [COMMIT]`, then check `dhewm3log.txt`
 (under the save/config path in the table above - `Documents\My Games\dhewm3\chextrek\` by default)
@@ -423,11 +425,12 @@ dependency (systemd just calls it on a timer), so it's fully covered by
 `tools/test-pipeline-poll.sh` without needing a real timer:
 
 ```
-tools/pipeline-poll.sh
+bash tools/pipeline-poll.sh
 ```
 
 One call is one "poll tick": it fetches `origin/<branch>` (default `master`;
-`CHEXTREK_PIPELINE_POLL_BRANCH` overrides), compares the fetched tip to the last commit this
+`CHEXTREK_PIPELINE_POLL_BRANCH` overrides; `CHEXTREK_PIPELINE_PROCESS_CMD` replaces the per-commit
+`bash tools/pipeline-process-commit.sh` call, for `tools/test-pipeline-poll.sh`'s stub only), compares the fetched tip to the last commit this
 poller has already handed off (`CHEXTREK_PIPELINE_STATE_DIR/poller-last-processed` - the same
 state root `tools/pipeline-process-commit.sh` uses), and processes every commit newer than that,
 **oldest first, one full `tools/pipeline-process-commit.sh` run at a time, in this one call**. The
@@ -449,7 +452,7 @@ closing comment, which names #68's poller directly: "assumes commits are process
 at a time ... and for #68's poller (one commit fully processed before the next is picked up)").
 Skipping ahead to the newest commit would violate that the moment any skipped commit was red - the
 issue #67 would have opened for it would simply never open. The accepted trade-off: a backlog of
-several commits (each a full suite run, tens of minutes - see "Measured build times" above) delays
+several commits (each a full build + suite run, about 3.5 minutes - see "Running the tests" below) delays
 the newest commit's own result until every older one in the backlog has been processed, in favor
 of never producing a wrong answer. A poll-level error partway through a backlog (exit 2 - see
 `tools/pipeline-poll.sh`'s own header) stops that tick at the failing commit without advancing past
@@ -460,6 +463,13 @@ design rather than silently giving up; unsticking it is a manual step: investiga
 `CHEXTREK_PIPELINE_STATE_DIR/logs/` for that commit's own run archive, and once the cause is
 understood, either fix it and let the next tick retry normally, or deliberately skip past that one
 commit by writing its SHA directly into `CHEXTREK_PIPELINE_STATE_DIR/poller-last-processed`.
+
+**Red and environment-blocked commits advance the baseline** (exit 1 or 3 from
+`tools/pipeline-process-commit.sh` - both already reported in the `pipeline:red` issue). The poller
+never retests a blocked commit on its own: retrying it every tick would re-comment on the issue each
+time and hold up every newer commit. Once the environment is fixed, the next commit pushed to
+`master` is processed normally. To get a result for the blocked commit itself (e.g. it's still the
+tip), run `bash tools/pipeline-process-commit.sh <sha>` by hand.
 
 **First run ever** (no state file yet) bootstraps the baseline to the current `origin/<branch>` tip
 without processing anything - otherwise the very first poll tick would try to process this repo's
@@ -498,12 +508,12 @@ tip without processing anything, a WARNING is logged, and the poll tick exits 2 
 `~/.config/systemd/user/chextrek-pipeline-poll.{service,timer}` and manages them:
 
 ```
-tools/setup-pipeline-poll-timer.sh install [--repo-dir DIR] [--interval DURATION] [--branch BRANCH]
-tools/setup-pipeline-poll-timer.sh enable            # systemctl --user enable --now the timer
-tools/setup-pipeline-poll-timer.sh disable            # systemctl --user disable --now the timer
-tools/setup-pipeline-poll-timer.sh status              # unit status + next/last scheduled fire
-tools/setup-pipeline-poll-timer.sh logs [--follow]      # journalctl --user -u the service
-tools/setup-pipeline-poll-timer.sh uninstall            # disable, remove the unit files, reload
+bash tools/setup-pipeline-poll-timer.sh install [--repo-dir DIR] [--interval DURATION] [--branch BRANCH]
+bash tools/setup-pipeline-poll-timer.sh enable       # systemctl --user enable --now the timer
+bash tools/setup-pipeline-poll-timer.sh disable      # systemctl --user disable --now the timer
+bash tools/setup-pipeline-poll-timer.sh status       # unit status + next/last scheduled fire
+bash tools/setup-pipeline-poll-timer.sh logs [--follow]   # journalctl --user -u the service
+bash tools/setup-pipeline-poll-timer.sh uninstall    # disable, remove the unit files, reload
 ```
 
 `--repo-dir` defaults to this checkout's own root and is the `WorkingDirectory` the service runs
@@ -529,11 +539,8 @@ checkout each tick, but that's out of scope here.
 after a reboot at all; lingering (already on for this user) is what lets a `systemd --user` unit
 run with nobody logged in in the first place; `OnBootSec=5min` (boot-relative, not wall-clock) is
 what makes a tick fire again shortly after *any* boot, catching up on whatever time Unicron was
-off regardless of how long that was. `Persistent=true` is included in the timer unit per the usual
-systemd convention, but - `systemd.timer(5)` is explicit about this - it only has an effect for
-`OnCalendar=` timers; this timer uses `OnBootSec=`/`OnUnitActiveSec=` instead, for which it's a
-documented no-op, so it isn't what's actually doing the reboot-catch-up work here - `OnBootSec=`
-alone already provides it, as above. Can't reboot Unicron from here to prove this live - verified instead via
+off regardless of how long that was. (No `Persistent=`: it only affects `OnCalendar=` timers,
+`systemd.timer(5)`.) Can't reboot Unicron from here to prove this live - verified instead via
 `systemd-analyze --user verify` against the rendered units (clean, no warnings) and by inspection
 of the unit files themselves; **owner-pending**: reboot Unicron once the real timer is enabled and
 confirm `systemctl --user list-timers` still shows it afterwards.
@@ -582,7 +589,11 @@ session or interactively-sourced shell profile is needed for any of the followin
   `systemctl --user` isn't usable in the environment it's run in; unconditionally disables, removes
   and `daemon-reload`s its throwaway unit (and `reset-failed`s it) on every exit path,
   live-verified by hand afterwards (`systemctl --user list-timers --all` /
-  `list-units --all | grep chextrek`) to leave nothing behind.
+  `list-units --all | grep chextrek`) to leave nothing behind. Because it's a `tools/test-*.sh`,
+  it also runs inside every pipeline suite run - once the real timer is on, that means from inside
+  the real service (a throwaway unit started from a oneshot unit). That combination hasn't been run
+  yet, since the real timer has never been enabled: **owner-pending**, checked by the first real
+  tick below.
 - **Never done in spec #58/#68, on purpose (HARD RULE):** the real "chextrek-pipeline-poll" unit was
   never installed or enabled against the real `origin/master` with a real `gh` - that would let an
   unattended poll tick publish a real release the moment any new commit landed, which is forbidden
@@ -593,20 +604,20 @@ session or interactively-sourced shell profile is needed for any of the followin
 dedicated, persistent checkout (not a worktree that gets cleaned up):
 
 ```
-tools/setup-pipeline-poll-timer.sh install --repo-dir /path/to/persistent/chex-trek-checkout
-tools/setup-pipeline-poll-timer.sh enable
-tools/setup-pipeline-poll-timer.sh status
+bash tools/setup-pipeline-poll-timer.sh install --repo-dir /path/to/persistent/chex-trek-checkout
+bash tools/setup-pipeline-poll-timer.sh enable
+bash tools/setup-pipeline-poll-timer.sh status
 ```
 
 Then push a throwaway commit to `master` (or wait for a real one) and confirm within one interval
 plus run time that either a `win-<sha>` release appears (`gh release view`, no tag - the Latest
 release) or the `pipeline:red` issue is opened/updated - the AC this whole sub-issue exists to
-satisfy. `tools/setup-pipeline-poll-timer.sh logs --follow` tails the run live.
+satisfy. `bash tools/setup-pipeline-poll-timer.sh logs --follow` tails the run live.
 
 ## Building
 
 ```
-tools/build-chextrek.sh [Debug|RelWithDebInfo|Release]
+bash tools/build-chextrek.sh [Debug|RelWithDebInfo|Release]
 ```
 
 Configures `engine/dhewm3-sdk` (the pinned dhewm3-sdk import, see `engine/dhewm3-sdk/UPSTREAM.md`)
@@ -620,17 +631,23 @@ what differs.
 ## Running the tests
 
 ```
-tools/run-all-tests.sh                   # the whole suite: builds once, runs every tools/test-*.sh
-tools/run-harness.sh [timeout-seconds]   # just the main-menu smoke run (default timeout: 60s)
+bash tools/run-all-tests.sh                   # the whole suite: builds once, runs every tools/test-*.sh
+bash tools/run-harness.sh [timeout-seconds]   # just the main-menu smoke run (default timeout: 60s)
 ```
+
+The scripts are mode `100644` in git (a repo convention), so invoke them with `bash`.
 
 `tools/run-all-tests.sh` is the one command for the whole suite (spec #28 story 38): it builds
 `chextrek.dll`, then runs the harness self-test, the main-menu smoke test and every feature scenario
 in turn, and prints a pass/fail summary. It exits 0 if all pass, 1 if any fail, 3 on a broken-
-environment blocker (no display, or, Linux-only, #63: missing Wine/winepath, an uninitialized
-Wine prefix, missing Doom 3 data, or a missing dhewm3 engine).
+environment blocker (no display, or, Linux-only: missing `wine`/`winepath`/`wineserver`/`flock`,
+an uninitialized Wine prefix, missing Doom 3 data, a missing dhewm3 engine, an unopenable lock
+file, or `docker`/the msvc-wine image missing for the build).
 `docs/harness-coverage.md` lists which scenario covers which feature. Each `tools/test-*.sh` also
 runs on its own (it builds first unless `CHEXTREK_SKIP_BUILD=1`).
+
+**How long it takes:** a full run on Unicron takes about 3.5 minutes (209-210s wall-clock for
+27 scripts, measured twice during spec #58's final review), including the ~8s clean build.
 
 Every run, smoke or scenario, goes through `chextrek_run_console_script` in `tools/lib-harness.sh`,
 which:
@@ -687,21 +704,24 @@ with `No displays available`; the harness checks `qwinsta` before launching and 
 run, and on no display it prints `ENVIRONMENT: no display ...` and exits the whole script with code
 3 - stop and get a human to reconnect, don't wait or retry. On Unicron nobody is ever logged in, so
 the harness brings its own display (Xvfb) instead of treating "no display" as that same kind of
-stop - see "Unicron (Linux/Wine)" above; exit 3 there means Xvfb itself couldn't be started at all.
+stop - see "Unicron (Linux/Wine)" above; exit 3 there means Xvfb couldn't be started, or the display
+it started died mid-run.
 `tools/test-harness-no-display.sh` covers both without needing a display itself.
 
 **Every other broken-Unicron-environment case stops the same way (#63), Linux-only.** Before ever
-touching a display, on Linux the harness checks that `wine` and `winepath` are on `PATH`, that
+touching a display, on Linux the harness checks that `wine`, `winepath`, `wineserver` and `flock`
+are on `PATH`, that
 `$WINEPREFIX` looks initialized (`system.reg` present), that the classic Doom 3 data is at
 `$DOOM3_BASEPATH` (`base/pak000.pk4` present), and that the dhewm3 engine itself is at
 `$DHEWM3_HOME`. Any of these missing prints one `ENVIRONMENT: ...` line naming the missing piece
 and exits the whole script with code 3, the same contract as the no-display case above - never an
 ordinary FAIL, and never a bare "command not found" from a missing `wine`/`winepath` silently
-swallowed by a path-conversion call. On Windows a missing dhewm3 engine is unchanged by #63: still
+swallowed by a path-conversion call. A lock file that can't be opened (`CHEXTREK_LOCK_FILE`) stops
+the same way, and so does `tools/build-chextrek.sh` when `docker` or the msvc-wine image is missing
+(`tools/run-all-tests.sh` passes that exit 3 through). On Windows a missing dhewm3 engine is unchanged by #63: still
 an ordinary FAIL/exit-1 next to chextrek.dll's own missing-build check, not this ENVIRONMENT/exit-3
 treatment. `tools/test-harness-broken-environment.sh` covers each of the Linux-only cases in
-isolation (a no-op on Windows), without needing any of the real installs
-itself.
+isolation (a no-op on Windows), without needing any of the real installs itself.
 
 ## Writing a feature scenario
 
@@ -726,8 +746,8 @@ depend on it.
 
 ## Why none of this lives in the repo
 
-- **The mount must be a real NTFS symlink, not a plain `ln -s` fallback.** On this
-  toolchain, `ln -s` on a directory silently falls back to a full recursive *copy* when it can't
+- **On Windows, the mount must be a real NTFS symlink, not a plain `ln -s` fallback.** On Git
+  Bash, `ln -s` on a directory silently falls back to a full recursive *copy* when it can't
   get symlink privilege, instead of failing loudly. A copy would make the harness silently test
   stale content. `tools/lib-harness.sh` forces a real symlink with
   `MSYS=winsymlinks:nativestrict` and verifies it with `readlink` before trusting it. If your

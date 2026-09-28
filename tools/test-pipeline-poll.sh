@@ -66,6 +66,7 @@ force_reset_origin_to_orphan() {
 REPO="${SCRATCH}/poller-repo"
 mkdir -p "${REPO}/tools"
 cp "${SCRIPT_DIR}/pipeline-poll.sh" "${REPO}/tools/pipeline-poll.sh"
+cp "${SCRIPT_DIR}/lib-harness.sh" "${REPO}/tools/lib-harness.sh"
 git init -q "$REPO"
 git -C "$REPO" remote add origin "$ORIGIN"
 git -C "$REPO" fetch -q origin master

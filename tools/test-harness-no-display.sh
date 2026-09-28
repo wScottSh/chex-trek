@@ -21,9 +21,8 @@ if chextrek_is_linux; then
 	# early checks, and the single-run lock (#62, chextrek_run_console_script takes it before any of
 	# this) need (symlinked from wherever they really live) - and deliberately no `Xvfb` - so "Xvfb
 	# isn't installed" (case 1a) is the real `command -v Xvfb` miss, not a stand-in. `flock` has to
-	# be here: without it, _chextrek_acquire_lock's own `flock -n`/`flock` calls would fail with
-	# "command not found" (now a loud `exit 1` - see _chextrek_acquire_lock), so this test would stop
-	# on that instead of exercising the real no-display code path below it. Each case uses a private
+	# be here: without it, the harness preflight would take its own "flock not found" exit-3 stop
+	# (see _chextrek_linux_preflight_or_exit), so this test would stop on that instead of exercising the real no-display code path below it. Each case uses a private
 	# CHEXTREK_LOCK_FILE so it never queues behind a real harness run on this machine.
 	mkdir -p "${SCRATCH}/no-xvfb-bin"
 	for TOOL in bash uname date cat mkdir rm printf sed grep id readlink basename dirname cp \
@@ -33,14 +32,14 @@ if chextrek_is_linux; then
 
 	# Every case below exercises the display check specifically, so every *other* #63 preflight
 	# resource (tools/test-harness-broken-environment.sh covers those in isolation) is stubbed
-	# present here: a fake Wine/winepath, an initialized-looking Wine prefix, Doom 3 data and a
-	# dhewm3 engine, none of which need to be real installs since nothing past the display check
+	# present here: a fake wine/winepath/wineserver, an initialized-looking Wine prefix, Doom 3 data
+	# and a dhewm3 engine, none of which need to be real installs since nothing past the display check
 	# ever runs them for real in these cases.
 	mkdir -p "${SCRATCH}/wine-bin" "${SCRATCH}/dhewm3" "${SCRATCH}/doom3/base" "${SCRATCH}/wineprefix"
 	: > "${SCRATCH}/dhewm3/dhewm3.exe"
 	: > "${SCRATCH}/doom3/base/pak000.pk4"
 	: > "${SCRATCH}/wineprefix/system.reg"
-	for TOOL in wine winepath; do
+	for TOOL in wine winepath wineserver; do
 		cat > "${SCRATCH}/wine-bin/${TOOL}" <<'EOF'
 #!/usr/bin/env bash
 exit 0

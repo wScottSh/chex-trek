@@ -5,7 +5,10 @@
 # the same MSVC version - 14.50.35717 - run under Wine in a pinned container, see
 # tools/msvc-wine/Dockerfile and docs/dev-setup.md's "Unicron (Linux/Wine)" section).
 #
-# Usage: tools/build-chextrek.sh [Debug|RelWithDebInfo|Release]
+# Usage: bash tools/build-chextrek.sh [Debug|RelWithDebInfo|Release]
+#
+# Exit status: 0 built; non-zero on a build failure; 3 (Linux only) on an environment blocker -
+# docker or the pinned toolchain image missing - with an ENVIRONMENT line, not a build result.
 #
 # Output: <repo-root>/chextrek.dll (and matching .pdb), placed at the repo root because that's
 # the mod's fs_game folder the engine searches for "<fs_game>.dll" - see docs/dev-setup.md.
@@ -27,13 +30,18 @@ Linux*)
 	# (see docs/dev-setup.md). Keep this tag in sync with tools/msvc-wine/build-image.sh.
 	CHEXTREK_MSVC_IMAGE="chextrek-msvc-wine:14.50.35717-x86"
 
+	# A missing docker or toolchain image is a machine-setup problem, not a build failure of this
+	# commit: exit 3 with an ENVIRONMENT line, the harness's environment-blocker contract (see
+	# tools/run-all-tests.sh), so the pipeline never files it as a red game result.
 	if ! command -v docker >/dev/null 2>&1; then
-		echo "error: docker not found on PATH - needed for the Linux (msvc-wine) build. See docs/dev-setup.md." >&2
-		exit 1
+		echo "ENVIRONMENT: docker not found on PATH - needed for the Linux (msvc-wine) build."
+		echo "ENVIRONMENT: this is not a test failure. See docs/dev-setup.md; do not wait or retry."
+		exit 3
 	fi
 	if ! docker image inspect "$CHEXTREK_MSVC_IMAGE" >/dev/null 2>&1; then
-		echo "error: docker image '${CHEXTREK_MSVC_IMAGE}' not found. One-time setup: tools/msvc-wine/build-image.sh. See docs/dev-setup.md." >&2
-		exit 1
+		echo "ENVIRONMENT: docker image '${CHEXTREK_MSVC_IMAGE}' not found (or docker isn't reachable)."
+		echo "ENVIRONMENT: this is not a test failure. One-time setup: bash tools/msvc-wine/build-image.sh (see docs/dev-setup.md); do not wait or retry."
+		exit 3
 	fi
 
 	echo "==> Configuring (Win32/MSVC-under-Wine, BASE_NAME=chextrek, D3XP=OFF) into ${BUILD_DIR}"

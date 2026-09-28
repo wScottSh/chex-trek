@@ -14,16 +14,17 @@
 # names the commit, the failing scenarios (red) or the ENVIRONMENT line (blocker - worded distinct
 # from a test failure), and this run's own archive log path.
 #
-# Invoked by hand for now (#66/#67) - the poller trigger is #68. This script's exit codes are the
-# seam #67's red-issue handling hangs off of: 1 (red), 3 (environment blocker) and 2 (pipeline
+# Invoked unattended by tools/pipeline-poll.sh (the AFK trigger, #68) once per new origin/master
+# commit, or by hand for any one commit. This script's exit codes are the seam #67's red-issue
+# handling hangs off of: 1 (red), 3 (environment blocker) and 2 (pipeline
 # error - not a game result either way) are always kept distinct, the same 0/1/3 contract
 # tools/run-all-tests.sh already makes, plus 2 for this script's own failure modes. Only 0 (green)
 # and 1/3 (red/blocker) ever touch the red issue - 2 never does, since it isn't a game result
 # either way and filing it as "red" would be a false report of a game bug. A per-commit lock (see
-# below) makes two runs of the same commit safe to overlap - #68's poller and a by-hand run, or two
+# below) makes two runs of the same commit safe to overlap - the poller and a by-hand run, or two
 # by-hand runs, can never corrupt each other's scratch worktree.
 #
-# Usage: tools/pipeline-process-commit.sh <commit-ish>
+# Usage: bash tools/pipeline-process-commit.sh <commit-ish>
 #
 # Exit status:
 #   0 - the commit is published: either a new release was created just now, or one already existed
@@ -80,9 +81,11 @@ set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+# shellcheck source=tools/lib-harness.sh
+source "${SCRIPT_DIR}/lib-harness.sh"
 
 usage() {
-	echo "Usage: tools/pipeline-process-commit.sh <commit-ish>" >&2
+	echo "Usage: bash tools/pipeline-process-commit.sh <commit-ish>" >&2
 }
 
 COMMITISH="${1:-}"
@@ -98,13 +101,9 @@ if [ -z "$FULL_SHA" ]; then
 	echo "error: '${COMMITISH}' doesn't resolve to a commit in $(git -C "$REPO_ROOT" rev-parse --show-toplevel 2>/dev/null || echo "$REPO_ROOT")" >&2
 	exit 2
 fi
-# A fixed length (not plain `rev-parse --short`, which auto-grows as the repo's object count
-# grows) so the same commit always maps to the same tag - a length that changed later would make
-# the idempotency check below miss an already-published commit and create a duplicate release.
-SHORT_SHA="$(git -C "$REPO_ROOT" rev-parse --short=10 "$FULL_SHA")"
-
-TAG_PREFIX="${CHEXTREK_PIPELINE_TAG_PREFIX:-win-}"
-TAG="${TAG_PREFIX}${SHORT_SHA}"
+# CHEXTREK_PIPELINE_TAG_PREFIX + a fixed 10-char short sha - the one tag scheme
+# tools/fetch-and-play.sh also looks releases up by (chextrek_release_tag, tools/lib-harness.sh).
+TAG="$(chextrek_release_tag "$REPO_ROOT" "$FULL_SHA")"
 
 # --- repo: explicit override for tests, else parsed from this checkout's own origin remote -
 # never inferred by `gh` implicitly, so every `gh` call below states its target in its own argv ---
@@ -116,7 +115,7 @@ else
 		echo "error: no 'origin' remote in $(git -C "$REPO_ROOT" rev-parse --show-toplevel) and CHEXTREK_PIPELINE_REPO isn't set" >&2
 		exit 2
 	fi
-	REPO="$(printf '%s' "$REMOTE_URL" | sed -E 's#^(https?://|git\+ssh://|ssh://)?(git@)?github\.com[:/]##; s#\.git$##')"
+	REPO="$(chextrek_parse_github_repo "$REMOTE_URL")"
 fi
 
 if ! command -v gh >/dev/null 2>&1; then
@@ -126,7 +125,7 @@ fi
 
 # --- state dir: outside every repo/worktree on purpose, so worktree cleanup below never touches
 # it and logs outlive the scratch checkout they describe ---
-STATE_DIR="${CHEXTREK_PIPELINE_STATE_DIR:-${XDG_STATE_HOME:-${HOME}/.local/state}/chextrek-pipeline}"
+STATE_DIR="$(chextrek_pipeline_state_dir)"
 LOG_DIR="${STATE_DIR}/logs"
 WORKTREE_ROOT="${STATE_DIR}/worktrees"
 LOCK_DIR="${STATE_DIR}/locks"
@@ -247,7 +246,7 @@ suite_summary_block() {
 	printf '%s\n' "$SUITE_TAIL" | tac | sed -n '0,/^=== summary:/p' | tac
 }
 
-# --- per-tag lock: two runs of the *same* commit (e.g. a caller and #68's poller racing, or two
+# --- per-tag lock: two runs of the *same* commit (e.g. a by-hand run and the poller racing, or two
 # by-hand invocations) must never touch the same scratch worktree at once - a second run treating
 # the first run's live worktree as "stale" and force-removing it out from under an in-progress
 # build would corrupt or kill that first run. Different commits get different tags and never
@@ -316,7 +315,7 @@ WT_CREATED=1
 if ! command -v wine >/dev/null 2>&1 && [ -x /opt/wine-11.0-wow64/bin/wine ]; then
 	# The harness's own Wine (docs/dev-setup.md) isn't on PATH by default in a fresh/unattended
 	# shell - put it there ourselves so this entry point doesn't depend on the caller remembering
-	# the `export` from docs/agents/unicron-build-test.md (matters once #68 invokes this
+	# the `export` from docs/agents/unicron-build-test.md (matters because the poller invokes this
 	# unattended, with nobody around to have set up their shell first).
 	export PATH="/opt/wine-11.0-wow64/bin:${PATH}"
 fi
@@ -416,7 +415,7 @@ fi
 # could have created the tag in between (a manual `gh release create`, GitHub-side state this
 # script doesn't know about). Re-check before calling it a pipeline error.
 if gh release view "$TAG" --repo "$REPO" >>"$LOG_FILE" 2>&1; then
-	log "OUTCOME: already published - lost a race with another run of the same commit; nothing to do"
+	log "OUTCOME: already published - ${TAG} appeared on ${REPO} while this run was publishing it (created outside this pipeline's per-commit lock); nothing to do"
 	close_red_issue "$(release_url_or_empty "$TAG")"
 	exit 0
 fi

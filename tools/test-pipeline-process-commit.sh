@@ -259,11 +259,12 @@ EOF
 REPO="${SCRATCH}/repo"
 mkdir -p "${REPO}/tools"
 cp "${SCRIPT_DIR}/pipeline-process-commit.sh" "${REPO}/tools/pipeline-process-commit.sh"
+cp "${SCRIPT_DIR}/lib-harness.sh" "${REPO}/tools/lib-harness.sh"
 git -C "$REPO" init -q -b main
 git -C "$REPO" config user.email test@example.invalid
 git -C "$REPO" config user.name "Pipeline Test"
 git -C "$REPO" remote add origin git@github.com:stub-owner/stub-repo.git
-git -C "$REPO" add tools/pipeline-process-commit.sh
+git -C "$REPO" add tools/pipeline-process-commit.sh tools/lib-harness.sh
 git -C "$REPO" commit -q -m "seed"
 
 commit_sha() {
@@ -295,11 +296,12 @@ SHA_STALE_WORKTREE="$(commit_sha "stale-worktree-from-a-crashed-run commit")"
 REPO_HTTPS="${SCRATCH}/repo-https"
 mkdir -p "${REPO_HTTPS}/tools"
 cp "${SCRIPT_DIR}/pipeline-process-commit.sh" "${REPO_HTTPS}/tools/pipeline-process-commit.sh"
+cp "${SCRIPT_DIR}/lib-harness.sh" "${REPO_HTTPS}/tools/lib-harness.sh"
 git -C "$REPO_HTTPS" init -q -b main
 git -C "$REPO_HTTPS" config user.email test@example.invalid
 git -C "$REPO_HTTPS" config user.name "Pipeline Test"
 git -C "$REPO_HTTPS" remote add origin https://github.com/stub-owner-https/stub-repo-https.git
-git -C "$REPO_HTTPS" add tools/pipeline-process-commit.sh
+git -C "$REPO_HTTPS" add tools/pipeline-process-commit.sh tools/lib-harness.sh
 git -C "$REPO_HTTPS" commit -q -m "seed"
 SHA_HTTPS_REPO="$(git -C "$REPO_HTTPS" commit -q --allow-empty -m "https-repo-parsing commit" && git -C "$REPO_HTTPS" rev-parse HEAD)"
 

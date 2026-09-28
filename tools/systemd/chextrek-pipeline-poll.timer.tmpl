@@ -15,14 +15,11 @@ Description=chex-trek pipeline: timer for the AFK-trigger poll service (spec #58
 # and exits at once if there's nothing new), and preferred over the alternative here.
 OnBootSec=5min
 OnUnitActiveSec=@@INTERVAL@@
-# Persistent=true only has an effect for OnCalendar= timers (systemd.timer(5)) - this timer uses
-# OnBootSec/OnUnitActiveSec instead, for which it's a documented no-op, so it's included here for
-# convention/clarity rather than because it changes behavior. Reboot survival for *this* timer
-# instead comes from OnBootSec itself: a boot-relative trigger inherently "catches up" on the next
-# boot regardless of how long Unicron was off, as long as the timer is enabled (WantedBy=
-# timers.target, below) and lingering is on for this user (already enabled - see
-# docs/dev-setup.md, untouched by spec #58/#68).
-Persistent=true
+# No Persistent=: it only affects OnCalendar= timers (systemd.timer(5)). Reboot survival for this
+# timer comes from OnBootSec itself: a boot-relative trigger fires again after every boot, however
+# long Unicron was off, as long as the timer is enabled (WantedBy=timers.target, below) and
+# lingering is on for this user (already enabled - see docs/dev-setup.md, untouched by spec
+# #58/#68).
 
 [Install]
 WantedBy=timers.target
