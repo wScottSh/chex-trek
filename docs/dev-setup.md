@@ -302,14 +302,18 @@ release. It:
 
 **Self-rewriting checkout (#70):** step 4's checkout can rewrite `tools/fetch-and-play.sh` itself
 on disk while it's still running (any commit whose copy differs from the one currently executing
-does this, not just occasionally) - on Git for Windows this can otherwise fail outright ("Unlink of
-file ... failed") or, worse, let bash resume reading mid-file into the new content and execute
-garbage. The whole script body is wrapped in one `main() { ...; }` function, called only at the very
-end, so bash has already fully parsed it - including everything after the checkout - before `git
-checkout` ever runs; nothing later in the file is read from disk again. See the script's own header
-comment for the full reasoning, and `tools/test-fetch-and-play.sh`'s "self-rewriting checkout" case
-for the proof (a release commit whose `tools/fetch-and-play.sh` differs from the one that's running
-still completes correctly).
+does this, not just occasionally) - bash can then resume reading mid-file into the new content and
+execute garbage. The whole script body is wrapped in one `main() { ...; }` function, called only at
+the very end, so bash has already fully parsed it - including everything after the checkout -
+before `git checkout` ever runs; nothing later in the file is read from disk again. This is
+mutation-tested, not just plausible: `tools/test-fetch-and-play.sh`'s "self-rewriting checkout" case
+injects a divergent instruction into the not-yet-read remainder of the on-disk file at the moment of
+checkout, and with the `main()` wrap removed, that same case genuinely fails - confirmed directly
+while building this fix. Separately, Git for Windows is reported to sometimes fail the file replace
+outright ("Unlink of file ... failed") rather than completing it with new content; that's a git/
+filesystem-level failure this wrap doesn't touch (a failed `git checkout` is still always checked
+and refused cleanly here, never assumed to have succeeded) and is unverified on real Windows. See
+the script's own header comment for the full reasoning.
 
 **Exit status:** `0` once `dhewm3` has been launched - the script's own exit status then becomes
 whatever `dhewm3` itself exits with (a real, interactive process, not a pass/fail check), not

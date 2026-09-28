@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Self-test for tools/fetch-and-play.sh (spec #58/#69). This never touches the real
+# Self-test for tools/fetch-and-play.sh (spec #58/#69/#70). This never touches the real
 # wScottSh/chex-trek repo, a real `gh`, or a real dhewm3/Wine install, and never launches the real
 # game:
 #   - a local bare git repo stands in for the real GitHub remote ("origin") - fetch-and-play's own
@@ -139,6 +139,42 @@ exit 1
 STUBEOF
 chmod +x "${SCRATCH}/bin/gh"
 
+# --- git passthrough shim, used only by case 10 (self-rewriting checkout) below: forwards every
+# call to the real git unchanged, EXCEPT the one call this test arms via STUB_GIT_REWRITE_TARGET/
+# STUB_GIT_REWRITE_CONTENT (an exact "checkout --detach <STUB_GIT_REWRITE_TARGET>" with "-C <dir>").
+# For every other case (those two env vars unset), this is a pure passthrough - it changes nothing
+# about how any other case's real git calls behave. See case 10 below for why this exists: a plain
+# Linux `git checkout` replaces a changed tracked file via unlink+recreate (a new inode), which
+# bash's already-open read handle on the old (now-unlinked) inode never observes - so it can't
+# exercise the same-inode-overwrite hazard fetch-and-play.sh's header describes on its own. This
+# shim reproduces that hazard directly instead. ---
+REAL_GIT_BIN="$(command -v git)"
+cat >"${SCRATCH}/bin/git" <<EOF
+#!/usr/bin/env bash
+REAL_GIT="${REAL_GIT_BIN}"
+DIR=""
+DETACH_SHA=""
+PREV=""
+for a in "\$@"; do
+	[ "\$PREV" = "-C" ] && DIR="\$a"
+	[ "\$PREV" = "--detach" ] && DETACH_SHA="\$a"
+	PREV="\$a"
+done
+if [ -n "\$DETACH_SHA" ] && [ -n "\${STUB_GIT_REWRITE_TARGET:-}" ] && [ "\$DETACH_SHA" = "\${STUB_GIT_REWRITE_TARGET}" ] && [ -n "\$DIR" ] && [ -f "\${STUB_GIT_REWRITE_CONTENT:-}" ]; then
+	# Same-inode sabotage: a plain \`>\` redirection to an *existing* file truncates and rewrites
+	# it in place (open(2) with O_TRUNC, no unlink/recreate) - exactly what would let a
+	# currently-open read handle observe the new bytes mid-read. This intentionally makes the
+	# working tree "dirty" from git's point of view (an untracked-looking local change to a
+	# tracked file) before the real checkout below runs, so that checkout is forced (-f) - an
+	# unguarded real run's own checkout would end up at the same final, correct content for this
+	# file regardless of exactly how it got there.
+	cat "\${STUB_GIT_REWRITE_CONTENT}" >"\${DIR}/tools/fetch-and-play.sh"
+	exec "\$REAL_GIT" -C "\$DIR" checkout -f --detach "\$DETACH_SHA"
+fi
+exec "\$REAL_GIT" "\$@"
+EOF
+chmod +x "${SCRATCH}/bin/git"
+
 # --- fake wine/winepath/dhewm3.exe: stand in for the engine, never launch anything real ---
 mkdir -p "${SCRATCH}/dhewm3-home"
 cat >"${SCRATCH}/dhewm3-home/dhewm3.exe" <<'EOF'
@@ -245,6 +281,8 @@ run_fetch_and_play() {
 		STUB_GH_NO_RELEASE="${STUB_GH_NO_RELEASE:-0}" \
 		STUB_GH_DOWNLOAD_FAIL="${STUB_GH_DOWNLOAD_FAIL:-0}" \
 		STUB_GH_RELEASES="${STUB_GH_RELEASES:-}" \
+		STUB_GIT_REWRITE_TARGET="${STUB_GIT_REWRITE_TARGET:-}" \
+		STUB_GIT_REWRITE_CONTENT="${STUB_GIT_REWRITE_CONTENT:-}" \
 		DHEWM3_HOME="${SCRATCH}/dhewm3-home" \
 		DOOM3_BASEPATH="$DOOM3_BASEPATH" \
 		bash "${CHECKOUT}/tools/fetch-and-play.sh" "$@"
@@ -386,20 +424,27 @@ if echo "$OUT5" | grep -qi "usage"; then pass "prints a usage message"; else fai
 # RELEASE_SHA's own real win-<short sha> tag (spec #66's exact scheme) - #70's commit-arg path
 # derives this same tag from the commit it's given, so these self-test releases must use it too.
 RELEASE_TAG="win-$(git -C "$SEED" rev-parse --short=10 "$RELEASE_SHA")"
-NEWER_TAG="win-$(git -C "$SEED" rev-parse --short=10 "$NEWER_SHA")"
 
 echo
-echo "=== case 6: commit argument with a green release -> resolves to a full sha, looks up that commit's own win-<short> release, lands detached on it, downloads, launches ==="
-git -C "$CHECKOUT" checkout -q main-local
+echo "=== case 6: commit argument with a green release -> resolves to a full sha, looks up THAT commit's own win-<short> release (not Latest), lands detached on it, downloads, launches ==="
+# Start from LATE_SHA (not RELEASE_SHA) and point the Latest stub at LATE_SHA too, both
+# deliberately different from the commit argument (RELEASE_SHA) - if the commit argument were ever
+# ignored and the run silently fell back to the Latest path, it would land back on LATE_SHA (a
+# no-op from this starting point) instead of moving to RELEASE_SHA, and the gh-argv assertion below
+# would see a no-tag "release view" call instead of one naming RELEASE_TAG.
+git -C "$CHECKOUT" checkout -q "$LATE_SHA"
 : >"${SCRATCH}/wine-invoked-count"
 rm -rf "${SCRATCH}/wine-invocations"
 mkdir -p "${SCRATCH}/wine-invocations"
-OUT6="$(STUB_GH_RELEASES="$(printf '%s\x1f%s\x1fchextrek.dll,chextrek.pdb' "$RELEASE_TAG" "$RELEASE_SHA")" \
+OUT6="$(STUB_GH_TAG="win-latest-should-not-be-used" STUB_GH_TARGET="$LATE_SHA" STUB_GH_ASSET_NAMES="chextrek.dll,chextrek.pdb" \
+	STUB_GH_RELEASES="$(printf '%s\x1f%s\x1fchextrek.dll,chextrek.pdb' "$RELEASE_TAG" "$RELEASE_SHA")" \
 	run_fetch_and_play "$RELEASE_SHA" 2>&1)"
 CODE6=$?
 if [ $CODE6 -eq 0 ]; then pass "exits 0 given a commit with a green release"; else fail "exit code $CODE6, want 0"; echo "$OUT6"; fi
 CUR6_SHA="$(git -C "$CHECKOUT" rev-parse HEAD)"
-if [ "$CUR6_SHA" = "$RELEASE_SHA" ]; then pass "HEAD is at the given commit (the older release, not Latest/branch tip)"; else fail "HEAD is ${CUR6_SHA}, want ${RELEASE_SHA}"; fi
+if [ "$CUR6_SHA" = "$RELEASE_SHA" ]; then pass "HEAD is at the given commit ${RELEASE_SHA} - not ${LATE_SHA}, the deliberately-different Latest stub target"; else fail "HEAD is ${CUR6_SHA}, want ${RELEASE_SHA} (landing on ${LATE_SHA} would mean the commit argument was silently ignored in favor of Latest)"; fi
+if [ "$(git -C "$CHECKOUT" symbolic-ref -q HEAD)" ]; then fail "HEAD is still on a branch - expected detached"; else pass "HEAD is detached (commit-arg path)"; fi
+if grep -qF "$RELEASE_TAG" "${SCRATCH}/gh-argv.d"/*.args 2>/dev/null; then pass "gh was called with the commit's own release tag (${RELEASE_TAG}), not a no-tag Latest lookup"; else fail "expected some gh call's argv to name ${RELEASE_TAG}"; fi
 if [ -f "${CHECKOUT}/chextrek.dll" ] && [ -f "${CHECKOUT}/chextrek.pdb" ]; then pass "chextrek.dll/chextrek.pdb were downloaded for the given commit"; else fail "chextrek.dll/chextrek.pdb missing from ${CHECKOUT}"; fi
 if [ "$(wine_call_count)" = "1" ]; then pass "the engine was launched exactly once for the given commit"; else fail "expected exactly one engine launch, found $(wine_call_count)"; fi
 rm -f "${CHECKOUT}/chextrek.dll" "${CHECKOUT}/chextrek.pdb"
@@ -425,29 +470,51 @@ echo
 echo "=== case 8: a commit with no release -> exits non-zero naming the commit, HEAD unchanged ==="
 git -C "$CHECKOUT" checkout -q main-local
 PRE_NOREL2_SHA="$(git -C "$CHECKOUT" rev-parse HEAD)"
+PRE_NOREL2_BRANCH="$(git -C "$CHECKOUT" symbolic-ref -q HEAD || true)"
 OUT8="$(STUB_GH_RELEASES="" run_fetch_and_play "$NEWER_SHA" 2>&1)"
 CODE8=$?
 if [ $CODE8 -ne 0 ]; then pass "exits non-zero for a commit with no release"; else fail "exit code 0, want non-zero"; fi
 if echo "$OUT8" | grep -qF "$NEWER_SHA"; then pass "names the commit in the error message"; else fail "expected the error to name ${NEWER_SHA}"; echo "$OUT8"; fi
 POST_NOREL2_SHA="$(git -C "$CHECKOUT" rev-parse HEAD)"
-if [ "$POST_NOREL2_SHA" = "$PRE_NOREL2_SHA" ]; then pass "HEAD unchanged for a commit with no release"; else fail "HEAD moved despite no release for the commit"; fi
+POST_NOREL2_BRANCH="$(git -C "$CHECKOUT" symbolic-ref -q HEAD || true)"
+if [ "$POST_NOREL2_SHA" = "$PRE_NOREL2_SHA" ] && [ "$POST_NOREL2_BRANCH" = "$PRE_NOREL2_BRANCH" ]; then pass "HEAD unchanged (still on main-local, not detached) for a commit with no release"; else fail "HEAD moved (sha ${PRE_NOREL2_SHA}->${POST_NOREL2_SHA}, branch '${PRE_NOREL2_BRANCH}'->'${POST_NOREL2_BRANCH}') despite no release for the commit"; fi
+if [ -f "${CHECKOUT}/chextrek.dll" ] || [ -f "${CHECKOUT}/chextrek.pdb" ]; then fail "a DLL/PDB exists despite no release for the commit"; else pass "no DLL/PDB downloaded - there's no release for the commit"; fi
 
 echo
 echo "=== case 9: a release found by the commit's own tag but targeting a different commit -> refuses (never trusts the tag alone), HEAD unchanged ==="
+git -C "$CHECKOUT" checkout -q main-local
 PRE_MISMATCH_SHA="$(git -C "$CHECKOUT" rev-parse HEAD)"
+PRE_MISMATCH_BRANCH="$(git -C "$CHECKOUT" symbolic-ref -q HEAD || true)"
 OUT9="$(STUB_GH_RELEASES="$(printf '%s\x1f%s\x1fchextrek.dll,chextrek.pdb' "$RELEASE_TAG" "$NEWER_SHA")" \
 	run_fetch_and_play "$RELEASE_SHA" 2>&1)"
 CODE9=$?
 if [ $CODE9 -ne 0 ]; then pass "exits non-zero when the release's target doesn't match the resolved commit"; else fail "exit code 0, want non-zero"; fi
 if echo "$OUT9" | grep -qF "$RELEASE_SHA" && echo "$OUT9" | grep -qF "$NEWER_SHA"; then pass "names both the resolved commit and the release's actual target"; else fail "expected the message to name both ${RELEASE_SHA} and ${NEWER_SHA}"; echo "$OUT9"; fi
 POST_MISMATCH_SHA="$(git -C "$CHECKOUT" rev-parse HEAD)"
-if [ "$POST_MISMATCH_SHA" = "$PRE_MISMATCH_SHA" ]; then pass "HEAD unchanged when the release's target doesn't match"; else fail "HEAD moved despite the target mismatch"; fi
+POST_MISMATCH_BRANCH="$(git -C "$CHECKOUT" symbolic-ref -q HEAD || true)"
+if [ "$POST_MISMATCH_SHA" = "$PRE_MISMATCH_SHA" ] && [ "$POST_MISMATCH_BRANCH" = "$PRE_MISMATCH_BRANCH" ]; then pass "HEAD unchanged (still on main-local, not detached) when the release's target doesn't match"; else fail "HEAD moved (sha ${PRE_MISMATCH_SHA}->${POST_MISMATCH_SHA}, branch '${PRE_MISMATCH_BRANCH}'->'${POST_MISMATCH_BRANCH}') despite the target mismatch"; fi
+if [ -f "${CHECKOUT}/chextrek.dll" ] || [ -f "${CHECKOUT}/chextrek.pdb" ]; then fail "a DLL/PDB exists despite the target mismatch"; else pass "no DLL/PDB downloaded - the release's target didn't match"; fi
 
 echo
-echo "=== case 10: self-rewriting checkout - the given commit's tools/fetch-and-play.sh differs from the copy currently running; the run still completes (main()-wrap guard, see fetch-and-play.sh's header) ==="
-printf '%s\n# case-10 marker: this commit'"'"'s tools/fetch-and-play.sh differs from the copy that ran it\n' "$(cat "${SCRIPT_DIR}/fetch-and-play.sh")" >"${SEED}/tools/fetch-and-play.sh"
+echo "=== case 10: self-rewriting checkout - a git wrapper simulates the exact same-inode, mid-file overwrite of tools/fetch-and-play.sh that a real Windows checkout race would cause; the run still completes correctly (main()-wrap guard, see fetch-and-play.sh's header and the git shim above) ==="
+# A real Linux `git checkout` replaces a changed tracked file via unlink+recreate (a new inode) -
+# bash's already-open read handle, pinned to the old (now-unlinked) inode, never observes that, so
+# a plain checkout of a commit with a differing tools/fetch-and-play.sh can't exercise the same
+# hazard on its own (confirmed directly while writing this test: main() removed, this case still
+# passed). REWRITE_CONTENT_FILE holds a version of tools/fetch-and-play.sh with a marker line
+# inserted right after the shebang - the *middle* of the file, not appended at the tail - since a
+# tail-only change wouldn't exercise "resume reading into different bytes mid-file": nothing
+# already read by the time of the checkout would differ. The "git" shim above, armed via
+# STUB_GIT_REWRITE_TARGET/STUB_GIT_REWRITE_CONTENT below, performs the actual same-inode overwrite
+# (a plain `>` redirection to the existing file) when it sees fetch-and-play.sh's own
+# `checkout --detach` call, simulating the race directly rather than hoping a real checkout
+# reproduces it.
+REWRITE_CONTENT_FILE="${SCRATCH}/rewrite-fetch-and-play.sh"
+awk '/^\techo "==> Checked out \${TARGET} \(detached\)"$/{print; print "\texit 91  # case-10 marker: only in bytes the currently-running script has not read yet at sabotage time"; next} {print}' \
+	"${SCRIPT_DIR}/fetch-and-play.sh" >"$REWRITE_CONTENT_FILE"
+cp "$REWRITE_CONTENT_FILE" "${SEED}/tools/fetch-and-play.sh"
 git -C "$SEED" add tools/fetch-and-play.sh
-git -C "$SEED" commit -q -m "case 10: a differing tools/fetch-and-play.sh"
+git -C "$SEED" commit -q -m "case 10: a differing tools/fetch-and-play.sh (mid-file change)"
 REWRITE_SHA="$(git -C "$SEED" rev-parse HEAD)"
 git -C "$SEED" push -q origin main
 REWRITE_TAG="win-$(git -C "$SEED" rev-parse --short=10 "$REWRITE_SHA")"
@@ -457,18 +524,24 @@ git -C "$SEED" add tools/fetch-and-play.sh
 git -C "$SEED" commit -q -m "case 10: restore tools/fetch-and-play.sh"
 git -C "$SEED" push -q origin main
 
+git -C "$CHECKOUT" fetch -q origin
 git -C "$CHECKOUT" checkout -q main-local
 : >"${SCRATCH}/wine-invoked-count"
 rm -rf "${SCRATCH}/wine-invocations"
 mkdir -p "${SCRATCH}/wine-invocations"
+PRE10_INODE="$(stat -c %i "${CHECKOUT}/tools/fetch-and-play.sh")"
 OUT10="$(STUB_GH_RELEASES="$(printf '%s\x1f%s\x1fchextrek.dll,chextrek.pdb' "$REWRITE_TAG" "$REWRITE_SHA")" \
+	STUB_GIT_REWRITE_TARGET="$REWRITE_SHA" \
+	STUB_GIT_REWRITE_CONTENT="$REWRITE_CONTENT_FILE" \
 	run_fetch_and_play "$REWRITE_SHA" 2>&1)"
 CODE10=$?
-if [ $CODE10 -eq 0 ]; then pass "the run completes even though its own checkout rewrites tools/fetch-and-play.sh mid-run"; else fail "exit code $CODE10, want 0"; echo "$OUT10"; fi
+if [ $CODE10 -eq 0 ]; then pass "the run completes even though its own checkout overwrites tools/fetch-and-play.sh in place, mid-run"; else fail "exit code $CODE10, want 0"; echo "$OUT10"; fi
 CUR10_SHA="$(git -C "$CHECKOUT" rev-parse HEAD)"
 if [ "$CUR10_SHA" = "$REWRITE_SHA" ]; then pass "HEAD landed on the differing commit"; else fail "HEAD is ${CUR10_SHA}, want ${REWRITE_SHA}"; fi
-if grep -q "case-10 marker" "${CHECKOUT}/tools/fetch-and-play.sh" 2>/dev/null; then pass "the on-disk script was actually rewritten by this run's own checkout (the hazard was real, not just theoretical)"; else fail "expected ${CHECKOUT}/tools/fetch-and-play.sh to contain the case-10 marker after checkout"; fi
-if [ "$(wine_call_count)" = "1" ]; then pass "the engine was still launched exactly once despite the rewrite"; else fail "expected exactly one engine launch, found $(wine_call_count)"; fi
+POST10_INODE="$(stat -c %i "${CHECKOUT}/tools/fetch-and-play.sh" 2>/dev/null || echo "<missing>")"
+if grep -q "case-10 marker" "${CHECKOUT}/tools/fetch-and-play.sh" 2>/dev/null; then pass "the on-disk tools/fetch-and-play.sh now matches the checked-out commit (the sabotage write and the real checkout both landed)"; else fail "expected ${CHECKOUT}/tools/fetch-and-play.sh to contain the case-10 marker after checkout"; fi
+if [ "$PRE10_INODE" != "$POST10_INODE" ]; then pass "tools/fetch-and-play.sh's inode changed by the end of the run (inode ${PRE10_INODE} -> ${POST10_INODE}) - the same-inode overwrite this case injects mid-run genuinely happened, not just a final state that looks right"; else fail "expected tools/fetch-and-play.sh's inode to change (still ${PRE10_INODE}) - the sabotage/checkout may not have run"; fi
+if [ "$(wine_call_count)" = "1" ]; then pass "the engine was still launched exactly once despite the mid-run rewrite"; else fail "expected exactly one engine launch, found $(wine_call_count)"; fi
 
 echo
 if [ $FAIL -eq 0 ]; then

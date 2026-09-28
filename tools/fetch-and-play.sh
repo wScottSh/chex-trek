@@ -41,20 +41,35 @@
 # this very file, tools/fetch-and-play.sh, on disk while bash is still executing it (a checkout of
 # any commit whose tools/fetch-and-play.sh differs from the one currently running does this every
 # time, not just occasionally). bash normally reads a plain script incrementally, off disk, as it
-# runs each command - so a rewrite mid-run is a real hazard: on Git for Windows, replacing a file a
-# process still has open can fail outright ("Unlink of file ... failed", aborting the checkout with
-# HEAD left moved-but-incomplete), and even when the replace succeeds, bash can resume reading from
-# the old byte offset into the *new* file's bytes and execute garbage. This script's whole body
-# below is wrapped in one `main() { ...; }` function, called only at the very end
-# (`main "$@"`). A function body is a single parse unit: bash must read all the way through main's
-# closing `}` before it can execute anything inside it, so by the time `git checkout` ever runs,
-# this entire script (including everything after the checkout) is already fully parsed and held in
-# memory - nothing past that point is ever read from disk again, checkout or not. (Re-executing
-# from a self-copy, or a temp-file copy guarded by an env var, would also work, but both add a
-# process spawn or an extra file on *every* run for a hazard this fully covers for free.)
-# tools/test-fetch-and-play.sh's "self-rewriting checkout" case proves this directly: it releases a
-# commit whose tools/fetch-and-play.sh differs from the copy currently executing, and the run still
-# completes correctly using the original, already-parsed script.
+# runs each command - so a rewrite mid-run is a real hazard: on Git for Windows this is reported to
+# surface as "Unlink of file ... failed", and more generally, if the file's bytes on disk change out
+# from under bash's read, bash can resume reading from the old byte offset into whatever new bytes
+# now sit there and execute garbage. This script's whole body below is wrapped in one
+# `main() { ...; }` function, called only at the very end (`main "$@"`). A function body is a single
+# parse unit: bash must read all the way through main's closing `}` before it can execute anything
+# inside it, so by the time `git checkout` ever runs, this entire script (including everything after
+# the checkout) is already fully parsed and held in memory - nothing past that point is ever read
+# from disk again, checkout or not. This directly closes the "resume reading into new/garbage bytes"
+# failure mode. It does NOT touch a separate possible failure mode - `git checkout` itself refusing
+# to replace an open file on Windows (an "Unlink of file ... failed" abort, which would be a git/
+# filesystem-level failure, not a bash-parsing one) - that's unverified here (see "Exit status"
+# below for how such a checkout failure is still handled safely either way: this script always
+# checks the checkout's own exit status and refuses cleanly if it fails, rather than assuming it
+# succeeded). (Re-executing from a self-copy, or a temp-file copy guarded by an env var, would also
+# work for the parsing hazard, but both add a process spawn or an extra file on *every* run for a
+# hazard this fully covers for free.) tools/test-fetch-and-play.sh's "self-rewriting checkout" case
+# proves the parsing hazard directly: a `git` wrapper simulates the exact race (an in-place,
+# same-inode overwrite of the running script's *not-yet-read* remainder - specifically injecting an
+# `exit 91` right after the checkout line that only exists in the on-disk bytes, not in whatever
+# bash already has buffered - the way a real concurrent replace would look to bash's already-open
+# read handle) and the run still completes correctly (exit 0, engine launched) using the original,
+# already-parsed script. This is a real mutation-tested guarantee, not just a plausible-looking
+# assertion: with the `main()` wrap temporarily removed, this same case genuinely fails (exit 91,
+# no engine launch) - confirmed directly while writing this fix, in this exact environment (a
+# plain, unguarded Linux `git checkout` of a changed tracked file replaces it via unlink+recreate,
+# which bash's open read handle on the old, now-unlinked inode never observes on its own - so this
+# case's `git` wrapper performs the same-inode overwrite itself, rather than relying on a plain
+# checkout to reproduce it).
 #
 # Usage: tools/fetch-and-play.sh [COMMIT]
 #   COMMIT - a commit-ish with a green release; plays/bisects that build instead of Latest.
@@ -62,15 +77,20 @@
 # Exit status:
 #   0 - dhewm3 was launched. Once launched, this script's own exit status is whatever dhewm3 itself
 #       (a real, interactive process, not a pass/fail check) exits with - not necessarily 0.
-#   1 - refused before ever launching anything. Up through and including the checkout itself (a
-#       dirty working tree, COMMIT not resolving to a commit, no release for COMMIT (or no Latest
-#       release), a release whose target doesn't match the resolved commit, one missing an asset, a
-#       missing gh/dhewm3.exe, a git/gh failure, or the checkout failing), the working tree, HEAD,
-#       and chextrek.dll/chextrek.pdb are all left exactly as they were. Every failure *after* the
-#       checkout (moving the already-downloaded DLL/PDB into place, pointing the mount, converting a
-#       path for the engine, or launching it) can instead leave HEAD at the release's target commit
-#       with the DLL/PDB, the mount, or both only partially updated, and dhewm3 never launched -
-#       each of those error messages says exactly what state HEAD and the DLL/PDB are left in.
+#   1 - refused before ever launching anything. Up through and including everything before the
+#       checkout itself (a dirty working tree, COMMIT not resolving to a commit, no release for
+#       COMMIT (or no Latest release), a release whose target doesn't match the resolved commit, one
+#       missing an asset, a missing gh/dhewm3.exe, or a git/gh failure), the working tree, HEAD, and
+#       chextrek.dll/chextrek.pdb are all left exactly as they were. The checkout itself failing is
+#       the one case in this group without that guarantee: ordinarily a refused checkout (e.g. one
+#       that would overwrite local changes) also leaves the tree/HEAD untouched, but a checkout that
+#       fails partway through (e.g. a file-replace failure) can leave both partially updated - that
+#       error message says to check 'git status'/'git rev-parse HEAD' rather than assuming either is
+#       unchanged. Every failure *after* the checkout succeeds (moving the already-downloaded DLL/PDB
+#       into place, pointing the mount, converting a path for the engine, or launching it) can leave
+#       HEAD at the release's target commit with the DLL/PDB, the mount, or both only partially
+#       updated, and dhewm3 never launched - each of those error messages says exactly what state
+#       HEAD and the DLL/PDB are left in.
 #
 # Injectable for tools/test-fetch-and-play.sh (never point these at the real repo/game on Unicron -
 # see that script's own header):
@@ -85,6 +105,12 @@ main() {
 	source "${SCRIPT_DIR}/lib-harness.sh"
 
 	if [ $# -gt 1 ]; then
+		usage
+		exit 1
+	fi
+	# An explicitly-given empty string ($# -eq 1, "$1" empty) is also a usage error, not "no
+	# argument" - silently falling through to the Latest path there would be surprising.
+	if [ $# -eq 1 ] && [ -z "$1" ]; then
 		usage
 		exit 1
 	fi
@@ -139,9 +165,11 @@ main() {
 			echo "error: 'git fetch origin' failed in ${REPO_ROOT}: ${FETCH_OUT}. Nothing was checked out or launched." >&2
 			exit 1
 		fi
-		FULL_SHA="$(git -C "$REPO_ROOT" rev-parse --verify "${COMMIT_ARG}^{commit}" 2>/dev/null)"
-		if [ -z "$FULL_SHA" ]; then
-			echo "error: '${COMMIT_ARG}' doesn't resolve to a commit in ${REPO_ROOT} (even after 'git fetch origin'). Nothing was checked out or launched." >&2
+		RESOLVE_OUT="$(git -C "$REPO_ROOT" rev-parse --verify "${COMMIT_ARG}^{commit}" 2>&1)"
+		RESOLVE_RC=$?
+		FULL_SHA="$RESOLVE_OUT"
+		if [ $RESOLVE_RC -ne 0 ] || [ -z "$FULL_SHA" ]; then
+			echo "error: '${COMMIT_ARG}' doesn't resolve to a single commit in ${REPO_ROOT} (even after 'git fetch origin'): ${RESOLVE_OUT}. Nothing was checked out or launched." >&2
 			exit 1
 		fi
 		# Same fixed length as tools/pipeline-process-commit.sh's own tag scheme (spec #66) - a
@@ -152,7 +180,7 @@ main() {
 			--jq '[.tagName, .targetCommitish, ([.assets[].name] | join(","))] | join("\u001f")' 2>&1)"
 		RELEASE_RC=$?
 		if [ $RELEASE_RC -ne 0 ]; then
-			echo "error: no release for commit ${FULL_SHA} (looked up as ${TAG} on ${REPO} - gh release view failed): ${RELEASE_OUT}. Nothing was checked out or launched." >&2
+			echo "error: no release for commit ${COMMIT_ARG} (resolved to ${FULL_SHA}, looked up as ${TAG} on ${REPO} - gh release view failed): ${RELEASE_OUT}. Nothing was checked out or launched." >&2
 			exit 1
 		fi
 	else
@@ -226,8 +254,9 @@ main() {
 		echo "error: ${TARGET} (the ${TAG} release's target commit) isn't reachable from ${REPO}'s origin - can't check it out. Nothing was checked out or launched." >&2
 		exit 1
 	fi
-	if ! git -C "$REPO_ROOT" checkout --detach "$TARGET" >/dev/null 2>&1; then
-		echo "error: couldn't check out ${TARGET} (detached) in ${REPO_ROOT}. Nothing was checked out or launched." >&2
+	CHECKOUT_OUT="$(git -C "$REPO_ROOT" checkout --detach "$TARGET" 2>&1)"
+	if [ $? -ne 0 ]; then
+		echo "error: couldn't check out ${TARGET} (detached) in ${REPO_ROOT}: ${CHECKOUT_OUT}. Nothing was launched. In the ordinary case (the checkout was refused outright, e.g. it would overwrite local changes) the working tree and HEAD are untouched; but a checkout that failed partway through (e.g. a file-replace failure) can leave both partially updated - check 'git status' and 'git rev-parse HEAD' in ${REPO_ROOT} before re-running." >&2
 		exit 1
 	fi
 	echo "==> Checked out ${TARGET} (detached)"
