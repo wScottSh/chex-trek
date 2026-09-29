@@ -63,8 +63,10 @@ chextrek_dump
 script sys.getEntity( $chextrek_test_str5 ).leftFoot()
 chextrek_dump
 
+script sys.println( 300 + !sys.getEntity( $chextrek_test_str4 ) )
 script sys.getEntity( $chextrek_test_str4 ).remove()
 wait 10
+script sys.println( 400 + !sys.getEntity( $chextrek_test_str4 ) )
 chextrek_dump
 
 screenshot chextrek_script_events
@@ -149,16 +151,22 @@ else
 	FAIL=1
 fi
 
-# --- remove: a script's remove() call actually shrinks the live entity count ---
-# Same 6 chextrek_dump calls as above: the 5th is right before chextrek_removeme.remove(), the
-# 6th right after.
+# --- remove: a script's remove() call actually deletes chextrek_removeme ---
+# Asked of the game directly: 300/400 + !sys.getEntity( chextrek_removeme ) right before and 10
+# frames after remove() (expect 300 = still there, then 401 = gone - distinct prefixes, same idea as
+# openDoors' markers above). The live entity count is shown too but no longer asserted: "exactly
+# one fewer" came out unchanged (238 -> 238) in 2 of ~25 Unicron runs on 2026-09-28, which can't
+# tell a failed remove() from something else in e1m1 spawning in those same 10 frames - this marker
+# can.
+REMOVE_BEFORE="$(grep -oE '^30[01]$' "$LOCAL_LOG" | head -1)"
+REMOVE_AFTER="$(grep -oE '^40[01]$' "$LOCAL_LOG" | head -1)"
 ENTITY_COUNTS="$(grep -oE '^entities: [0-9]+' "$LOCAL_LOG" | grep -oE '[0-9]+$')"
 BEFORE_REMOVE="$(echo "$ENTITY_COUNTS" | sed -n '5p')"
 AFTER_REMOVE="$(echo "$ENTITY_COUNTS" | sed -n '6p')"
-if [ -n "$BEFORE_REMOVE" ] && [ -n "$AFTER_REMOVE" ] && [ "$AFTER_REMOVE" -eq $(( BEFORE_REMOVE - 1 )) ]; then
-	echo "PASS: remove - entities went from ${BEFORE_REMOVE} to ${AFTER_REMOVE} after chextrek_removeme.remove()"
+if [ "$REMOVE_BEFORE" = "300" ] && [ "$REMOVE_AFTER" = "401" ]; then
+	echo "PASS: remove - chextrek_removeme existed before remove() and is gone after (live entities ${BEFORE_REMOVE} -> ${AFTER_REMOVE})"
 else
-	echo "FAIL: remove - expected the 6th entity count to be exactly one less than the 5th, got '${BEFORE_REMOVE}' then '${AFTER_REMOVE}'"
+	echo "FAIL: remove - expected chextrek_removeme markers 300 (exists) then 401 (gone), got '${REMOVE_BEFORE}' then '${REMOVE_AFTER}' (live entities ${BEFORE_REMOVE} -> ${AFTER_REMOVE})"
 	FAIL=1
 fi
 
