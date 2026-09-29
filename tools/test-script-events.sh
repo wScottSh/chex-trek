@@ -155,7 +155,7 @@ fi
 # Asked of the game directly: 300/400 + !sys.getEntity( chextrek_removeme ) right before and 10
 # frames after remove() (expect 300 = still there, then 401 = gone - distinct prefixes, same idea as
 # openDoors' markers above). The live entity count is shown too but no longer asserted: "exactly
-# one fewer" came out unchanged (238 -> 238) in 3 of ~25 Unicron runs on 2026-09-28, which can't
+# one fewer" came out unchanged (238 -> 238) in 2 of ~25 Unicron runs on 2026-09-28, which can't
 # tell a failed remove() from something else in e1m1 spawning in those same 10 frames - this marker
 # can.
 REMOVE_BEFORE="$(grep -oE '^30[01]$' "$LOCAL_LOG" | head -1)"
