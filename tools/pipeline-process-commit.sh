@@ -14,8 +14,10 @@
 # names the commit, the failing scenarios (red) or the ENVIRONMENT line (blocker - worded distinct
 # from a test failure), and this run's own archive log path.
 #
-# Invoked unattended by tools/pipeline-poll.sh (the AFK trigger, #68) once per new origin/master
-# commit, or by hand for any one commit. This script's exit codes are the seam #67's red-issue
+# Invoked unattended by tools/pipeline-poll.sh (the AFK trigger, #68) for each new origin/master
+# tip, or by hand for any one commit. With --backfill (tools/pipeline-backfill.sh - building older
+# commits on demand, e.g. to bisect), a green release is published without being marked Latest and
+# the pipeline:red issue is never touched; everything else, exit codes included, is the same. This script's exit codes are the seam #67's red-issue
 # handling hangs off of: 1 (red), 3 (environment blocker) and 2 (pipeline
 # error - not a game result either way) are always kept distinct, the same 0/1/3 contract
 # tools/run-all-tests.sh already makes, plus 2 for this script's own failure modes. Only 0 (green)
@@ -24,7 +26,7 @@
 # below) makes two runs of the same commit safe to overlap - the poller and a by-hand run, or two
 # by-hand runs, can never corrupt each other's scratch worktree.
 #
-# Usage: bash tools/pipeline-process-commit.sh <commit-ish>
+# Usage: bash tools/pipeline-process-commit.sh [--backfill] <commit-ish>
 #
 # Exit status:
 #   0 - the commit is published: either a new release was created just now, or one already existed
@@ -85,11 +87,21 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 source "${SCRIPT_DIR}/lib-harness.sh"
 
 usage() {
-	echo "Usage: bash tools/pipeline-process-commit.sh <commit-ish>" >&2
+	echo "Usage: bash tools/pipeline-process-commit.sh [--backfill] <commit-ish>" >&2
 }
 
+# --backfill (tools/pipeline-backfill.sh): building an older commit on demand, e.g. to bisect.
+# Same build, suite and exit codes, but a green release is published with --latest=false (never
+# marked Latest - that's always the poller's newest commit), and the pipeline:red issue is never
+# opened, commented on or closed - an old commit's result says nothing about master's current state.
+BACKFILL=0
+if [ "${1:-}" = "--backfill" ]; then
+	BACKFILL=1
+	shift
+fi
+
 COMMITISH="${1:-}"
-if [ -z "$COMMITISH" ]; then
+if [ -z "$COMMITISH" ] || [ "$#" -gt 1 ]; then
 	usage
 	exit 2
 fi
@@ -143,6 +155,9 @@ log() {
 
 log "=== pipeline: process commit ${FULL_SHA} (${TAG}) -> ${REPO} ==="
 log "log: ${LOG_FILE}"
+if [ "$BACKFILL" = "1" ]; then
+	log "==> backfill: a green release won't be marked Latest, and the pipeline:red issue won't be touched"
+fi
 
 # --- red-issue tracking (#67): a single open issue, fixed title/label, that a red or
 # environment-blocked run opens or comments on, and a later green run closes. ---
@@ -179,6 +194,10 @@ find_red_issue() {
 # find_red_issue couldn't tell (see above), does nothing rather than risk a duplicate.
 open_or_update_red_issue() {
 	local BODY="$1" NUM
+	if [ "$BACKFILL" = "1" ]; then
+		log "==> backfill: not opening/commenting on the ${RED_LABEL} issue"
+		return
+	fi
 	NUM="$(find_red_issue)"
 	if [ "$NUM" = "_LIST_FAILED" ]; then
 		log "==> not opening/commenting on a ${RED_LABEL} issue this run - couldn't confirm whether one is already open (see the WARNING above)"
@@ -210,6 +229,9 @@ open_or_update_red_issue() {
 # on a later green run instead.
 close_red_issue() {
 	local RELEASE_URL="${1:-}" NUM BODY
+	if [ "$BACKFILL" = "1" ]; then
+		return 0
+	fi
 	NUM="$(find_red_issue)"
 	if [ "$NUM" = "_LIST_FAILED" ]; then
 		log "==> couldn't check for an open ${RED_LABEL} issue to close (see the WARNING above)"
@@ -386,7 +408,16 @@ fi
 SUMMARY="$(suite_summary_block)"
 NOTES="$(printf 'Pipeline build of %s (%s).\n\n%s\n' "$FULL_SHA" "$TAG" "$SUMMARY")"
 
-log "==> publishing ${TAG} (target ${FULL_SHA}) with chextrek.dll + chextrek.pdb, marked Latest"
+# Explicit either way: left unset, gh/GitHub pick "Latest" automatically by date, which would make a
+# backfill release published today the Latest one.
+if [ "$BACKFILL" = "1" ]; then
+	LATEST_FLAG="--latest=false"
+	LATEST_WORDS="not marked Latest (backfill)"
+else
+	LATEST_FLAG="--latest"
+	LATEST_WORDS="marked Latest"
+fi
+log "==> publishing ${TAG} (target ${FULL_SHA}) with chextrek.dll + chextrek.pdb, ${LATEST_WORDS}"
 # stdout and stderr captured separately (rather than `>>"$LOG_FILE" 2>&1` like every other `gh`
 # call here): on success, `gh release create`'s *stdout* is exactly one line, the release's own
 # URL - the link the red issue's closing comment cites (AC "closes with a comment linking its
@@ -398,14 +429,14 @@ CREATE_STDOUT="$(gh release create "$TAG" \
 	--target "$FULL_SHA" \
 	--title "$TAG" \
 	--notes "$NOTES" \
-	--latest \
+	"$LATEST_FLAG" \
 	"$DLL" "$PDB" 2>"$CREATE_STDERR_FILE")"
 CREATE_STATUS=$?
 cat "$CREATE_STDERR_FILE" >>"$LOG_FILE"
 rm -f "$CREATE_STDERR_FILE"
 printf '%s\n' "$CREATE_STDOUT" >>"$LOG_FILE"
 if [ "$CREATE_STATUS" = "0" ]; then
-	log "OUTCOME: published - ${TAG} created on ${REPO}, marked Latest"
+	log "OUTCOME: published - ${TAG} created on ${REPO}, ${LATEST_WORDS}"
 	close_red_issue "$(printf '%s\n' "$CREATE_STDOUT" | tail -1)"
 	exit 0
 fi
