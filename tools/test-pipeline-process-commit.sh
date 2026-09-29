@@ -731,6 +731,48 @@ case "$STATE_DIR" in
 esac
 
 echo
+echo "=== case 9: --backfill publishes a green old commit without marking it Latest, and never touches the pipeline:red issue ==="
+run_backfill() {
+	# run_backfill SHA SUITE_SCRIPT - run_pipeline's override branch, with --backfill.
+	env -u CHEXTREK_PIPELINE_TAG_PREFIX -u CHEXTREK_PIPELINE_RED_LABEL -u CHEXTREK_PIPELINE_RED_TITLE \
+		CHEXTREK_PIPELINE_REPO="stub/testrepo" \
+		CHEXTREK_PIPELINE_STATE_DIR="$STATE_DIR" \
+		CHEXTREK_PIPELINE_SUITE_CMD="bash \"$2\"" \
+		bash "${REPO}/tools/pipeline-process-commit.sh" --backfill "$1"
+}
+SHA_BF_SETUP_RED="$(commit_sha "red commit that leaves the issue open before the backfill cases")"
+SHA_BF_GREEN="$(commit_sha "old green commit built by backfill")"
+SHA_BF_RED="$(commit_sha "old red commit built by backfill")"
+SHA_BF_ENV="$(commit_sha "old env-blocked commit built by backfill")"
+run_pipeline "$SHA_BF_SETUP_RED" "${SCRATCH}/suite-red.sh" >/dev/null
+BF_ISSUE="$(open_issue_number)"
+if [ -n "$BF_ISSUE" ]; then pass "setup: a normal red run left pipeline:red issue #${BF_ISSUE} open"; else fail "setup: expected an open pipeline:red issue"; fi
+COMMENTS_BEFORE="$(wc -l <"$STUB_GH_ISSUE_COMMENTS" | tr -d ' ')"
+CLOSES_BEFORE="$(count_gh_calls issue close)"
+ISSUES_BEFORE="$(wc -l <"$STUB_GH_ISSUES" | tr -d ' ')"
+
+OUT9="$(run_backfill "$SHA_BF_GREEN" "${SCRATCH}/suite-green.sh")"
+CODE9=$?
+TAG_BF_GREEN="win-$(git -C "$REPO" rev-parse --short=10 "$SHA_BF_GREEN")"
+BF_ARGF="$(find_create_argv "$TAG_BF_GREEN")"
+if [ $CODE9 -eq 0 ] && grep -qxF "$TAG_BF_GREEN" "$STUB_GH_RELEASES"; then pass "backfill green: exits 0 and publishes ${TAG_BF_GREEN}"; else fail "backfill green: exit $CODE9, release recorded: $(grep -cxF "$TAG_BF_GREEN" "$STUB_GH_RELEASES")"; echo "$OUT9"; fi
+if [ -n "$BF_ARGF" ] && grep -qxF -- "--latest=false" "$BF_ARGF" && ! grep -qxF -- "--latest" "$BF_ARGF"; then pass "backfill green: create call passes --latest=false, never --latest"; else fail "backfill green: expected --latest=false and no --latest in the create call"; [ -n "$BF_ARGF" ] && cat "$BF_ARGF"; fi
+if [ "$(count_gh_calls issue close)" = "$CLOSES_BEFORE" ] && [ "$(issue_state "$BF_ISSUE")" = "open" ]; then pass "backfill green: the open pipeline:red issue is left open"; else fail "backfill green closed pipeline:red issue #${BF_ISSUE} (state now '$(issue_state "$BF_ISSUE")')"; fi
+
+OUT9B="$(run_backfill "$SHA_BF_RED" "${SCRATCH}/suite-red.sh")"
+CODE9B=$?
+OUT9C="$(run_backfill "$SHA_BF_ENV" "${SCRATCH}/suite-env.sh")"
+CODE9C=$?
+if [ $CODE9B -eq 1 ] && [ $CODE9C -eq 3 ]; then pass "backfill red/env-blocked: exit codes 1 and 3, same as a normal run"; else fail "backfill red/env exit codes: $CODE9B, $CODE9C (want 1, 3)"; echo "$OUT9B"; echo "$OUT9C"; fi
+if [ "$(wc -l <"$STUB_GH_ISSUE_COMMENTS" | tr -d ' ')" = "$COMMENTS_BEFORE" ] && [ "$(wc -l <"$STUB_GH_ISSUES" | tr -d ' ')" = "$ISSUES_BEFORE" ]; then pass "backfill red/env-blocked: no comment on the red issue and no new issue"; else fail "backfill red/env touched the issue tracker (comments $COMMENTS_BEFORE -> $(wc -l <"$STUB_GH_ISSUE_COMMENTS"), issues $ISSUES_BEFORE -> $(wc -l <"$STUB_GH_ISSUES"))"; fi
+
+env CHEXTREK_PIPELINE_REPO="stub/testrepo" CHEXTREK_PIPELINE_STATE_DIR="$STATE_DIR" bash "${REPO}/tools/pipeline-process-commit.sh" --backfill >/dev/null 2>&1
+CODE9D=$?
+env CHEXTREK_PIPELINE_REPO="stub/testrepo" CHEXTREK_PIPELINE_STATE_DIR="$STATE_DIR" bash "${REPO}/tools/pipeline-process-commit.sh" --backfill "$SHA_BF_GREEN" extra-arg >/dev/null 2>&1
+CODE9E=$?
+if [ $CODE9D -eq 2 ] && [ $CODE9E -eq 2 ]; then pass "backfill usage errors (no commit, or an extra argument) exit 2"; else fail "backfill usage errors: exit $CODE9D, $CODE9E (want 2, 2)"; fi
+
+echo
 if [ $FAIL -eq 0 ]; then
 	echo "PASS: whole self-test"
 	exit 0

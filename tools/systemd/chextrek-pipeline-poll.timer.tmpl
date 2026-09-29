@@ -6,7 +6,7 @@ Description=chex-trek pipeline: timer for the AFK-trigger poll service (spec #58
 # whole point: this alone is what makes a boot with Unicron never logged into still eventually
 # catch up), then again every @@INTERVAL@@ after the *previous run started* (OnUnitActiveSec
 # counts from the last activation, not from completion - systemd.timer(5)). A run that overruns
-# one interval (e.g. a backlog of several commits, each a full suite run) doesn't cause two
+# one interval (e.g. a full suite run that waits on the harness lock) doesn't cause two
 # concurrent runs to pile up: systemd refuses to start a second instance of the same
 # already-active service unit, and tools/pipeline-poll.sh's own non-blocking lock is a second,
 # independent guard - see docs/dev-setup.md's "AFK trigger" section for the full argument. It does

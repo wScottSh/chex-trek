@@ -8,10 +8,11 @@
 #     tools/pipeline-process-commit.sh - that script's own behavior is
 #     tools/test-pipeline-process-commit.sh's job, not this one's.
 # Covers: first-ever poll bootstraps the baseline without processing anything; a single new commit
-# is processed and the baseline advances; several commits landing between polls are processed in
-# order, oldest first, one at a time; a commit that already processed is never processed again; a
-# poll-level error (exit 2) from the process command stops that tick without advancing past the
-# failing commit, and a later poll retries exactly that commit first; red/environment-blocked
+# is processed and the baseline advances; when several commits land between polls only the newest
+# (the tip) is processed, and the skipped older ones are named in the log for
+# tools/pipeline-backfill.sh; a commit that already processed is never processed again; a
+# poll-level error (exit 2) from the process command doesn't advance the baseline, and a later poll
+# retries the tip - the same commit, or a newer one if one has landed since; red/environment-blocked
 # results (exit 1/3) still count as "processed" and advance the baseline; two overlapping poll
 # ticks never both process the same commit (the poll lock); history divergence (a force-push past
 # the last-processed commit) resets the baseline without processing and is reported distinctly; a
@@ -153,7 +154,8 @@ else
 	fail "already-processed commit was reprocessed: $(calls_since)"
 fi
 
-# === 5. several commits land between polls: processed in order, oldest first, one poll run ===
+# === 5. several commits land between polls: only the tip is processed; the older ones are skipped
+# and named in the log, oldest first, for tools/pipeline-backfill.sh ===
 reset_calls
 SHA_B="$(push_commit "commit B")"
 SHA_C="$(push_commit "commit C")"
@@ -161,11 +163,16 @@ SHA_D="$(push_commit "commit D")"
 OUT="$(poll)"
 CODE=$?
 GOT_CALLS="$(calls_since | tr '\n' ' ')"
-EXPECTED="${SHA_B} ${SHA_C} ${SHA_D} "
-if [ "$CODE" = "0" ] && [ "$GOT_CALLS" = "$EXPECTED" ] && [ "$(cat "$STATE_FILE")" = "$SHA_D" ]; then
-	pass "backlog of several commits processed in order, oldest first, baseline lands on the newest"
+if [ "$CODE" = "0" ] && [ "$GOT_CALLS" = "${SHA_D} " ] && [ "$(cat "$STATE_FILE")" = "$SHA_D" ]; then
+	pass "several new commits: only the tip is processed, baseline lands on it"
 else
-	fail "backlog ordering: exit=$CODE calls='${GOT_CALLS}' expected='${EXPECTED}' state='$(cat "$STATE_FILE")'"
+	fail "tip-only: exit=$CODE calls='${GOT_CALLS}' expected only '${SHA_D}' state='$(cat "$STATE_FILE")'"
+fi
+SKIP_LINE="$(printf '%s\n' "$OUT" | grep 'skipping 2 older commit(s)')"
+if [ -n "$SKIP_LINE" ] && printf '%s' "$SKIP_LINE" | grep -q "pipeline-backfill.sh: ${SHA_B} ${SHA_C}$"; then
+	pass "the skipped older commits are logged, oldest first, pointing at tools/pipeline-backfill.sh"
+else
+	fail "skipped-commits log line: got '${SKIP_LINE}' expected it to end 'pipeline-backfill.sh: ${SHA_B} ${SHA_C}'"
 fi
 
 # === 6. red/environment-blocked results (exit 1/3) still count as processed ===
@@ -191,36 +198,45 @@ else
 	fail "environment-blocked result handling: exit=$CODE state='$(cat "$STATE_FILE")' expected '${SHA_ENV}'"
 fi
 
-# === 7. a poll-level error (exit 2) stops the tick without advancing past the failing commit, and
-# a later poll retries exactly that commit first (not skipping it, not re-running earlier ones) ===
+# === 7. a poll-level error (exit 2) doesn't advance the baseline, and a later poll retries the tip:
+# the same commit if nothing newer landed, otherwise only the newer tip ===
 reset_calls
 BASELINE_BEFORE="$(cat "$STATE_FILE")"
 SHA_ERR="$(push_commit "commit pipeline-error")"
-SHA_AFTER_ERR="$(push_commit "commit after the error")"
 printf '%s 2\n' "$SHA_ERR" >>"$STUB_PROCESS_EXITCODES"
 OUT="$(poll)"
 CODE=$?
 GOT_CALLS="$(calls_since | tr '\n' ' ')"
 if [ "$CODE" = "2" ] && [ "$GOT_CALLS" = "${SHA_ERR} " ] && [ "$(cat "$STATE_FILE")" = "$BASELINE_BEFORE" ]; then
-	pass "poll-level error (exit 2) stops the tick, doesn't advance the baseline, doesn't process the commit after it"
+	pass "poll-level error (exit 2) exits 2 and doesn't advance the baseline"
 else
 	fail "poll-level error handling: exit=$CODE calls='${GOT_CALLS}' state='$(cat "$STATE_FILE")' expected_unchanged='${BASELINE_BEFORE}'"
 fi
 
-# Fix the stub so the previously-failing commit now succeeds, and poll again - it must be retried
-# first (not skipped), and the commit after it must then also be processed in the same or a
-# subsequent tick.
-sed -i "\|^${SHA_ERR} |d" "$STUB_PROCESS_EXITCODES"
+# Still erroring, nothing newer: the next tick retries that same commit.
 reset_calls
 OUT="$(poll)"
 CODE=$?
 GOT_CALLS="$(calls_since | tr '\n' ' ')"
-EXPECTED="${SHA_ERR} ${SHA_AFTER_ERR} "
-if [ "$CODE" = "0" ] && [ "$GOT_CALLS" = "$EXPECTED" ] && [ "$(cat "$STATE_FILE")" = "$SHA_AFTER_ERR" ]; then
-	pass "once fixed, the previously-erroring commit is retried first, then the one after it"
+if [ "$CODE" = "2" ] && [ "$GOT_CALLS" = "${SHA_ERR} " ] && [ "$(cat "$STATE_FILE")" = "$BASELINE_BEFORE" ]; then
+	pass "a still-erroring tip is retried on the next tick"
 else
-	fail "retry-after-error ordering: exit=$CODE calls='${GOT_CALLS}' expected='${EXPECTED}' state='$(cat "$STATE_FILE")'"
+	fail "retry of erroring tip: exit=$CODE calls='${GOT_CALLS}' state='$(cat "$STATE_FILE")' expected_unchanged='${BASELINE_BEFORE}'"
 fi
+
+# A newer commit lands before the error is resolved: the next tick processes only that new tip -
+# the erroring commit is skipped like any other older commit, not retried first.
+reset_calls
+SHA_AFTER_ERR="$(push_commit "commit after the error")"
+OUT="$(poll)"
+CODE=$?
+GOT_CALLS="$(calls_since | tr '\n' ' ')"
+if [ "$CODE" = "0" ] && [ "$GOT_CALLS" = "${SHA_AFTER_ERR} " ] && [ "$(cat "$STATE_FILE")" = "$SHA_AFTER_ERR" ] && printf '%s' "$OUT" | grep -q "skipping 1 older commit(s).*${SHA_ERR}"; then
+	pass "a newer tip after an erroring commit is processed on its own; the erroring commit is logged as skipped"
+else
+	fail "newer tip after error: exit=$CODE calls='${GOT_CALLS}' expected only '${SHA_AFTER_ERR}' state='$(cat "$STATE_FILE")'"
+fi
+sed -i "\|^${SHA_ERR} |d" "$STUB_PROCESS_EXITCODES"
 
 # === 8. no-overlap: a poll tick that finds the lock already held skips cleanly (exit 0, no calls) ===
 reset_calls
@@ -346,14 +362,17 @@ for BROKEN_RC in 127 65; do
 		fail "broken flock (exit ${BROKEN_RC}): exit=$CODE calls=$(wc -l <"$STUB_PROCESS_CALLS") state='$(cat "$STATE_FILE")' expected_unchanged='${BEFORE_STATE}' out='${OUT}'"
 	fi
 done
-# The backlog left by the broken-flock ticks is picked up once flock works again.
+# Once flock works again, the next tick processes the tip (the newer of the two commits pushed
+# while it was broken) - once.
 reset_calls
 OUT="$(poll)"
 CODE=$?
-if [ "$CODE" = "0" ] && [ "$(wc -l <"$STUB_PROCESS_CALLS")" = "2" ]; then
-	pass "broken flock follow-up: the commits skipped while flock was broken are processed on the next working tick"
+GOT_CALLS="$(calls_since | tr '\n' ' ')"
+TIP_NOW="$(git -C "$PUSHER" rev-parse HEAD)"
+if [ "$CODE" = "0" ] && [ "$GOT_CALLS" = "${TIP_NOW} " ]; then
+	pass "broken flock follow-up: the next working tick processes the tip once"
 else
-	fail "broken flock follow-up: exit=$CODE calls=$(wc -l <"$STUB_PROCESS_CALLS")"
+	fail "broken flock follow-up: exit=$CODE calls='${GOT_CALLS}' expected only '${TIP_NOW}'"
 fi
 
 echo

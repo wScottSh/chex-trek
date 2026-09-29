@@ -193,12 +193,17 @@ assertions were unchanged; only a `wait` count each script sends the game grew, 
 ### Publishing pipeline: "process commit X" (spec #58/#66)
 
 `tools/pipeline-process-commit.sh <commit-ish>` is the pipeline's one entry point. The poller
-(see "AFK trigger" below) invokes it once per new `origin/master` commit; you can also run it by
+(see "AFK trigger" below) invokes it for each new `origin/master` tip; you can also run it by
 hand for any one commit:
 
 ```
 bash tools/pipeline-process-commit.sh <commit-ish>
 ```
+
+With `--backfill` (what `tools/pipeline-backfill.sh` uses to build older commits on demand - see
+"Building older commits" below), a green release is published with `--latest=false` instead of
+`--latest`, and the `pipeline:red` issue is never opened, commented on or closed. Everything else -
+the clean worktree, the full suite, idempotency, exit codes - is the same.
 
 No `export PATH=...wine...` needed first (unlike `docs/agents/unicron-build-test.md`'s one
 command) - this script prepends the harness's own Wine location itself if `wine` isn't already on
@@ -292,8 +297,9 @@ notification, without ever spamming a second issue for the same ongoing problem:
   tracker rather than risk a duplicate open or a wrongly-skipped close - the failure is logged as a
   WARNING in that run's own archive log, and a still-open issue waits for a later run.
 
-This all assumes commits are processed in order, one at a time - true for the poller (one commit
-fully processed before the next is picked up) and for a single by-hand run. It isn't proven safe
+This all assumes commits are processed in order, one at a time - true for the poller (each tick
+processes only the tip, which is always newer than the last one it processed) and for a single
+by-hand run. `--backfill` runs (older commits) stay out of it entirely: they never touch the issue. It isn't proven safe
 against two *different* commits being processed concurrently: e.g. two red commits racing could
 both see no issue open and both create one, or a fresh green publish of an old, out-of-order commit
 could close an issue a genuinely later, still-red commit opened. The per-commit lock above only
@@ -419,10 +425,10 @@ itself prints this same reminder once it launches the engine.
 Nobody has to start anything. A systemd **user** timer on Unicron, combined with lingering
 (already enabled for this user - `loginctl show-user <user> -p Linger`; spec #58/#68 doesn't touch
 it - if it were ever off, `loginctl enable-linger <user>` turns it on), polls `origin/master` on a
-schedule and hands every new commit to `tools/pipeline-process-commit.sh`, oldest first, one at a
-time - the trigger #66/#67 were built without, and the piece that makes spec #58 actually AFK: a
-commit pushed while nobody is logged in to Unicron still gets built, tested and published (or
-reported red).
+schedule and hands the newest commit to `tools/pipeline-process-commit.sh` - the trigger #66/#67
+were built without, and the piece that makes spec #58 actually AFK: a commit pushed while nobody is
+logged in to Unicron still gets built, tested and published (or reported red). Commits that landed
+in between are skipped, not queued; `tools/pipeline-backfill.sh` builds any of them on demand.
 
 **The poll logic itself** lives in `tools/pipeline-poll.sh` - a plain script with no systemd
 dependency (systemd just calls it on a timer), so it's fully covered by
@@ -436,48 +442,60 @@ One call is one "poll tick": it fetches `origin/<branch>` (default `master`;
 `CHEXTREK_PIPELINE_POLL_BRANCH` overrides; `CHEXTREK_PIPELINE_PROCESS_CMD` replaces the per-commit
 `bash tools/pipeline-process-commit.sh` call, for `tools/test-pipeline-poll.sh`'s stub only), compares the fetched tip to the last commit this
 poller has already handed off (`CHEXTREK_PIPELINE_STATE_DIR/poller-last-processed` - the same
-state root `tools/pipeline-process-commit.sh` uses), and processes every commit newer than that,
-**oldest first, one full `tools/pipeline-process-commit.sh` run at a time, in this one call**. The
-state file is updated after each commit's own run returns, not once at the end, so an interrupted
-backlog resumes exactly where it left off. The backlog is walked via `git rev-list --first-parent`
-- master's own linear merge-commit history, the same shape every PR into this repo actually takes
-(a merge commit per PR, same as this repo's own `Merge #67:`/`Merge #69:` commits) - deliberately
-**not** a plain `rev-list`, which would also enumerate every individual commit on each merged-in
-feature branch, interleaved by date across branches rather than in master's own merge order -
-exactly the out-of-order processing the in-order design below exists to avoid, and a needless
-suite run/release per WIP commit on a branch that never itself sat at the tip of master.
+state root `tools/pipeline-process-commit.sh` uses), and if the tip is newer, processes **only the
+tip** - one `tools/pipeline-process-commit.sh` run - then records it as the new baseline. Any
+commits between the old baseline and the tip are skipped and named in the tick's log (`skipping N
+older commit(s) ... build any of them with tools/pipeline-backfill.sh: <shas>`). They're listed via
+`git rev-list --first-parent` - master's own merge commits, one per PR (this repo's own
+`Merge #67:`/`Merge #69:` shape) - not a plain `rev-list`, which would also list every individual
+commit on each merged-in feature branch.
 
-**Why oldest-first, one at a time, rather than skipping straight to the newest commit when several
-land between polls:** #67's red/green issue tracking is explicitly documented as only safe for
-in-order, one-commit-at-a-time processing - re-processing an old commit can't be told apart from
-the current state, and a stale green publish for an old commit could wrongly close an issue a
-genuinely later, still-red commit opened (see "Red/green issue tracking" above, and #67's own
-closing comment, which names #68's poller directly: "assumes commits are processed in order, one
-at a time ... and for #68's poller (one commit fully processed before the next is picked up)").
-Skipping ahead to the newest commit would violate that the moment any skipped commit was red - the
-issue #67 would have opened for it would simply never open. The accepted trade-off: a backlog of
-several commits (each a full build + suite run, about 3.5 minutes - see "Running the tests" below) delays
-the newest commit's own result until every older one in the backlog has been processed, in favor
-of never producing a wrong answer. A poll-level error partway through a backlog (exit 2 - see
-`tools/pipeline-poll.sh`'s own header) stops that tick at the failing commit without advancing past
-it, so the next tick retries it first rather than skipping ahead. If a commit's error is
+**Why only the tip:** the build worth playing is the newest green one, and each processed commit is
+a full build + suite run (about 3.5 minutes - see "Running the tests" below), so walking a backlog
+of several merges one by one delayed the newest commit's result for no benefit to it. #67's
+red/green issue tracking stays correct: it only ever sees commits in master's order (each tick's tip
+is newer than the last), so a green run can never close an issue a later, still-red commit opened.
+What's given up: a skipped commit gets no release and no red/green verdict of its own - if three
+PRs land between polls and the tip is red, which of them broke it isn't recorded. Build them with
+`tools/pipeline-backfill.sh` (below) when that matters.
+
+A poll-level error for the tip (exit 2 - see `tools/pipeline-poll.sh`'s own header) leaves the
+baseline where it was, so the next tick retries - the same commit, or a newer tip if one has landed
+since (the erroring commit is then skipped like any other older commit). If a commit's error is
 persistent rather than transient (e.g. `tools/pipeline-process-commit.sh` reliably exits 2 for that
-exact commit - a bad worktree state it can't recover from, say), the poller retries it forever by
-design rather than silently giving up; unsticking it is a manual step: investigate
-`CHEXTREK_PIPELINE_STATE_DIR/logs/` for that commit's own run archive, and once the cause is
-understood, either fix it and let the next tick retry normally, or deliberately skip past that one
-commit by writing its SHA directly into `CHEXTREK_PIPELINE_STATE_DIR/poller-last-processed`.
+exact commit - a bad worktree state it can't recover from, say) and nothing newer lands, the poller
+retries it every tick by design rather than silently giving up; unsticking it is a manual step:
+investigate `CHEXTREK_PIPELINE_STATE_DIR/logs/` for that commit's own run archive, and once the cause
+is understood, either fix it and let the next tick retry normally, or deliberately skip past it by
+writing its SHA directly into `CHEXTREK_PIPELINE_STATE_DIR/poller-last-processed`.
 
 **Red and environment-blocked commits advance the baseline** (exit 1 or 3 from
 `tools/pipeline-process-commit.sh` - both already reported in the `pipeline:red` issue). The poller
 never retests a blocked commit on its own: retrying it every tick would re-comment on the issue each
-time and hold up every newer commit. Once the environment is fixed, the next commit pushed to
-`master` is processed normally. To get a result for the blocked commit itself (e.g. it's still the
-tip), run `bash tools/pipeline-process-commit.sh <sha>` by hand.
+time. Once the environment is fixed, the next commit pushed to `master` is processed normally. To
+get a result for the blocked commit itself (e.g. it's still the tip), run
+`bash tools/pipeline-process-commit.sh <sha>` by hand.
+
+**Building older commits** (optional, by hand - e.g. to bisect a regression in game with
+`bash tools/fetch-and-play.sh <commit>` on the Windows PC, which needs a release for that exact
+commit):
+
+```
+bash tools/pipeline-backfill.sh <commit-ish> [...]       # one or more commits
+bash tools/pipeline-backfill.sh 5d915e6..origin/master   # every PR merge in a range, oldest first
+```
+
+Each commit goes through `tools/pipeline-process-commit.sh --backfill`, one at a time: same build
+and suite, but a green release isn't marked Latest (Latest stays the poller's newest build) and the
+`pipeline:red` issue is never touched. Already-published commits are skipped quickly. A red commit
+gets no release and the run carries on (for a bisect, which commits are red is the point); an
+environment blocker or pipeline error stops it. Exit 0 = all published, 1 = at least one red,
+2 = bad argument or pipeline error, 3 = environment blocker. Like any suite run it takes the
+single-run harness lock, so it waits behind (and holds up) the poller's own runs.
 
 **First run ever** (no state file yet) bootstraps the baseline to the current `origin/<branch>` tip
-without processing anything - otherwise the very first poll tick would try to process this repo's
-entire history and publish a release for every past commit. Only commits pushed *after* that
+without processing anything - an unintended release on first install is exactly what spec #58/#68
+rules out. Only commits pushed *after* that
 baseline are ever processed.
 
 **History divergence** (a force-push to the polled branch past the last-processed commit) is
@@ -504,8 +522,8 @@ tip without processing anything, a WARNING is logged, and the poll tick exits 2 
    from `pipeline-process-commit.sh`'s own per-tag lock) - defense in depth against anything
    invoking the poll script outside systemd entirely (e.g. a human running it directly by hand,
    bypassing `systemctl` altogether, while the timer also fires). A tick that finds the lock
-   already held logs that and exits 0 at once, rather than queuing - the next tick picks up any
-   backlog.
+   already held logs that and exits 0 at once, rather than queuing - the next tick picks up
+   whatever the tip is by then.
 
 **Installing the timer** - `tools/setup-pipeline-poll-timer.sh` renders
 `tools/systemd/chextrek-pipeline-poll.{service,timer}.tmpl` into
@@ -574,10 +592,11 @@ session or interactively-sourced shell profile is needed for any of the followin
   end against a local bare repo standing in for `origin` and a stubbed process-commit command (not
   the real `tools/pipeline-process-commit.sh` - that script's own behavior is
   `tools/test-pipeline-process-commit.sh`'s job) - bootstrap, up-to-date no-op, a single new
-  commit, a multi-commit backlog processed in order (including a merge commit, processed once via
-  `--first-parent`, with the individual commits it merged in never processed separately),
-  red/environment-blocked results still advancing the baseline, a poll-level error stopping and
-  being retried first (not skipped) next time, a merge-base lookup error being treated as a
+  commit, several new commits processing only the tip (the older ones logged as skipped, oldest
+  first), a merge commit processed once via `--first-parent` (the individual commits it merged in
+  never processed separately), red/environment-blocked results still advancing the baseline, a
+  poll-level error leaving the baseline alone and being retried next tick - or superseded by a newer
+  tip - a merge-base lookup error being treated as a
   poll-level error rather than a false force-push reset, the poll lock's no-overlap skip, and
   history-divergence handling.
 - **Live systemd mechanics** (`tools/test-pipeline-poll-systemd.sh`): a real, uniquely-named

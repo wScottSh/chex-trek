@@ -208,7 +208,7 @@ main() {
 			--jq '[.tagName, .targetCommitish, ([.assets[].name] | join(","))] | join("\u001f")' 2>&1)"
 		RELEASE_RC=$?
 		if [ $RELEASE_RC -ne 0 ]; then
-			echo "error: no release for commit ${COMMIT_ARG} (resolved to ${FULL_SHA}, looked up as ${TAG} on ${REPO} - gh release view failed): ${RELEASE_OUT}. Nothing was checked out or launched." >&2
+			echo "error: no release for commit ${COMMIT_ARG} (resolved to ${FULL_SHA}, looked up as ${TAG} on ${REPO} - gh release view failed): ${RELEASE_OUT}. Nothing was checked out or launched. The Unicron poller only builds master's newest commit - to build this one, run 'bash tools/pipeline-backfill.sh ${FULL_SHA}' on Unicron (docs/dev-setup.md, \"AFK trigger\")." >&2
 			exit 1
 		fi
 	else
