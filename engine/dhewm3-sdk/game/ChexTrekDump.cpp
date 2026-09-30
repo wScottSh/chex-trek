@@ -600,6 +600,9 @@ Test-only, bug #49. Prints one line: game time (ms), the named entity's health, 
 damage (fl.takedamage) and whether it's hidden. Read-only. Scenario timing under Wine can't rely on
 the console's frame-counted `wait` mapping to a fixed amount of game time (see
 tools/test-flemriser-rise.sh), so scenarios stamp each probe with gameLocal.time instead.
+The hangar cutscene scenario (tools/test-hangar-cutscene.sh) added the entity's origin and the
+active cinematic camera (gameLocal.GetCamera(), "none" if the player's own view) on the end of the
+same line, so it can watch doors and walking monsters and time the camera shot.
 ==================
 */
 void ChexTrek_TestProbe_f( const idCmdArgs &args ) {
@@ -612,7 +615,9 @@ void ChexTrek_TestProbe_f( const idCmdArgs &args ) {
 		gameLocal.Printf( "chextrek_test_probe: time=%d entity=%s missing\n", gameLocal.time, args.Argv( 1 ) );
 		return;
 	}
-	gameLocal.Printf( "chextrek_test_probe: time=%d entity=%s health=%d takedamage=%d hidden=%d\n", gameLocal.time, ent->name.c_str(), ent->health, ent->fl.takedamage ? 1 : 0, ent->IsHidden() ? 1 : 0 );
+	const idVec3 &origin = ent->GetPhysics()->GetOrigin();
+	idCamera *camera = gameLocal.GetCamera();
+	gameLocal.Printf( "chextrek_test_probe: time=%d entity=%s health=%d takedamage=%d hidden=%d origin=%.0f,%.0f,%.0f camera=%s\n", gameLocal.time, ent->name.c_str(), ent->health, ent->fl.takedamage ? 1 : 0, ent->IsHidden() ? 1 : 0, origin.x, origin.y, origin.z, camera ? camera->name.c_str() : "none" );
 }
 
 /*

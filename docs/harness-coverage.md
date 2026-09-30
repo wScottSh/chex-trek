@@ -74,6 +74,7 @@ functions against the reference files.
 | Bug | Scenario | Status |
 |---|---|---|
 | Clicking `sf_923`'s crane panel (`crane_panel`, `guis/storage_facility/crane.gui`) dropped the level: its arrows `runScript` `map_storage_facility::crane_left`/`crane_right`/`crane_stop`, which didn't exist (#50) | `tools/test-crane-panel.sh` | covered - standing at the panel (crosshair focus on it), left, left, right, right clicks via `chextrek_test_gui_click` send all three `runScript`s through crane.gui's own `onAction` scripts and `idEntity::HandleGuiCommands`; no "Can't find function", `sf_923` still running after. Fails with the level drop against the unfixed script. |
+| `sf_923`'s bridge "open hangar" cutscene showed under a second of a closed door and left the flemoids in the hangar: `open_hangar` triggered both team doors (`hbdoor1`/`hbdoor2`, team `sf_3`) in one frame, so the second reversed the first; also needed the door to stay open (`wait -1`), the four walkers `neverDormant`, and a 1s wait before `dooroids` | `tools/test-hangar-cutscene.sh` | covered - on `sf_923`, from the bridge console, probes stamped with game time since the button: `hbdoor1` opens and stays open, `func_cameraview_1` is up >= 5s then ends, no `couldn't reach path_corner` warning, and `monster_flemoid_13`..`16` each end on their last `path_corner` out in the hallway. |
 
 ## Recorded deviations, port choices and known gaps
 

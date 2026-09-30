@@ -95,7 +95,7 @@ void ChexTrek_TestGuiCompletion_f( const idCmdArgs &args );
 void ChexTrek_TestImpulse_f( const idCmdArgs &args );
 
 // chextrek: bug #49, test-only. "chextrek_test_probe <entity>" prints game time + the entity's
-// health/takedamage/hidden; "chextrek_test_projectile_hit <entity>" applies the local player's
+// health/takedamage/hidden/origin and the active cinematic camera; "chextrek_test_projectile_hit <entity>" applies the local player's
 // current weapon projectile's def_damage to it the way idProjectile::Collide does. See
 // ChexTrekDump.cpp and tools/test-flemriser-rise.sh.
 void ChexTrek_TestProbe_f( const idCmdArgs &args );

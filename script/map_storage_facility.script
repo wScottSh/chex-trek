@@ -115,16 +115,22 @@ namespace map_storage_facility {
 	}
 	
 	void open_hangar() {
+		//disable GUI entirely - first, so a second press can't get in during the wait below
+		$hbcontrol.setGuiParm( "gui_parm3", "2" );
+		// hbdoor1/hbdoor2 are one team (sf_3), so triggering one opens both. This used to trigger
+		// both: the second, in the same frame, found the team already MOVER_1TO2 and sent it back
+		// (idMover_Binary::Use_BinaryMover), so the door never opened and the flemoids couldn't
+		// walk out. See tools/test-hangar-cutscene.sh.
 		sys.trigger( $hbdoor1 );
-		sys.trigger( $hbdoor2 );
 		if( !door_broken ) {
+			door_broken = true;
 			$brokendoor.show();
 			$unbrokendoor.hide();
+			// let the door finish opening (its "time" is 1) before the flemoids set off - started
+			// together with it, the four of them jam each other at the foot of the ramp
+			sys.wait( 1 );
 			sys.trigger( $dooroids );
-			door_broken = true;
 		}
-		//disable GUI entirely
-		$hbcontrol.setGuiParm( "gui_parm3", "2" );
 	}
 	
 	void close_hangar() {
