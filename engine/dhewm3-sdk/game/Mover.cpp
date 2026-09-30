@@ -3495,7 +3495,10 @@ void idDoor::Show( void ) {
 				if ( slaveDoor->areaPortal && ( slaveDoor->moverState == MOVER_POS1 ) ) {
 					slaveDoor->SetPortalState( false );
 				}
-				slaveDoor->SetAASAreaState( IsLocked() || IsNoTouch() );
+				// chextrek: IsLocked() only, not dhewm3's IsLocked() || IsNoTouch() - the original
+				// gamex86.so's idDoor::Show (0x143b30) and Event_ClosePortal (0x143a90) test only the
+				// lock. See the matching comment in Event_ClosePortal.
+				slaveDoor->SetAASAreaState( IsLocked() );
 			}
 			slave->GetPhysics()->GetClipModel()->Enable();
 			slave->idMover_Binary::Show();
@@ -4026,7 +4029,13 @@ void idDoor::Event_ClosePortal( void ) {
 				if ( slaveDoor->areaPortal ) {
 					slaveDoor->SetPortalState( false );
 				}
-				slaveDoor->SetAASAreaState( IsLocked() || IsNoTouch() );
+				// chextrek: IsLocked() only, as the original gamex86.so's Event_ClosePortal (0x143a90)
+				// and idDoor::Show (0x143b30). With dhewm3's "|| IsNoTouch()" an unlocked no_touch door
+				// (script/trigger-only, e.g. sf_923's hangar door hbdoor1/2) is an AAS obstacle while
+				// shut, so monsters can't path through it to open it: sf_923's hangar cutscene flemoids
+				// couldn't reach their path_corners and never left the hangar
+				// (tools/test-hangar-cutscene.sh).
+				slaveDoor->SetAASAreaState( IsLocked() );
 			}
 		}
 	}
