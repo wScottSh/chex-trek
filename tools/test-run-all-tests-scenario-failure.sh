@@ -13,6 +13,9 @@
 # this issue's PR (see the PR body) instead of baked in here, to avoid an extra full game run in
 # every future test suite run.
 set -u
+# The stub build writes chextrek.dll, the default platform's library: pin that default so a
+# CHEXTREK_PLATFORM=native suite run still tests this platform-independent logic as written.
+unset CHEXTREK_PLATFORM
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SCRATCH="$(mktemp -d)"

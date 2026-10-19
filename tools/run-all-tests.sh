@@ -22,13 +22,27 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-if [ "${CHEXTREK_SKIP_BUILD:-0}" = "1" ]; then
+# tools/lib-harness.sh's chextrek_platform/chextrek_game_lib_name, repeated here so this script
+# stays standalone (its self-tests run a copy of it with nothing else alongside): the game library
+# a build drops at the repo root is chextrek.so for the native platform, else chextrek.dll.
+PLATFORM=windows
+case "$(uname -s)" in
+Linux*) PLATFORM="${CHEXTREK_PLATFORM:-wine}" ;;
+esac
+GAME_LIB=chextrek.dll
+[ "$PLATFORM" = native ] && GAME_LIB=chextrek.so
+
+if [ "$PLATFORM" = appimage ]; then
+	# The appimage platform tests the packaged artifact's own chextrek.so; there's nothing in this
+	# checkout to build (tools/package-linux.sh builds the artifact).
+	echo "=== build (skipped: CHEXTREK_PLATFORM=appimage tests the packaged artifact) ==="
+elif [ "${CHEXTREK_SKIP_BUILD:-0}" = "1" ]; then
 	echo "=== build (skipped: CHEXTREK_SKIP_BUILD=1) ==="
-	if [ ! -f "${REPO_ROOT}/chextrek.dll" ]; then
-		echo "FAIL: CHEXTREK_SKIP_BUILD=1 but ${REPO_ROOT}/chextrek.dll doesn't exist. Copy a prebuilt chextrek.dll to the repo root first - see docs/dev-setup.md."
+	if [ ! -f "${REPO_ROOT}/${GAME_LIB}" ]; then
+		echo "FAIL: CHEXTREK_SKIP_BUILD=1 but ${REPO_ROOT}/${GAME_LIB} doesn't exist. Copy a prebuilt ${GAME_LIB} to the repo root first - see docs/dev-setup.md."
 		exit 1
 	fi
-	echo "==> Using prebuilt ${REPO_ROOT}/chextrek.dll"
+	echo "==> Using prebuilt ${REPO_ROOT}/${GAME_LIB}"
 else
 	echo "=== build ==="
 	bash "${SCRIPT_DIR}/build-chextrek.sh"

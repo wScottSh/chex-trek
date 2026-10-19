@@ -28,7 +28,8 @@ if [ $HARNESS_EXIT -ne 0 ]; then
 	FAIL=1
 fi
 
-for marker in "PASS: chextrek.dll loaded (not base.dll)" "PASS: state-dump header present" "PASS: no ERROR / unknown-event / unknown-spawnclass / script-compile lines"; do
+GAME_LIB="$(chextrek_game_lib_name)"
+for marker in "PASS: ${GAME_LIB} loaded (not base.${GAME_LIB##*.})" "PASS: state-dump header present" "PASS: no ERROR / unknown-event / unknown-spawnclass / script-compile lines"; do
 	if ! echo "$HARNESS_OUT" | grep -qF "$marker"; then
 		echo "FAIL: expected to see '${marker}'"
 		FAIL=1

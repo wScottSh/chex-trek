@@ -7,7 +7,8 @@
 # latter three, each in isolation, with every other resource stubbed present so only the one
 # case's check can fire - plus the same contract for the rest of the Unicron machine setup:
 # wineserver or flock missing from PATH, an unopenable lock file, and (build-chextrek.sh) docker
-# missing. Linux/Wine-only (Windows keeps its own qwinsta/no-display path unchanged,
+# missing. The CHEXTREK_PLATFORM cases: an unknown platform (harness and build), a missing native
+# engine or AppImage, and native needing no Wine at all. Linux-only (Windows keeps its own qwinsta/no-display path unchanged,
 # #63 AC3); this self-test is a no-op there. Needs no display itself either way.
 set -u
 
@@ -78,7 +79,8 @@ EOF
 # run_case PATH_DIRS DHEWM3_HOME DOOM3_BASEPATH WINEPREFIX [LOCK_FILE]
 #
 # Runs chextrek_run_console_script with the given fixtures and PATH, in a subshell so `exit 3`
-# doesn't kill this script. Sets OUT/CODE/ELAPSED.
+# doesn't kill this script. Sets OUT/CODE/ELAPSED. CASE_PLATFORM, if set, is passed as
+# CHEXTREK_PLATFORM (unset means the default, wine); CHEXTREK_APPIMAGE always names a missing file.
 run_case() {
 	local CASE_PATH="$1" CASE_HOME="$2" CASE_DOOM3="$3" CASE_PREFIX="$4"
 	local CASE_LOCK="${5:-${SCRATCH}/harness.lock}"
@@ -86,6 +88,7 @@ run_case() {
 	START=$(date +%s)
 	OUT="$(env -i PATH="$CASE_PATH" HOME="$SCRATCH" CHEXTREK_LOCK_FILE="$CASE_LOCK" \
 		DHEWM3_HOME="$CASE_HOME" DOOM3_BASEPATH="$CASE_DOOM3" WINEPREFIX="$CASE_PREFIX" \
+		CHEXTREK_PLATFORM="${CASE_PLATFORM:-}" CHEXTREK_APPIMAGE="${SCRATCH}/missing.AppImage" \
 		bash -c '
 			unset DISPLAY
 			source "$1/tools/lib-harness.sh"
@@ -172,6 +175,46 @@ if echo "$OUT" | grep -qi "wine not found\|winepath not found\|wineserver not fo
 	FAIL=1
 else
 	echo "PASS: no #63 preflight check false-positived"
+fi
+
+# --- native/appimage platform cases (CHEXTREK_PLATFORM): no Wine anywhere on PATH, since those
+# platforms must not need it ---
+# --- case: an unknown CHEXTREK_PLATFORM -> exit 3 naming it, never a silent fallback to wine ---
+setup_good_fixtures
+CASE_PLATFORM=nativ run_case "${SCRATCH}/base-bin" "${SCRATCH}/dhewm3" "${SCRATCH}/doom3" "${SCRATCH}/wineprefix"
+assert_environment_exit "unknown CHEXTREK_PLATFORM" "unknown CHEXTREK_PLATFORM 'nativ'"
+
+# --- case: native, no native engine binary (only the win32 dhewm3.exe fixture) -> exit 3 naming it ---
+setup_good_fixtures
+CASE_PLATFORM=native run_case "${SCRATCH}/base-bin" "${SCRATCH}/dhewm3" "${SCRATCH}/doom3" "${SCRATCH}/wineprefix"
+assert_environment_exit "native engine missing" "native dhewm3 engine"
+
+# --- case: appimage, CHEXTREK_APPIMAGE pointing at nothing -> exit 3 naming the AppImage ---
+setup_good_fixtures
+CASE_PLATFORM=appimage run_case "${SCRATCH}/base-bin" "${SCRATCH}/dhewm3" "${SCRATCH}/doom3" "${SCRATCH}/wineprefix"
+assert_environment_exit "AppImage missing" "AppImage not found"
+
+# --- case: native with every native resource present and no Wine at all -> passes the preflight
+# (no Wine check runs for it) and stops only on the missing-Xvfb display check ---
+setup_good_fixtures
+printf '#!/usr/bin/env bash\nexit 0\n' > "${SCRATCH}/dhewm3/dhewm3"
+chmod +x "${SCRATCH}/dhewm3/dhewm3"
+CASE_PLATFORM=native run_case "${SCRATCH}/base-bin" "${SCRATCH}/dhewm3" "${SCRATCH}/doom3" "${SCRATCH}/missing-wineprefix"
+if [ "$CODE" -eq 3 ] && echo "$OUT" | grep -q "^ENVIRONMENT: no display"; then
+	echo "PASS: native with no Wine installed gets past the preflight, stopping only on the missing-Xvfb display check"
+else
+	echo "FAIL: expected native to need no Wine and stop only on the missing-Xvfb display check; got (exit $CODE):"
+	echo "$OUT" | tail -8
+	FAIL=1
+fi
+
+# --- case: build-chextrek.sh with an unknown CHEXTREK_PLATFORM -> exit 3, ENVIRONMENT line ---
+OUT="$(env -i PATH="${SCRATCH}/base-bin" HOME="$SCRATCH" CHEXTREK_PLATFORM=nativ bash "${REPO_ROOT}/tools/build-chextrek.sh" 2>&1)"
+CODE=$?
+if [ "$CODE" -eq 3 ] && echo "$OUT" | grep -q "^ENVIRONMENT: unknown CHEXTREK_PLATFORM 'nativ'"; then
+	echo "PASS: build with an unknown CHEXTREK_PLATFORM exits 3 with an ENVIRONMENT line naming it"
+else
+	echo "FAIL: build with an unknown CHEXTREK_PLATFORM: exit $CODE, want 3 with an ENVIRONMENT line"; echo "$OUT" | tail -5; FAIL=1
 fi
 
 # --- case: build-chextrek.sh with docker not on PATH -> exit 3 with an ENVIRONMENT line, not an

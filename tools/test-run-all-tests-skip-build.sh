@@ -9,6 +9,9 @@
 # test-*.sh scripts (just exit 0), so it exercises only the build-skipping logic itself - plus the
 # build step's own exit 3 (environment blocker) propagating as the suite's exit 3.
 set -u
+# The stub build writes chextrek.dll, the default platform's library: pin that default so a
+# CHEXTREK_PLATFORM=native suite run still tests this platform-independent logic as written.
+unset CHEXTREK_PLATFORM
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SCRATCH="$(mktemp -d)"

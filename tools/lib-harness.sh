@@ -5,7 +5,7 @@
 #   chextrek_run_console_script - one game run: mounts this checkout as the "chextrek" fs_game
 #     folder, wipes the scratch save path, writes and execs a console script, launches dhewm3 with
 #     a timeout, archives the run's log/screenshots/cfg outside the repo, and asserts the spec #28
-#     always-on checks (chextrek.dll loaded, state-dump header present, no ERROR/unknown-event/
+#     always-on checks (chextrek.dll/.so loaded, state-dump header present, no ERROR/unknown-event/
 #     unknown-spawnclass/script-compile lines, no timeout kill).
 #   chextrek_ensure_mount - just the "chextrek" mount step on its own (#69): shared by
 #     chextrek_run_console_script and tools/fetch-and-play.sh, which needs the mount but not a
@@ -26,7 +26,8 @@
 #     Windows keeps its pre-#63 behavior for all of these unchanged.
 #
 # Scenario-script helpers (tools/test-*.sh):
-#   chextrek_build_or_exit      - builds chextrek.dll once (skipped under CHEXTREK_SKIP_BUILD=1).
+#   chextrek_build_or_exit      - builds the game library once (skipped under CHEXTREK_SKIP_BUILD=1,
+#                                 and under CHEXTREK_PLATFORM=appimage, which has nothing to build).
 #   chextrek_run_scenario       - runs one console script via tools/run-scenario.sh and finds its
 #                                 archived log; propagates any environment-blocker exit 3.
 #   chextrek_assert_map_loaded  - the always-on "map finishes loading" check.
@@ -42,6 +43,16 @@
 #                                 (Linux), instead of the Windows qwinsta active-session check.
 #   chextrek_lock_file / _chextrek_acquire_lock / _chextrek_release_lock - the single-run lock
 #                                 (spec #62) serializing concurrent runs on Unicron.
+#
+# Platforms: on Linux, CHEXTREK_PLATFORM picks what a run launches (chextrek_platform):
+#   wine     - the default: the official win32 dhewm3.exe under Wine, loading chextrek.dll.
+#   native   - a native x86_64 dhewm3 1.5.5 (tools/linux-native/build-engine.sh), loading the
+#              chextrek.so tools/build-chextrek.sh builds under the same CHEXTREK_PLATFORM.
+#   appimage - the packaged artifact itself (tools/package-linux.sh's AppImage, CHEXTREK_APPIMAGE):
+#              its bundled engine, chextrek.so and pk4'd mod data, not this checkout's.
+# Native and appimage runs share the Linux display/lock machinery but none of the Wine-specific
+# steps (chextrek_uses_wine), and point the engine's XDG save/config paths at a harness scratch
+# root (chextrek_native_xdg_root) so a run never wipes a real player's saves.
 # See docs/dev-setup.md's "Unicron (Linux/Wine)" section for the one-time setup this assumes
 # (Wine, the VC++ x86 redist in the prefix, Xvfb) and for the environment variables this reads
 # (DHEWM3_HOME, DOOM3_BASEPATH, DHEWM3_DOCUMENTS_DIR, WINEPREFIX) and why the mount/save-path/
@@ -54,6 +65,7 @@
 # up front instead of once per scenario).
 chextrek_build_or_exit() {
 	[ "${CHEXTREK_SKIP_BUILD:-0}" = "1" ] && return 0
+	[ "$(chextrek_platform)" = appimage ] && return 0
 	local LIB_DIR
 	LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 	bash "${LIB_DIR}/build-chextrek.sh"
@@ -163,6 +175,63 @@ chextrek_is_linux() {
 	esac
 }
 
+# chextrek_platform
+#
+# What a run launches: `windows` off Linux, else CHEXTREK_PLATFORM - `wine` (the default),
+# `native` or `appimage` (see this file's header). Printed verbatim even if it's none of those:
+# _chextrek_linux_preflight_or_exit is the one place that rejects an unknown value (exit 3), so
+# every branch below can trust it. tools/build-chextrek.sh repeats this resolution.
+chextrek_platform() {
+	if chextrek_is_linux; then
+		printf '%s\n' "${CHEXTREK_PLATFORM:-wine}"
+	else
+		echo windows
+	fi
+}
+
+# chextrek_uses_wine
+#
+# True only for the wine platform: winepath, $WINEPREFIX, the wineserver cleanup and CRLF log
+# normalization are Wine's, not Linux's - native and appimage runs skip every one of them.
+chextrek_uses_wine() {
+	[ "$(chextrek_platform)" = wine ]
+}
+
+# chextrek_game_lib_name
+#
+# File name of the game library the engine must load: chextrek.so for native/appimage,
+# chextrek.dll otherwise. For every platform but appimage it's also what tools/build-chextrek.sh
+# drops at the repo root.
+chextrek_game_lib_name() {
+	case "$(chextrek_platform)" in
+	native | appimage) echo chextrek.so ;;
+	*) echo chextrek.dll ;;
+	esac
+}
+
+# chextrek_native_xdg_root
+#
+# Scratch root the native/appimage engine's XDG_DATA_HOME (saves, dhewm3log.txt) and
+# XDG_CONFIG_HOME (dhewm.cfg) point into: CHEXTREK_NATIVE_XDG_ROOT, else
+# $XDG_STATE_HOME/chextrek-harness/native (default $HOME/.local/state/...). Native dhewm3 does
+# honor `+set fs_savepath`, but it opens dhewm3log.txt under XDG_DATA_HOME before any `+set` is
+# read (sys/linux/main.cpp SetSavePath), so the environment is the one lever that moves both.
+# Without it the per-run wipe would hit a real player's ~/.local/share/dhewm3/chextrek.
+chextrek_native_xdg_root() {
+	printf '%s\n' "${CHEXTREK_NATIVE_XDG_ROOT:-${XDG_STATE_HOME:-${HOME}/.local/state}/chextrek-harness/native}"
+}
+
+# _chextrek_engine_exe
+#
+# The program a run launches: dhewm3.exe (windows/wine), the native dhewm3 binary, or the AppImage.
+_chextrek_engine_exe() {
+	case "$(chextrek_platform)" in
+	native) echo "${DHEWM3_HOME}/dhewm3" ;;
+	appimage) echo "$CHEXTREK_APPIMAGE" ;;
+	*) echo "${DHEWM3_HOME}/dhewm3.exe" ;;
+	esac
+}
+
 # chextrek_to_engine_path UNIX_PATH
 #
 # dhewm3 is a native Windows binary; every `+set fs_*` path it's given on the command line has to
@@ -172,8 +241,12 @@ chextrek_is_linux() {
 # `winepath` can itself start a wineserver (#62): closes this call's copy of the single-run lock fd
 # first (see _chextrek_acquire_lock) so that wineserver - which can outlive this whole call - never
 # gets a copy of it either.
+#
+# Native/appimage (chextrek_uses_wine false on Linux): a native engine takes the path as-is.
 chextrek_to_engine_path() {
-	if chextrek_is_linux; then
+	if chextrek_is_linux && ! chextrek_uses_wine; then
+		printf '%s\n' "$1"
+	elif chextrek_is_linux; then
 		if [ -n "${CHEXTREK_LOCK_FD:-}" ]; then
 			winepath -w "$1" {CHEXTREK_LOCK_FD}>&-
 		else
@@ -315,13 +388,28 @@ _chextrek_exit_environment() {
 # missing engine is reported without paying for a display first. Windows keeps its pre-#63
 # behavior unchanged (#63 AC): a missing dhewm3.exe there still falls through to the ordinary
 # FAIL/exit-1 check next to chextrek.dll's, further down.
+#
+# Native/appimage: the engine is a native executable, so it must also be executable (-x).
 _chextrek_check_engine_or_exit() {
-	local EXE="${DHEWM3_HOME}/dhewm3.exe"
-	if [ ! -f "$EXE" ]; then
-		_chextrek_exit_environment \
+	local EXE
+	EXE="$(_chextrek_engine_exe)"
+	case "$(chextrek_platform)" in
+	native)
+		[ -x "$EXE" ] || _chextrek_exit_environment \
+			"ENVIRONMENT: native dhewm3 engine not found (or not executable) at ${EXE}." \
+			"ENVIRONMENT: this is not a test failure. Build it with tools/linux-native/build-engine.sh or point DHEWM3_HOME at it (see docs/dev-setup.md); do not wait or retry."
+		;;
+	appimage)
+		[ -x "$EXE" ] || _chextrek_exit_environment \
+			"ENVIRONMENT: Chex Trek AppImage not found (or not executable) at ${EXE}." \
+			"ENVIRONMENT: this is not a test failure. Build it with tools/package-linux.sh or point CHEXTREK_APPIMAGE at it (see docs/dev-setup.md); do not wait or retry."
+		;;
+	*)
+		[ -f "$EXE" ] || _chextrek_exit_environment \
 			"ENVIRONMENT: dhewm3 engine not found at ${EXE}." \
 			"ENVIRONMENT: this is not a test failure. Install dhewm3 1.5.5 win32 or point DHEWM3_HOME at it (see docs/dev-setup.md); do not wait or retry."
-	fi
+		;;
+	esac
 }
 
 # _chextrek_linux_preflight_or_exit
@@ -336,7 +424,38 @@ _chextrek_check_engine_or_exit() {
 # instead of exit 3). Each of these is a #63 "broken environment" case: exit 3, one ENVIRONMENT
 # line naming what's missing, dhewm3 never launched. Run before chextrek_ensure_display_or_exit so
 # a broken Wine setup doesn't pay for starting Xvfb first.
+#
+# An unknown CHEXTREK_PLATFORM is checked first, the same kind of stop: a typo must never fall
+# through to another platform and report that platform's results as the one asked for. The Wine
+# checks (_chextrek_wine_preflight_or_exit) only apply to the wine platform.
 _chextrek_linux_preflight_or_exit() {
+	case "$(chextrek_platform)" in
+	wine | native | appimage) ;;
+	*)
+		_chextrek_exit_environment \
+			"ENVIRONMENT: unknown CHEXTREK_PLATFORM '$(chextrek_platform)' - expected wine (the default), native or appimage." \
+			"ENVIRONMENT: this is not a test failure. See docs/dev-setup.md; do not wait or retry."
+		;;
+	esac
+	chextrek_uses_wine && _chextrek_wine_preflight_or_exit
+	# flock: the single-run lock (#62) - proceeding unlocked would defeat it.
+	if ! command -v flock >/dev/null 2>&1; then
+		_chextrek_exit_environment \
+			"ENVIRONMENT: flock not found on PATH - needed for the single-run harness lock." \
+			"ENVIRONMENT: this is not a test failure. Install util-linux's flock (see docs/dev-setup.md); do not wait or retry."
+	fi
+	if [ ! -f "${DOOM3_BASEPATH}/base/pak000.pk4" ]; then
+		_chextrek_exit_environment \
+			"ENVIRONMENT: classic Doom 3 data not found at ${DOOM3_BASEPATH} (no base/pak000.pk4)." \
+			"ENVIRONMENT: this is not a test failure. Copy the Doom 3 1.3.1 data there (see docs/dev-setup.md); do not wait or retry."
+	fi
+}
+
+# _chextrek_wine_preflight_or_exit
+#
+# The wine platform's share of _chextrek_linux_preflight_or_exit: wine, winepath and wineserver on
+# PATH, and an initialized $WINEPREFIX.
+_chextrek_wine_preflight_or_exit() {
 	if ! command -v wine >/dev/null 2>&1; then
 		_chextrek_exit_environment \
 			"ENVIRONMENT: wine not found on PATH - dhewm3 runs under Wine on Unicron." \
@@ -355,21 +474,10 @@ _chextrek_linux_preflight_or_exit() {
 			"ENVIRONMENT: wineserver not found on PATH - needed to clean up Wine after each run." \
 			"ENVIRONMENT: this is not a test failure. Put Wine's bin dir on PATH (see docs/dev-setup.md); do not wait or retry."
 	fi
-	# flock: the single-run lock (#62) - proceeding unlocked would defeat it.
-	if ! command -v flock >/dev/null 2>&1; then
-		_chextrek_exit_environment \
-			"ENVIRONMENT: flock not found on PATH - needed for the single-run harness lock." \
-			"ENVIRONMENT: this is not a test failure. Install util-linux's flock (see docs/dev-setup.md); do not wait or retry."
-	fi
 	if [ ! -f "${WINEPREFIX}/system.reg" ]; then
 		_chextrek_exit_environment \
 			"ENVIRONMENT: Wine prefix not set up at ${WINEPREFIX} (no system.reg)." \
 			"ENVIRONMENT: this is not a test failure. Initialize \$WINEPREFIX, including the VC++ x86 redist (see docs/dev-setup.md); do not wait or retry."
-	fi
-	if [ ! -f "${DOOM3_BASEPATH}/base/pak000.pk4" ]; then
-		_chextrek_exit_environment \
-			"ENVIRONMENT: classic Doom 3 data not found at ${DOOM3_BASEPATH} (no base/pak000.pk4)." \
-			"ENVIRONMENT: this is not a test failure. Copy the Doom 3 1.3.1 data there (see docs/dev-setup.md); do not wait or retry."
 	fi
 }
 
@@ -486,11 +594,24 @@ chextrek_pipeline_state_dir() {
 # (docs/dev-setup.md) whenever the environment doesn't already set them - never overrides an
 # explicit override. Shared by chextrek_run_console_script and tools/fetch-and-play.sh (#69), so
 # the two default paths can't drift apart.
+#
+# Native: DHEWM3_HOME is tools/linux-native/build-engine.sh's documented install dir. Appimage:
+# CHEXTREK_APPIMAGE defaults to tools/package-linux.sh's output in this checkout's dist/.
 chextrek_apply_engine_defaults() {
 	if chextrek_is_linux; then
-		DHEWM3_HOME="${DHEWM3_HOME:-$HOME/games/dhewm3/1.5.5-win32/dhewm3}"
 		DOOM3_BASEPATH="${DOOM3_BASEPATH:-$HOME/games/doom3}"
-		export WINEPREFIX="${WINEPREFIX:-$HOME/games/wineprefix-chextrek}"
+		case "$(chextrek_platform)" in
+		native) DHEWM3_HOME="${DHEWM3_HOME:-$HOME/games/dhewm3/1.5.5-linux-x86_64}" ;;
+		appimage)
+			local LIB_DIR
+			LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+			CHEXTREK_APPIMAGE="${CHEXTREK_APPIMAGE:-$(cd "${LIB_DIR}/.." && pwd)/dist/ChexTrek-x86_64.AppImage}"
+			;;
+		*)
+			DHEWM3_HOME="${DHEWM3_HOME:-$HOME/games/dhewm3/1.5.5-win32/dhewm3}"
+			export WINEPREFIX="${WINEPREFIX:-$HOME/games/wineprefix-chextrek}"
+			;;
+		esac
 	else
 		DHEWM3_HOME="${DHEWM3_HOME:-/c/Users/Scott/dhewm3/1.5.5-win32/dhewm3}"
 		DOOM3_BASEPATH="${DOOM3_BASEPATH:-/c/Program Files (x86)/Steam/steamapps/common/Doom 3}"
@@ -628,25 +749,35 @@ _chextrek_run_console_script_impl() {
 		fi
 	fi
 
-	local DHEWM3_EXE="${DHEWM3_HOME}/dhewm3.exe"
+	local PLATFORM
+	PLATFORM="$(chextrek_platform)"
+	local GAME_LIB
+	GAME_LIB="$(chextrek_game_lib_name)"
+	local DHEWM3_EXE
+	DHEWM3_EXE="$(_chextrek_engine_exe)"
 	if [ ! -f "$DHEWM3_EXE" ]; then
 		echo "error: dhewm3.exe not found at ${DHEWM3_EXE}. See docs/dev-setup.md (DHEWM3_HOME)." >&2
 		CHEXTREK_RUN_STATUS=1
 		return 1
 	fi
 
-	if [ ! -f "${REPO_ROOT}/chextrek.dll" ]; then
-		echo "error: ${REPO_ROOT}/chextrek.dll not found. Run tools/build-chextrek.sh first." >&2
-		CHEXTREK_RUN_STATUS=1
-		return 1
-	fi
+	# The appimage platform runs the artifact's own bundled chextrek.so and pk4'd mod data - this
+	# checkout's build and the "chextrek" mount aren't part of what it tests, so neither is
+	# required or touched.
+	if [ "$PLATFORM" != appimage ]; then
+		if [ ! -f "${REPO_ROOT}/${GAME_LIB}" ]; then
+			echo "error: ${REPO_ROOT}/${GAME_LIB} not found. Run tools/build-chextrek.sh first." >&2
+			CHEXTREK_RUN_STATUS=1
+			return 1
+		fi
 
-	# --- keep the basepath's "chextrek" mount pointed at *this* checkout (worktrees change this) -
-	# see chextrek_ensure_mount's own header above for why it must be a real symlink on both
-	# platforms and how a silent fallback is caught ---
-	if ! chextrek_ensure_mount "$REPO_ROOT"; then
-		CHEXTREK_RUN_STATUS=1
-		return 1
+		# --- keep the basepath's "chextrek" mount pointed at *this* checkout (worktrees change
+		# this) - see chextrek_ensure_mount's own header above for why it must be a real symlink
+		# on both platforms and how a silent fallback is caught ---
+		if ! chextrek_ensure_mount "$REPO_ROOT"; then
+			CHEXTREK_RUN_STATUS=1
+			return 1
+		fi
 	fi
 
 	# --- dhewm3 hardcodes its per-user save folder (Documents/My Games/dhewm3); that's our
@@ -654,15 +785,28 @@ _chextrek_run_console_script_impl() {
 	# already lives outside this repo, which is what the "never write into the repo" AC is about.
 	# On Unicron (#60) "Documents" is the one inside the Wine prefix dhewm3 actually runs in, not
 	# this Linux user's own $HOME/Documents.
-	local DOCUMENTS_DIR
-	if [ -n "${DHEWM3_DOCUMENTS_DIR:-}" ]; then
-		DOCUMENTS_DIR="$DHEWM3_DOCUMENTS_DIR"
-	elif chextrek_is_linux; then
-		DOCUMENTS_DIR="${WINEPREFIX}/drive_c/users/$(id -un)/Documents"
+	# Native/appimage: the engine's own XDG save path ($XDG_DATA_HOME/dhewm3), with XDG_DATA_HOME
+	# and XDG_CONFIG_HOME pointed into the harness's scratch root for this run (see
+	# chextrek_native_xdg_root) - and the config dir wiped along with the save dir, since native
+	# dhewm3 keeps dhewm.cfg there rather than next to the saves.
+	local SAVE_ROOT
+	local XDG_ROOT=""
+	if [ "$PLATFORM" = native ] || [ "$PLATFORM" = appimage ]; then
+		XDG_ROOT="$(chextrek_native_xdg_root)"
+		SAVE_ROOT="${XDG_ROOT}/data/dhewm3"
+		rm -rf "${XDG_ROOT}/config"
+		mkdir -p "${XDG_ROOT}/config"
 	else
-		DOCUMENTS_DIR="${HOME}/Documents"
+		local DOCUMENTS_DIR
+		if [ -n "${DHEWM3_DOCUMENTS_DIR:-}" ]; then
+			DOCUMENTS_DIR="$DHEWM3_DOCUMENTS_DIR"
+		elif chextrek_is_linux; then
+			DOCUMENTS_DIR="${WINEPREFIX}/drive_c/users/$(id -un)/Documents"
+		else
+			DOCUMENTS_DIR="${HOME}/Documents"
+		fi
+		SAVE_ROOT="${DOCUMENTS_DIR}/My Games/dhewm3"
 	fi
-	local SAVE_ROOT="${DOCUMENTS_DIR}/My Games/dhewm3"
 	local MOD_SAVE_DIR="${SAVE_ROOT}/chextrek"
 
 	# A leftover dhewm.cfg/config.spec from a previous partial/hung run can change how far this
@@ -694,10 +838,20 @@ _chextrek_run_console_script_impl() {
 	local LOG_FILE="${SAVE_ROOT}/dhewm3log.txt"
 	rm -f "$LOG_FILE"
 
-	local -a ENGINE_ARGS=(
-		+set fs_basepath "$(chextrek_to_engine_path "$DOOM3_BASEPATH")"
-		+set fs_game chextrek
-		+set fs_gameDllPath "$(chextrek_to_engine_path "$REPO_ROOT")"
+	# The appimage platform hands the Doom 3 dir to the AppImage's own launcher (--doom3), which
+	# sets fs_basepath/fs_game/fs_cdpath/fs_gameDllPath to the artifact's bundled paths itself -
+	# passing this checkout's here would make it test the checkout instead of the artifact.
+	local -a ENGINE_ARGS
+	if [ "$PLATFORM" = appimage ]; then
+		ENGINE_ARGS=(--doom3 "$DOOM3_BASEPATH")
+	else
+		ENGINE_ARGS=(
+			+set fs_basepath "$(chextrek_to_engine_path "$DOOM3_BASEPATH")"
+			+set fs_game chextrek
+			+set fs_gameDllPath "$(chextrek_to_engine_path "$REPO_ROOT")"
+		)
+	fi
+	ENGINE_ARGS+=(
 		+set developer 1
 		+set in_nograb 1
 		+set r_fullscreen 0
@@ -710,7 +864,25 @@ _chextrek_run_console_script_impl() {
 	# foreground and still delivers a clean kill when the ceiling is hit.
 	echo "==> Launching dhewm3 (mod=chextrek, timeout=${TIMEOUT_SECS}s, scenario=${RUN_LABEL})"
 	local RUN_EXIT
-	if chextrek_is_linux; then
+	if [ -n "$XDG_ROOT" ]; then
+		# Native/appimage: no wrapper shell needed - `timeout` execs the engine (or the AppImage,
+		# whose launcher execs the engine in turn) directly with the scratch XDG paths in its
+		# environment, and gets the same --kill-after and lock-fd treatment as the wine launch
+		# below, for the same reasons. The native engine echoes its whole console to stdout (the
+		# win32 one doesn't); left in this call's output it would bury the PASS/FAIL lines and,
+		# being megabytes, make callers' `echo "$OUT" | grep -q` pipelines fail under pipefail
+		# (grep exits at the first match, echo dies of SIGPIPE). It goes to engine-stdout.txt
+		# instead, archived with the log - the one place a crash's stderr would show up.
+		if [ -n "${CHEXTREK_LOCK_FD:-}" ]; then
+			XDG_DATA_HOME="${XDG_ROOT}/data" XDG_CONFIG_HOME="${XDG_ROOT}/config" \
+				timeout --kill-after=10 "$TIMEOUT_SECS" "$DHEWM3_EXE" "${ENGINE_ARGS[@]}" \
+				>"${SAVE_ROOT}/engine-stdout.txt" 2>&1 {CHEXTREK_LOCK_FD}>&-
+		else
+			XDG_DATA_HOME="${XDG_ROOT}/data" XDG_CONFIG_HOME="${XDG_ROOT}/config" \
+				timeout --kill-after=10 "$TIMEOUT_SECS" "$DHEWM3_EXE" "${ENGINE_ARGS[@]}" \
+				>"${SAVE_ROOT}/engine-stdout.txt" 2>&1
+		fi
+	elif chextrek_is_linux; then
 		# `bash -c '... && exec wine ...'` cds into the engine's own dir first (it looks for
 		# SDL2.dll/OpenAL32.dll next to itself, spike #59) and then `exec`s into wine, so `timeout`
 		# is still tracking exactly one PID - the wine process itself, not a wrapper shell around
@@ -743,7 +915,7 @@ _chextrek_run_console_script_impl() {
 	# the spike saw *that* hang instead, when winedevice.exe outlives its display) stops this run's
 	# own $WINEPREFIX server so those fds close; it's scoped to this one prefix, so it can't touch
 	# a concurrent run's wine processes in a different prefix.
-	if chextrek_is_linux && command -v wineserver >/dev/null 2>&1; then
+	if chextrek_uses_wine && command -v wineserver >/dev/null 2>&1; then
 		wineserver -k >/dev/null 2>&1 || true
 	fi
 
@@ -764,7 +936,7 @@ _chextrek_run_console_script_impl() {
 	# the trailing CR; Linux grep doesn't, so every `...$`-anchored always-on check below would
 	# silently fail even though the value is right there (spike #59 finding 1). Normalize before
 	# archiving/asserting, on the log this run wrote to, before it's ever grepped.
-	if chextrek_is_linux && [ -f "$LOG_FILE" ]; then
+	if chextrek_uses_wine && [ -f "$LOG_FILE" ]; then
 		sed -i 's/\r$//' "$LOG_FILE"
 	fi
 
@@ -777,6 +949,7 @@ _chextrek_run_console_script_impl() {
 	CHEXTREK_ARTIFACT_DIR="${SAVE_ROOT}/chextrek-harness-artifacts/${RUN_ID}"
 	mkdir -p "$CHEXTREK_ARTIFACT_DIR"
 	[ -f "$LOG_FILE" ] && cp -f "$LOG_FILE" "${CHEXTREK_ARTIFACT_DIR}/dhewm3log.txt"
+	[ -f "${SAVE_ROOT}/engine-stdout.txt" ] && mv -f "${SAVE_ROOT}/engine-stdout.txt" "${CHEXTREK_ARTIFACT_DIR}/"
 	for f in "${MOD_SAVE_DIR}"/* "${MOD_SAVE_DIR}"/screenshots/*; do
 		[ -f "$f" ] || continue
 		[ "$(basename "$f")" = "$CFG_NAME" ] && continue
@@ -802,12 +975,25 @@ _chextrek_run_console_script_impl() {
 
 	CHEXTREK_RUN_STATUS=0
 
-	if grep -qE "loaded game library '[^']*[Cc]hextrek\.dll'" "$CHEXTREK_LOCAL_LOG"; then
-		echo "PASS: chextrek.dll loaded (not base.dll)"
+	local LIB_EXT="${GAME_LIB##*.}"
+	if grep -qE "loaded game library '[^']*[Cc]hextrek\.${LIB_EXT}'" "$CHEXTREK_LOCAL_LOG"; then
+		echo "PASS: ${GAME_LIB} loaded (not base.${LIB_EXT})"
 	else
-		echo "FAIL: chextrek.dll was not the game library that loaded"
+		echo "FAIL: ${GAME_LIB} was not the game library that loaded"
 		grep -F "loaded game library" "$CHEXTREK_LOCAL_LOG" | tail -1
 		CHEXTREK_RUN_STATUS=1
+	fi
+	# The appimage platform must prove the artifact's own chextrek.so ran: one loaded from this
+	# checkout (a stray fs_gameDllPath, say) would make the whole run test the wrong library.
+	if [ "$PLATFORM" = appimage ]; then
+		local LOADED_LIB
+		LOADED_LIB="$(sed -n "s/^loaded game library '\(.*\)'\.\$/\1/p" "$CHEXTREK_LOCAL_LOG" | tail -1)"
+		if [ -n "$LOADED_LIB" ] && [ "${LOADED_LIB#"$REPO_ROOT"/}" = "$LOADED_LIB" ]; then
+			echo "PASS: the AppImage's own ${GAME_LIB} loaded (${LOADED_LIB}), not this checkout's"
+		else
+			echo "FAIL: expected the AppImage's own ${GAME_LIB}, got '${LOADED_LIB}'"
+			CHEXTREK_RUN_STATUS=1
+		fi
 	fi
 
 	if grep -qF "CHEXTREK-STATE-DUMP v1" "$CHEXTREK_LOCAL_LOG"; then
