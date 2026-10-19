@@ -4,3 +4,7 @@
 /chextrek.pdb
 /chextrek.exp
 /chextrek.lib
+# Native-Linux build (CHEXTREK_PLATFORM=native) and tools/package-linux.sh output.
+/engine/build-native/
+/chextrek.so
+/dist/
