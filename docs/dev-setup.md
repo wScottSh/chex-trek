@@ -637,6 +637,100 @@ plus run time that either a `win-<sha>` release appears (`gh release view`, no t
 release) or the `pipeline:red` issue is opened/updated - the AC this whole sub-issue exists to
 satisfy. `bash tools/setup-pipeline-poll-timer.sh logs --follow` tails the run live.
 
+## Native Linux (`CHEXTREK_PLATFORM=native`)
+
+Unicron can also build and test a native x86_64 Linux build, no Wine: a 64-bit `chextrek.so`
+loaded by a native dhewm3 1.5.5. It's what `tools/package-linux.sh` ships to Linux players. On
+Linux, `CHEXTREK_PLATFORM` picks the platform for `tools/build-chextrek.sh`, `tools/lib-harness.sh`
+and so `tools/run-all-tests.sh` and every `tools/test-*.sh`:
+
+| `CHEXTREK_PLATFORM` | Engine | Game library | Mod data |
+|---|---|---|---|
+| `wine` (default, unset) | win32 `dhewm3.exe` under Wine | `chextrek.dll` (repo root) | this checkout, via the `chextrek` mount |
+| `native` | native `$DHEWM3_HOME/dhewm3` | `chextrek.so` (repo root) | this checkout, via the `chextrek` mount |
+| `appimage` | the AppImage's bundled one | the AppImage's bundled `chextrek.so` | the AppImage's `chextrek.pk4` |
+
+Wine stays the default because it's what the AFK pipeline builds and publishes (Windows releases).
+Any other value stops with exit 3 and an `ENVIRONMENT:` line.
+
+One-time setup:
+
+| Thing | Location | Notes |
+|---|---|---|
+| Toolchain image `chextrek-linux-native:jammy-2` | `bash tools/linux-native/build-image.sh` | Ubuntu 22.04 (pinned by digest), gcc 11, plus SDL2 2.32.10 and OpenAL Soft 1.24.3 built from checksummed upstream tarballs for the AppImage (`tools/linux-native/Dockerfile`). Building in 22.04 sets the shipped binaries' glibc floor; a host build (Ubuntu 26.04) would need glibc 2.43. |
+| Native dhewm3 1.5.5 | `$HOME/games/dhewm3/1.5.5-linux-x86_64/dhewm3` (`DHEWM3_HOME` in native mode) | `bash tools/linux-native/build-engine.sh ~/games/dhewm3/1.5.5-linux-x86_64`. Stock upstream source (tag 1.5.5, pinned commit), cloned to `$HOME/games/src/dhewm3` (`DHEWM3_SRC`) if missing; the script checks its `GAME_API_VERSION` matches `engine/dhewm3-sdk`'s. |
+| Save/config/log path | `$CHEXTREK_NATIVE_XDG_ROOT`, default `~/.local/state/chextrek-harness/native/{data,config}` | Native dhewm3 uses `$XDG_DATA_HOME/dhewm3` (saves, `dhewm3log.txt`) and `$XDG_CONFIG_HOME/dhewm3` (`dhewm.cfg`). The harness points both into this scratch root for the run, so its per-run wipe never touches a real player's `~/.local/share/dhewm3/chextrek`. Artifacts land in `.../data/dhewm3/chextrek-harness-artifacts/`. |
+
+What native mode does differently from Wine (same `chextrek_run_console_script` interface):
+no `winepath`, no `$WINEPREFIX`, no `wineserver -k`, no CRLF normalization; plain paths on the
+command line. The native engine echoes its whole console to stdout, so the harness sends that to
+`engine-stdout.txt` in the run's artifact dir instead of its own output. Display (Xvfb), the
+`chextrek` mount, the single-run lock and the timeout kill are shared with Wine mode, and so are
+the two Wine-era longer waits (`chextrek_is_linux` is true for both; llvmpipe is the slow part).
+
+```
+CHEXTREK_PLATFORM=native bash tools/run-all-tests.sh   # builds chextrek.so, then the whole suite
+```
+
+The build: `tools/build-chextrek.sh` runs CMake + Ninja in the toolchain image with the same
+options as the other two builds (`BASE_NAME=chextrek`, `D3XP=OFF`), into `engine/build-native`
+(gitignored, separate from the Wine build's `engine/build`), and copies `chextrek.so` to the repo
+root. A clean build takes about 7s. The decompile-derived code needed no pointer-size fixes to
+compile; the 64-bit port's two fixes are uninitialized members whose garbage behaved differently
+under gcc/glibc (`decomp-so/reference/script-events.md`, `end-level-stats.md`).
+
+### Packaging for Linux players
+
+```
+bash tools/package-linux.sh
+```
+
+Builds everything fresh (`chextrek.so`, the engine, both in the toolchain image) and writes
+`dist/ChexTrek-x86_64.AppImage` (about 95 MB) and `dist/README.md` (the player README,
+`tools/linux-native/README-player.md`). Send the player both. The AppImage holds:
+
+- `usr/bin/dhewm3`, `usr/lib/chextrek/chextrek.so`, `usr/lib/libSDL2-2.0.so.0`,
+  `usr/lib/libopenal.so.1`. Upstream builds of SDL2/OpenAL dlopen their X11/Wayland/PipeWire/
+  PulseAudio/ALSA backends, so the bundle needs only glibc and libstdc++ from the system.
+- `usr/share/chextrek/chextrek/chextrek.pk4`: the tracked files of the runtime data dirs (`af dds
+  def env guis maps materials models newpdas particles script skins sound strings textures
+  video`) and `autoexec.cfg`, minus dev cruft (`.bak .tmp .exe .bat .txt .xcf .guied .gif`,
+  `*autosave.map`) and minus the mod's verbatim copies of id's own files (see below).
+- `AppRun` (`tools/linux-native/AppRun`), the desktop entry, icon, README and licenses.
+
+No Doom 3 data. `tools/linux-native/make-pk4.py` leaves out any file byte-identical to the copy
+the engine would load from the player's own base paks, and stops on a copy of an older id version
+unless `tools/package-linux.sh` lists it with a reason (just `script/doom_events.script` today).
+`tools/linux-native/check-no-id-data.py` then re-checks the finished pk4 against
+`$DOOM3_BASEPATH/base`. Packaging also refuses if any binary needs glibc newer than 2.35.
+
+How the launcher wires dhewm3 1.5.5's search paths (`framework/FileSystem.cpp`
+`SetupGameDirectories`: each game dir is searched under `fs_cdpath`, then `fs_basepath`, then
+`fs_savepath`, later winning): `fs_basepath` is the AppImage's `usr/share/chextrek`;
+`fs_cdpath` is `~/.cache/chextrek/doom3-base`, which holds only a `base` symlink to the player's
+`<Doom 3>/base`, so a stale `<Doom 3>/chextrek` from an old install of the original mod is never
+mounted; `fs_gameDllPath` is `usr/lib/chextrek`, searched before any other place
+(`LoadGameDLLbyName`); `fs_savepath` stays dhewm3's default. The Doom 3 dir comes from
+`--doom3 DIR` (remembered in `~/.config/chextrek/doom3-dir`), `CHEXTREK_DOOM3_DIR`, the remembered
+dir, Steam libraries (native, Flatpak, Snap, every `libraryfolders.vdf` path), `~/GOG Games/Doom 3`,
+`/usr/local/games/doom3` or `/usr/share/games/doom3`; otherwise one line on stderr (and a
+zenity/kdialog box when started without a terminal) says to pass `--doom3`.
+
+Tooling: appimagetool 1.9.1 and the type2 runtime 20251108 (static, so the player needs no
+libfuse2), pinned by sha256, downloaded once into `$CHEXTREK_TOOLS_DIR` (default
+`~/games/tools/appimage`). `SOURCE_DATE_EPOCH` is the packaged commit's time, and the pk4 is
+byte-reproducible per commit.
+
+Prove the artifact itself, not the build tree:
+
+```
+CHEXTREK_PLATFORM=appimage bash tools/run-all-tests.sh   # whole suite against dist/ChexTrek-x86_64.AppImage
+```
+
+`CHEXTREK_APPIMAGE` points it at another copy. Nothing is built; each run passes the AppImage
+`--doom3 $DOOM3_BASEPATH` plus the usual `+set`/`+exec` arguments, and the always-on checks also
+assert the loaded `chextrek.so` is the AppImage's, not this checkout's.
+
 ## Building
 
 ```
@@ -649,7 +743,8 @@ with CMake, `BASE_NAME=chextrek`, `D3XP=OFF`, 32-bit, and copies the resulting `
 either machine. On Windows this uses `Visual Studio 18 2026` / Win32 and MSBuild, unchanged since
 spec #28/#29. On Unicron (spec #64) this uses Ninja against the pinned MSVC-14.50.35717-x86-under-
 Wine container image - see "Building `chextrek.dll` on Unicron" above for the one-time setup and
-what differs.
+what differs. With `CHEXTREK_PLATFORM=native` on Unicron it builds a 64-bit `chextrek.so` instead
+(see "Native Linux" above).
 
 ## Running the tests
 
