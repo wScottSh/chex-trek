@@ -45,12 +45,15 @@
 # was observed to land on either side of the flip across runs - sometimes
 # still 1, sometimes already 0. Rather than guess a bigger fixed margin (liable to the same
 # intermittent failure, just at lower odds), this scenario samples repeatedly: eight chextrek_dumps,
-# 20 frames apart (160 frames of total margin), and the assertion
+# 60 frames apart (480 frames of total margin), and the assertion
 # below passes if *any* of the eight shows visible=0 - the flip is one-time and monotonic (hud.gui's
 # own onTime semantics: a timeline fires once and only resetTime rearms it, and nothing here calls
 # resetTime "hudmap_close" again), so once one sample sees 0, every later sample would too. The
 # last of the eight is also reused as AC2's pre-setviewpos coverage baseline (still standing at the
-# spawn point throughout - see AC2 below).
+# spawn point throughout - see AC2 below). The margin was 20 frames apart (160 in all) until the
+# native Linux build: it renders a frame in ~2.4ms of game time under Xvfb (measured with
+# chextrek_test_probe player1 stamps: 160 waits = 384ms), so 160 frames ended short of the 400ms
+# flip and every sample read 1. 480 frames is ~1.15s there, and only slower everywhere else.
 #
 # --- AC2 ---
 # `coverage` is the number of alpha-revealed texels (hudmap_alpha[level][...][3] > 0) out of the
@@ -96,21 +99,21 @@ wait 10
 chextrek_dump
 
 chextrek_test_impulse 23
-wait 20
+wait 60
 chextrek_dump
-wait 20
+wait 60
 chextrek_dump
-wait 20
+wait 60
 chextrek_dump
-wait 20
+wait 60
 chextrek_dump
-wait 20
+wait 60
 chextrek_dump
-wait 20
+wait 60
 chextrek_dump
-wait 20
+wait 60
 chextrek_dump
-wait 20
+wait 60
 chextrek_dump
 
 setviewpos 300 -976 8 0
