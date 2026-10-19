@@ -9,6 +9,11 @@ functions against the reference files.
   environment blocker - no display, or, Linux-only: missing wine/winepath/wineserver/flock, an
   uninitialized Wine prefix, missing Doom 3 data, a missing dhewm3 engine, an unopenable lock file,
   or docker/the msvc-wine image missing for the build).
+- **Platform:** on Linux, `CHEXTREK_PLATFORM` picks what every run launches: `wine` (the
+  default, win32 `dhewm3.exe` + `chextrek.dll`), `native` (native dhewm3 1.5.5 + a 64-bit
+  `chextrek.so`) or `appimage` (the packaged `dist/ChexTrek-x86_64.AppImage` itself, its bundled
+  engine, library and pk4). The whole suite runs unchanged on each; see `docs/dev-setup.md`'s
+  "Native Linux" section.
 - **Run one feature:** `bash tools/test-<feature>.sh` (game scenarios build first unless
   `CHEXTREK_SKIP_BUILD=1`).
   Setup and environment variables: `docs/dev-setup.md`.
@@ -25,6 +30,9 @@ functions against the reference files.
 | Feature | Scenario | Status |
 |---|---|---|
 | `chextrek.dll` builds (32-bit x86) from stock dhewm3-sdk pinned at `ad837f9b1b`, on both the Windows dev machine (MSVC/MSBuild) and Unicron (the same MSVC version under Wine, a pinned container image, #64) | `tools/build-chextrek.sh` | covered - `tools/test-menu-smoke.sh` (and every other `tools/test-*.sh`) builds via this script unless `CHEXTREK_SKIP_BUILD=1`, so it also proves the Unicron-built DLL loads and passes the always-on checks, same as a Windows-built one. |
+| `chextrek.so` builds (64-bit x86_64, gcc 11) from the same pinned SDK and runs the whole suite natively, no Wine (`CHEXTREK_PLATFORM=native`); the native dhewm3 1.5.5 engine builds from upstream source, its `GAME_API_VERSION` checked against the SDK's | `tools/build-chextrek.sh`, `tools/linux-native/build-engine.sh` | covered - `CHEXTREK_PLATFORM=native bash tools/run-all-tests.sh` builds `chextrek.so` and runs every `tools/test-*.sh` against it; each run's always-on check asserts `chextrek.so` (not `base.so`) loaded. |
+| The Linux AppImage (`tools/package-linux.sh`): bundles engine, `chextrek.so`, SDL2/OpenAL and the tracked mod data as one pk4; refuses to package if a binary needs glibc newer than 2.35 or the pk4 holds a file byte-identical to one in the Doom 3 base paks | `tools/package-linux.sh` | covered - `CHEXTREK_PLATFORM=appimage bash tools/run-all-tests.sh` runs the whole suite against the packaged artifact; its always-on check also asserts the AppImage's own `chextrek.so` loaded, not the checkout's. The two refusals are checks in the script itself, run on every packaging. |
+| The AppImage's launcher finds classic Doom 3 (`--doom3`, remembered dir, `CHEXTREK_DOOM3_DIR`, Steam libraries from `libraryfolders.vdf`, GOG, system paths), mounts only its `base/`, and with none found prints one line saying what to pass | `tools/test-appimage-launcher.sh` | covered - self-test of `tools/linux-native/AppRun` against a stub engine and a scratch `HOME`; the not-found case also runs against the packaged AppImage when one exists. Real Steam/GOG/Flatpak installs on another machine are owner-pending. |
 | Harness launches dhewm3 1.5.5 win32 with the mod mounted, drives it with a console script ending in `quit`, kills a hung run after a timeout | `tools/run-harness.sh` (`tools/run-scenario.sh` for any console script) | covered |
 | Harness stops at once with exit 3 and one `ENVIRONMENT` line when there's no display (disconnected Windows session), or brings up its own display when none is usable (Unicron/Wine, #60) | `tools/test-harness-no-display.sh` | covered - self-test; on Windows stubs `qwinsta`, on Linux hides Xvfb from `PATH` and separately stubs it to fail to start, never launches the game either way. |
 | Harness stops at once with exit 3 and one `ENVIRONMENT` line for every other broken-Unicron-environment case: missing `wine`/`winepath`/`wineserver`/`flock` on `PATH`, an uninitialized Wine prefix, missing Doom 3 data, a missing dhewm3 engine (#63), an unopenable lock file; `tools/build-chextrek.sh` does the same when `docker` is missing, and `tools/run-all-tests.sh` passes a build's exit 3 through | `tools/test-harness-broken-environment.sh`, `tools/test-run-all-tests-skip-build.sh` | covered - self-test; each case checked in isolation with every other resource stubbed present, plus a "nothing missing" case proving none of the checks false-positive. Linux-only (a no-op on Windows); never launches the game. |
@@ -91,7 +99,7 @@ Detail lives where each bullet points; this list is the index.
   ships in the mod's data.
 
 **Port choices and fixes beyond the reconstruction** (each in that reference file's Notes).
-- `idTarget_EndLevelGUI::Spawn` zeroes `ticSound` (crash fix); `idMover_Binary` `secret`/
+- `idTarget_EndLevelGUI::Spawn` and (64-bit port, for the load path) its constructor zero `ticSound` (crash fix); `idMover_Binary` `secret`/
   `secretFound` are saved (binary unchecked); `idPlayer` saves `levelStats` counts, not its
   name pointers (#52): `decomp-so/reference/end-level-stats.md`.
 - `idPlayer` constructor defaults for the unsaved HUD-map members (a savegame load never runs
@@ -103,8 +111,9 @@ Detail lives where each bullet points; this list is the index.
   left as an open lead): `decomp-so/reference/door-opening.md`.
 - `idWorldspawn::Save( idSaveGame * )` declared `const`; `EV_FadeSound` made `static` (link
   clash): `decomp-so/reference/worldspawn.md`.
-- `FC_FOOTPRINT` field use, `footprintRight` left uninitialized, `EV_Remove` entry ported as a
-  no-op: `decomp-so/reference/script-events.md`.
+- `FC_FOOTPRINT` field use, `footprintRight` starting `false` (the binary left it uninitialized,
+  which never alternates feet under gcc), `EV_Remove` entry ported as a no-op:
+  `decomp-so/reference/script-events.md`.
 
 **Original-mod bugs kept** (spec #28 Out of Scope; they don't crash).
 - `mkTrail::lastPos` uninitialized: about half of `sf_923`'s trails never update or anchor, so

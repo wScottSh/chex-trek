@@ -471,11 +471,15 @@ idActor::idActor( void ) {
 
 	// chextrek: spec #30, decomp-so/reference/script-events.md. Binary sets these two on
 	// construction; it does not set footprintRight (an open question in the reference - the first
-	// footstep's side may be arbitrary in the original). Per spec #28 ("keep the reference's
-	// choice unless a scenario shows it's wrong"), footprintRight is deliberately left
-	// uninitialized here too, matching the binary rather than forcing determinism.
+	// footstep's side may be arbitrary in the original).
 	footprintEndTime	= 0;
 	footprintSurfaceType = -1;
+	// chextrek: 64-bit/gcc port. The binary's uninitialized footprintRight only made the *first*
+	// foot arbitrary, but a heap byte that's neither 0 nor 1 in a bool is UB, and gcc compiles
+	// `footprintRight = !footprintRight` as `xor 1` - 0xCD -> 0xCC, still true - so on Linux the
+	// prints would never alternate at all. Starting from false keeps the binary's alternation on
+	// every toolchain; only which foot goes first is now fixed (left).
+	footprintRight		= false;
 
 	// chextrek: spec #43. Not documented in the reference (Actor.h has the fuller comment); a safe
 	// default so ~idActor's hasTrail check below never reads trail through garbage memory on an

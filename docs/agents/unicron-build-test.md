@@ -26,6 +26,17 @@ found on PATH - dhewm3 runs under Wine on Unicron.` and exit 3, spec #63's envir
 working as designed. That's not a game bug and not something to wait out or retry; put Wine on
 `PATH` and run it again.
 
+That's the Wine (Windows-build) proof, and the default. A change that could behave differently
+on 64-bit Linux, or touches `tools/linux-native/`, `tools/package-linux.sh` or the
+`CHEXTREK_PLATFORM` code paths, also needs the native suite and, for packaging changes, the suite
+against the packaged artifact (one-time setup: `docs/dev-setup.md`'s "Native Linux" section):
+
+```
+CHEXTREK_PLATFORM=native bash tools/run-all-tests.sh     # 64-bit chextrek.so, native dhewm3, no Wine
+bash tools/package-linux.sh                               # dist/ChexTrek-x86_64.AppImage
+CHEXTREK_PLATFORM=appimage bash tools/run-all-tests.sh   # the whole suite against that AppImage
+```
+
 ## Reading the result
 
 - **Exit 0:** every scenario passed. The change is proven in game - safe to open the PR.

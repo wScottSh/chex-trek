@@ -1,17 +1,25 @@
 #!/usr/bin/env bash
-# One command to build chextrek.dll (32-bit x86) from the vendored dhewm3-sdk import
+# One command to build the chextrek game library from the vendored dhewm3-sdk import
 # (engine/dhewm3-sdk, pinned at ad837f9b1b - see engine/dhewm3-sdk/UPSTREAM.md). Spec #28/#29
 # (Windows, MSVC via the installed VS 18 Build Tools), extended by spec #58/#64 (Unicron/Linux,
 # the same MSVC version - 14.50.35717 - run under Wine in a pinned container, see
-# tools/msvc-wine/Dockerfile and docs/dev-setup.md's "Unicron (Linux/Wine)" section).
+# tools/msvc-wine/Dockerfile and docs/dev-setup.md's "Unicron (Linux/Wine)" section), and by the
+# native-Linux platform (CHEXTREK_PLATFORM=native on Linux: a 64-bit chextrek.so built with gcc in
+# the pinned tools/linux-native/ container, see docs/dev-setup.md's "Native Linux" section).
 #
 # Usage: bash tools/build-chextrek.sh [Debug|RelWithDebInfo|Release]
 #
-# Exit status: 0 built; non-zero on a build failure; 3 (Linux only) on an environment blocker -
-# docker or the pinned toolchain image missing - with an ENVIRONMENT line, not a build result.
+# Environment: CHEXTREK_PLATFORM (Linux only) - `wine` (the default: chextrek.dll for the win32
+# engine under Wine) or `native` (chextrek.so for the native engine). The same variable selects
+# the harness's platform (tools/lib-harness.sh's chextrek_platform).
 #
-# Output: <repo-root>/chextrek.dll (and matching .pdb), placed at the repo root because that's
-# the mod's fs_game folder the engine searches for "<fs_game>.dll" - see docs/dev-setup.md.
+# Exit status: 0 built; non-zero on a build failure; 3 (Linux only) on an environment blocker -
+# docker or the pinned toolchain image missing, or an unknown CHEXTREK_PLATFORM - with an
+# ENVIRONMENT line, not a build result.
+#
+# Output: <repo-root>/chextrek.dll (and matching .pdb), or <repo-root>/chextrek.so for native,
+# placed at the repo root because that's the fs_gameDllPath the harness passes the engine, which
+# searches it for "<fs_game>.dll"/"<fs_game>.so" - see docs/dev-setup.md.
 set -euo pipefail
 
 # Exit 3 means "environment blocker" (see Exit status above) and only the checks that print an
@@ -27,8 +35,70 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 SDK_DIR="${REPO_ROOT}/engine/dhewm3-sdk"
 BUILD_DIR="${REPO_ROOT}/engine/build"
 
+# Same resolution as tools/lib-harness.sh's chextrek_platform (this script doesn't source that
+# library - see docs/dev-setup.md - so it repeats it): windows off Linux, else CHEXTREK_PLATFORM.
 case "$(uname -s)" in
-Linux*)
+Linux*) PLATFORM="${CHEXTREK_PLATFORM:-wine}" ;;
+*) PLATFORM=windows ;;
+esac
+case "$PLATFORM" in
+windows | wine | native) ;;
+*)
+	echo "ENVIRONMENT: unknown CHEXTREK_PLATFORM '${PLATFORM}' - expected 'wine' (the default) or 'native'."
+	echo "ENVIRONMENT: this is not a test failure. See docs/dev-setup.md; do not wait or retry."
+	ENVIRONMENT_EXIT=1
+	exit 3
+	;;
+esac
+
+case "$PLATFORM" in
+native)
+	# Native Linux: a 64-bit chextrek.so, same CMake project options as the other two
+	# (BASE_NAME=chextrek, D3XP=OFF), built with gcc in the pinned Ubuntu 22.04 toolchain image -
+	# the same image tools/linux-native/build-engine.sh builds the engine in and
+	# tools/package-linux.sh ships from, so what the harness tests is what gets packaged. A
+	# separate build dir (engine/build-native) so switching platforms never reuses the other
+	# toolchain's CMake cache. --user keeps engine/build-native owned by the invoking user.
+	# Keep this tag in sync with tools/linux-native/build-image.sh.
+	CHEXTREK_NATIVE_IMAGE="chextrek-linux-native:jammy-2"
+	if ! command -v docker >/dev/null 2>&1; then
+		echo "ENVIRONMENT: docker not found on PATH - needed for the native Linux build."
+		echo "ENVIRONMENT: this is not a test failure. See docs/dev-setup.md; do not wait or retry."
+		ENVIRONMENT_EXIT=1
+		exit 3
+	fi
+	if ! docker image inspect "$CHEXTREK_NATIVE_IMAGE" >/dev/null 2>&1; then
+		echo "ENVIRONMENT: docker image '${CHEXTREK_NATIVE_IMAGE}' not found (or docker isn't reachable)."
+		echo "ENVIRONMENT: this is not a test failure. One-time setup: bash tools/linux-native/build-image.sh (see docs/dev-setup.md); do not wait or retry."
+		ENVIRONMENT_EXIT=1
+		exit 3
+	fi
+	BUILD_DIR="${REPO_ROOT}/engine/build-native"
+	echo "==> Configuring (native x86_64/gcc, BASE_NAME=chextrek, D3XP=OFF) into ${BUILD_DIR}"
+	mkdir -p "$BUILD_DIR"
+	timeout 1800 docker run --rm -i --init \
+		--user "$(id -u):$(id -g)" \
+		-v "${REPO_ROOT}:/src" \
+		-w /src \
+		-e CONFIG="$CONFIG" \
+		"$CHEXTREK_NATIVE_IMAGE" \
+		bash -s <<'DOCKER_BUILD_EOF'
+set -euo pipefail
+cmake -S engine/dhewm3-sdk -B engine/build-native -G Ninja \
+	-DBASE=ON -DBASE_NAME=chextrek -DD3XP=OFF -DCMAKE_BUILD_TYPE="${CONFIG}"
+echo "==> Building (${CONFIG})"
+cmake --build engine/build-native --target base
+DOCKER_BUILD_EOF
+	if [ ! -f "${BUILD_DIR}/chextrek.so" ]; then
+		echo "error: build finished but chextrek.so wasn't found under ${BUILD_DIR}" >&2
+		exit 1
+	fi
+	echo "==> Copying chextrek.so -> ${REPO_ROOT}/chextrek.so"
+	cp -f "${BUILD_DIR}/chextrek.so" "${REPO_ROOT}/chextrek.so"
+	echo "==> Built ${REPO_ROOT}/chextrek.so ($CONFIG)"
+	exit 0
+	;;
+wine)
 	# Unicron (Linux/Wine, spec #58/#64): same CMake project options as Windows
 	# (BASE=ON, BASE_NAME=chextrek, D3XP=OFF, 32-bit), built with Ninja against the pinned
 	# MSVC-14.50.35717-x86-under-Wine toolchain, packaged as a container image so a rebuild
@@ -116,7 +186,7 @@ echo "==> Building (${CONFIG})"
 cmake --build engine/build --target base
 DOCKER_BUILD_EOF
 	;;
-*)
+windows)
 	# CMake ships inside the VS 18 Build Tools install, which lives outside this repo/worktree.
 	CMAKE_CANDIDATES=(
 		"/c/Program Files (x86)/Microsoft Visual Studio/18/BuildTools/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/bin/cmake.exe"
