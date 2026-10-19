@@ -60,7 +60,7 @@ native)
 	# separate build dir (engine/build-native) so switching platforms never reuses the other
 	# toolchain's CMake cache. --user keeps engine/build-native owned by the invoking user.
 	# Keep this tag in sync with tools/linux-native/build-image.sh.
-	CHEXTREK_NATIVE_IMAGE="chextrek-linux-native:jammy-1"
+	CHEXTREK_NATIVE_IMAGE="chextrek-linux-native:jammy-2"
 	if ! command -v docker >/dev/null 2>&1; then
 		echo "ENVIRONMENT: docker not found on PATH - needed for the native Linux build."
 		echo "ENVIRONMENT: this is not a test failure. See docs/dev-setup.md; do not wait or retry."

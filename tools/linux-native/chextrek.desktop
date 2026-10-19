@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Chex Trek
+Comment=Chex Trek, a Doom 3 total conversion, on dhewm3
+Exec=chextrek
+Icon=chextrek
+Terminal=false
+Categories=Game;ActionGame;

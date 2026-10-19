@@ -1,0 +1,150 @@
+#!/usr/bin/env bash
+# Chex Trek AppImage launcher (packaged by tools/package-linux.sh). Finds the player's classic
+# Doom 3 install, then execs the bundled dhewm3 1.5.5 with the bundled chextrek.so and mod data.
+#
+# How the engine's search paths are set (dhewm3 1.5.5, framework/FileSystem.cpp): every game dir
+# is searched under fs_cdpath, then fs_basepath, then fs_savepath, later ones winning. So:
+#   fs_basepath    = this AppImage's usr/share/chextrek, holding chextrek/chextrek.pk4.
+#   fs_cdpath      = a launcher-made dir holding only a `base` symlink to <Doom 3>/base - the
+#                    base game's pk4s, and nothing else from the player's Doom 3 dir. Pointing
+#                    fs_cdpath at the Doom 3 dir itself would also mount any <Doom 3>/chextrek
+#                    left there by an old install of the original mod, whose stale defs and
+#                    scripts the engine would load alongside these.
+#   fs_gameDllPath = this AppImage's usr/lib/chextrek, searched for chextrek.so before any other
+#                    place.
+#   fs_savepath    = left at dhewm3's default, $XDG_DATA_HOME/dhewm3 (~/.local/share/dhewm3);
+#                    the config (dhewm.cfg) goes to $XDG_CONFIG_HOME/dhewm3/chextrek.
+set -euo pipefail
+
+HERE="${APPDIR:-$(dirname "$(readlink -f "$0")")}"
+CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/chextrek"
+REMEMBERED="${CONFIG_DIR}/doom3-dir"
+
+usage() {
+	cat <<'EOF'
+Usage: ChexTrek-x86_64.AppImage [--doom3 DIR] [dhewm3 arguments...]
+
+Runs Chex Trek on the bundled dhewm3 1.5.5. Needs classic Doom 3 (not BFG Edition): DIR is the
+folder that contains base/pak000.pk4 ... base/pak008.pk4.
+
+  --doom3 DIR   Use the Doom 3 install at DIR, and remember it for later launches.
+                CHEXTREK_DOOM3_DIR=DIR does the same for one launch.
+  --help        Show this help.
+
+Without either, the last remembered DIR is used, then common Steam and GOG install locations are
+searched. Any other argument goes to dhewm3 as-is, e.g. +set r_fullscreen 0.
+Saves: ~/.local/share/dhewm3/chextrek. Settings: ~/.config/dhewm3/chextrek.
+EOF
+}
+
+# fail MESSAGE - one clear line on stderr, plus a dialog when started from a file manager (no
+# terminal to print to) and zenity or kdialog is available.
+fail() {
+	echo "chextrek: $1" >&2
+	if [ ! -t 2 ]; then
+		if command -v zenity >/dev/null 2>&1; then
+			zenity --error --title "Chex Trek" --text "$1" >/dev/null 2>&1 || true
+		elif command -v kdialog >/dev/null 2>&1; then
+			kdialog --title "Chex Trek" --error "$1" >/dev/null 2>&1 || true
+		fi
+	fi
+	exit 2
+}
+
+is_classic_doom3() { [ -f "$1/base/pak000.pk4" ]; }
+
+# why_not_doom3 DIR - the reason DIR isn't usable, for an explicitly given DIR.
+why_not_doom3() {
+	if [ ! -d "$1" ]; then
+		echo "'$1' doesn't exist."
+	elif [ -f "$1/base/_common.resources" ]; then
+		echo "'$1' is Doom 3 BFG Edition; Chex Trek needs classic Doom 3 (base/pak000.pk4)."
+	else
+		echo "'$1' has no base/pak000.pk4 - pass the classic Doom 3 folder that contains base/."
+	fi
+}
+
+# steam_libraries - every Steam library root this user has, from each Steam install's
+# libraryfolders.vdf, so a Doom 3 installed on a second drive is found too.
+steam_libraries() {
+	local ROOT
+	for ROOT in "$HOME/.steam/steam" "$HOME/.local/share/Steam" \
+		"$HOME/.var/app/com.valvesoftware.Steam/.local/share/Steam" \
+		"$HOME/.var/app/com.valvesoftware.Steam/data/Steam" \
+		"$HOME/snap/steam/common/.local/share/Steam"; do
+		[ -d "$ROOT" ] || continue
+		echo "$ROOT"
+		[ -f "$ROOT/steamapps/libraryfolders.vdf" ] &&
+			sed -n 's/^[[:space:]]*"path"[[:space:]]*"\(.*\)"[[:space:]]*$/\1/p' "$ROOT/steamapps/libraryfolders.vdf"
+	done
+}
+
+find_doom3() {
+	local DIR LIB
+	if [ -f "$REMEMBERED" ]; then
+		DIR="$(cat "$REMEMBERED")"
+		is_classic_doom3 "$DIR" && { echo "$DIR"; return 0; }
+	fi
+	while IFS= read -r LIB; do
+		for DIR in "$LIB/steamapps/common/Doom 3" "$LIB/steamapps/common/DOOM 3"; do
+			is_classic_doom3 "$DIR" && { echo "$DIR"; return 0; }
+		done
+	done < <(steam_libraries)
+	# /usr/local/games/doom3 is dhewm3's own built-in default; /usr/share/games/doom3 is where
+	# Debian's game-data-packager installs the Doom 3 data.
+	for DIR in "$HOME/GOG Games/Doom 3" "$HOME/GOG Games/DOOM 3" \
+		/usr/local/games/doom3 /usr/share/games/doom3; do
+		is_classic_doom3 "$DIR" && { echo "$DIR"; return 0; }
+	done
+	return 1
+}
+
+DOOM3_DIR="${CHEXTREK_DOOM3_DIR:-}"
+REMEMBER=0
+ENGINE_ARGS=()
+while [ $# -gt 0 ]; do
+	case "$1" in
+	--doom3)
+		[ $# -ge 2 ] || fail "--doom3 needs a directory: --doom3 /path/to/Doom3"
+		DOOM3_DIR="$2"
+		REMEMBER=1
+		shift 2
+		;;
+	--doom3=*)
+		DOOM3_DIR="${1#--doom3=}"
+		REMEMBER=1
+		shift
+		;;
+	-h | --help)
+		usage
+		exit 0
+		;;
+	*)
+		ENGINE_ARGS+=("$1")
+		shift
+		;;
+	esac
+done
+
+if [ -n "$DOOM3_DIR" ]; then
+	is_classic_doom3 "$DOOM3_DIR" || fail "$(why_not_doom3 "$DOOM3_DIR")"
+	DOOM3_DIR="$(cd "$DOOM3_DIR" && pwd)"
+	if [ $REMEMBER -eq 1 ]; then
+		mkdir -p "$CONFIG_DIR" && printf '%s\n' "$DOOM3_DIR" >"$REMEMBERED"
+	fi
+else
+	DOOM3_DIR="$(find_doom3)" ||
+		fail "classic Doom 3 not found - run with --doom3 /path/to/Doom3 (the folder containing base/pak000.pk4), or set CHEXTREK_DOOM3_DIR."
+fi
+
+STAGE="${XDG_CACHE_HOME:-$HOME/.cache}/chextrek/doom3-base"
+mkdir -p "$STAGE"
+ln -sfn "${DOOM3_DIR}/base" "${STAGE}/base"
+
+export LD_LIBRARY_PATH="${HERE}/usr/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+exec "${HERE}/usr/bin/dhewm3" \
+	+set fs_basepath "${HERE}/usr/share/chextrek" \
+	+set fs_cdpath "$STAGE" \
+	+set fs_game chextrek \
+	+set fs_gameDllPath "${HERE}/usr/lib/chextrek" \
+	"${ENGINE_ARGS[@]}"

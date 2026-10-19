@@ -25,7 +25,7 @@ DHEWM3_TAG="1.5.5"
 DHEWM3_COMMIT="455b88e8dff2be822f08eb498f51b383e851fa38"
 DHEWM3_SRC="${DHEWM3_SRC:-$HOME/games/src/dhewm3}"
 # Keep in sync with tools/linux-native/build-image.sh.
-CHEXTREK_NATIVE_IMAGE="chextrek-linux-native:jammy-1"
+CHEXTREK_NATIVE_IMAGE="chextrek-linux-native:jammy-2"
 
 if ! command -v docker >/dev/null 2>&1 || ! docker image inspect "$CHEXTREK_NATIVE_IMAGE" >/dev/null 2>&1; then
 	echo "ENVIRONMENT: docker or the '${CHEXTREK_NATIVE_IMAGE}' image is missing - needed for the native Linux build."

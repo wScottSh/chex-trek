@@ -11,7 +11,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Keep this tag in sync with CHEXTREK_NATIVE_IMAGE in tools/build-chextrek.sh and
 # tools/linux-native/build-engine.sh.
-IMAGE="chextrek-linux-native:jammy-1"
+IMAGE="chextrek-linux-native:jammy-2"
 
 echo "==> Building ${IMAGE} from ${SCRIPT_DIR}/Dockerfile"
 docker build -t "$IMAGE" "$SCRIPT_DIR"
