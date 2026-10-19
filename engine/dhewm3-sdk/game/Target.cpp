@@ -1918,6 +1918,21 @@ END_CLASS
 
 /*
 ================
+idTarget_EndLevelGUI::idTarget_EndLevelGUI
+
+chextrek: 64-bit/gcc port. Spawn's ticSound = NULL (below) doesn't cover a savegame load:
+idRestoreGame::CreateObjects only constructs the object and calls Restore, never Spawn, and
+Restore re-posts EV_UpdateEndLevelStats for a save made mid-count - whose Event_UpdateStats then
+passes ticSound to StartSoundShader. Left to the constructor-less default it would be whatever the
+heap held, so whether that load crashes would depend on the platform's allocator.
+================
+*/
+idTarget_EndLevelGUI::idTarget_EndLevelGUI( void ) {
+	ticSound = NULL;
+}
+
+/*
+================
 idTarget_EndLevelGUI::~idTarget_EndLevelGUI
 ================
 */

@@ -602,7 +602,7 @@ idStr idStr::FormatTime( const char *format, int ms ) {
   - The `try { ... } CatchHandler` and `catch() { ... }` comments in `updateStats` and `FormatTime` span far past the functions and are not code. In `FormatTime`'s 'M' branch, `cVar1 = acStack_24[0]` ... `acStack_24[0] = cVar1` is register-allocation noise.
 - **Open questions (binary behavior, need an in-game check).**
   - `ticSound` is set only by `Event_Activate`, and only if the `s_shader` key exists. Nothing else initializes it (not `Spawn`, not a constructor), and it is not saved. After loading a save in which the screen was running, `Restore` restarts the tics, and `Event_UpdateStats` plays whatever `ticSound` holds.
-    - Fixed in the dhewm3 port (spec #33, crash risk, spec #28's "unless they crash" carve-out): `Spawn` sets `ticSound` to NULL, which `Event_UpdateStats` already treats as "no tic sound".
+    - Fixed in the dhewm3 port (spec #33, crash risk, spec #28's "unless they crash" carve-out): `Spawn` sets `ticSound` to NULL, which `Event_UpdateStats` already treats as "no tic sound". The 64-bit Linux port added a constructor that sets it to NULL too, since a load constructs and `Restore`s the object without ever calling `Spawn`, leaving the crash to whatever the platform's heap held.
   - `unknown2d4` is zeroed, saved and restored, and read nowhere in the binary's copy of this class. Possibly left over from an earlier version.
   - With `extHndNextMap` set, state 5 posts nothing more, so the GUI stays up until a script hides the entity (`idCustomUI::Event_Hide` unregisters it).
   - `FormatTime` copies the character after a field run as is, so fields must be separated ("hhmm" would print the hours, then a literal 'm'). The mod uses only "mm:ss:MMM".

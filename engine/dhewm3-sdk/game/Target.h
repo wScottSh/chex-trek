@@ -626,6 +626,7 @@ class idTarget_EndLevelGUI : public idCustomUI {
 public:
 	CLASS_PROTOTYPE( idTarget_EndLevelGUI );
 
+						idTarget_EndLevelGUI( void );
 						~idTarget_EndLevelGUI( void );
 
 	void				Spawn( void );
